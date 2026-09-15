@@ -6,10 +6,12 @@
  * arbetar just nu, och när den sist gjorde något — så att man kan läsa maskinparken utan att
  * gå fram till varje enskild maskin.
  *
- * Fyra spalter, en per gård, i gårdarnas egna färger.
+ * Fyra spalter, en per gård, i gårdarnas egna färger. Stommen och rubrikraden kommer ur
+ * skyltverket: tavlan ska läsas som Loggbokens syskon, inte som en annan produkt.
  */
 import * as THREE from 'three'
 import { CSS, TAL, rgba } from './palett.js'
+import { SANS, byggDuk, byggPlank, bakgrund, huvud, regel, spartext, vridMot } from './skyltverk.js'
 
 const BREDD = 15
 const HOJD = 8
@@ -46,32 +48,16 @@ export class Agenttavla {
     this.riktning = 0
     this.nyckel = ''
 
-    const stal = new THREE.MeshStandardMaterial({ color: TAL.stomme, roughness: 0.75, metalness: 0.3 })
-    for (const dx of [-BREDD / 2 + 1.4, BREDD / 2 - 1.4]) {
-      const ben = new THREE.Mesh(new THREE.BoxGeometry(0.45, BENHOJD + 1, 0.45), stal)
-      ben.position.set(dx, (BENHOJD + 1) / 2, 0)
-      ben.castShadow = true
-      this.grupp.add(ben)
-    }
-    const mittY = BENHOJD + HOJD / 2
-    const ram = new THREE.Mesh(new THREE.BoxGeometry(BREDD + 0.4, HOJD + 0.4, 0.26), stal)
-    ram.position.set(0, mittY, 0)
-    ram.castShadow = true
-    this.grupp.add(ram)
+    const { mittY } = byggPlank(this.grupp, {
+      bredd: BREDD,
+      hojd: HOJD,
+      benhojd: BENHOJD,
+      accent: TAL.sage,
+    })
+    const duk = byggDuk(this.grupp, { bredd: BREDD, hojd: HOJD, pixlar: PIXLAR, mittY })
+    this.duk = duk.duk
+    this.textur = duk.textur
 
-    this.duk = document.createElement('canvas')
-    this.duk.width = Math.round(BREDD * PIXLAR)
-    this.duk.height = Math.round(HOJD * PIXLAR)
-    this.textur = new THREE.CanvasTexture(this.duk)
-    this.textur.colorSpace = THREE.SRGBColorSpace
-    this.textur.anisotropy = 8
-
-    const skarm = new THREE.Mesh(
-      new THREE.PlaneGeometry(BREDD, HOJD),
-      new THREE.MeshBasicMaterial({ map: this.textur, toneMapped: false })
-    )
-    skarm.position.set(0, mittY, 0.15)
-    this.grupp.add(skarm)
     scene.add(this.grupp)
   }
 
@@ -88,89 +74,98 @@ export class Agenttavla {
     const c = this.duk.getContext('2d')
     const W = this.duk.width
     const H = this.duk.height
-    const pad = 40
+    const pad = 52
     const nu = Date.now()
 
     c.clearRect(0, 0, W, H)
-    const bak = c.createLinearGradient(0, 0, 0, H)
-    bak.addColorStop(0, CSS.natt)
-    bak.addColorStop(1, CSS.panel)
-    c.fillStyle = bak
-    c.fillRect(0, 0, W, H)
-    c.textBaseline = 'top'
-    c.textAlign = 'left'
+    bakgrund(c, W, H)
 
     const arbetar = maskiner.filter((m) => m.status === 'ok' && m.sistaLogg && nu - m.sistaLogg < AKTIV_MS).length
     const tysta = maskiner.filter((m) => m.status === 'ok').length - arbetar
     const trasiga = maskiner.filter((m) => m.status === 'fel').length
     const nere = maskiner.filter((m) => m.status === 'nere').length
 
-    c.font = '700 52px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = CSS.cream
-    c.fillText('AGENTERNA', pad, pad - 4)
-    c.font = '500 26px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = CSS.dampad
-    const rad = [
-      `${maskiner.length} maskiner`,
-      `${arbetar} arbetar`,
-      `${tysta} på tomgång`,
-      trasiga ? `${trasiga} fel` : '',
-      nere ? `${nere} nere` : '',
+    const y0 = huvud(c, {
+      W,
+      pad,
+      nummer: 'No. 02 · MASKINPARKEN',
+      titel: 'Agenterna',
+      under: `${maskiner.length} maskiner på fyra gårdar`,
+      accent: CSS.sage,
+      hoger: `${arbetar} ARBETAR`,
+      hogerFarg: CSS.gron,
+      skala: 0.88,
+    })
+
+    // Räkneverket som en rad siffror med etiketter under — editoriellt, inte som brickor.
+    const rutor = [
+      ['ARBETAR', arbetar, CSS.gron],
+      ['TOMGÅNG', tysta, CSS.dampad],
+      ['FEL', trasiga, trasiga ? CSS.crit : CSS.dampad],
+      ['NERE', nere, nere ? CSS.dampad : CSS.dampad],
     ]
-      .filter(Boolean)
-      .join('   ·   ')
-    c.fillText(rad, pad, pad + 62)
-    c.fillStyle = rgba('cream', 0.16)
-    c.fillRect(pad, pad + 104, W - pad * 2, 3)
+    rutor.forEach(([etikett, tal, farg], i) => {
+      const x = pad + i * 150
+      c.font = `400 48px ui-sans-serif, system-ui, sans-serif`
+      c.fillStyle = farg
+      c.fillText(String(tal), x, y0 - 8)
+      c.font = `600 18px ${SANS}`
+      c.fillStyle = rgba('cream', 0.35)
+      spartext(c, etikett, x, y0 + 46, 4)
+    })
+    regel(c, pad, y0 + 82, W - pad * 2, 0.1)
 
     // En spalt per gård.
     const spalter = this.falt.length
     const spaltBredd = (W - pad * 2) / spalter
+    const topp = y0 + 108
     this.falt.forEach((f, i) => {
       const x = pad + i * spaltBredd
+      const farg = `#${f.farg.toString(16).padStart(6, '0')}`
       const mina = maskiner.filter((m) => m.grupp === f.nyckel)
-      c.font = '700 24px ui-sans-serif, system-ui, sans-serif'
-      c.fillStyle = `#${f.farg.toString(16).padStart(6, '0')}`
-      c.fillText(f.namn, x, pad + 122)
 
-      let y = pad + 164
+      // Gårdens färg som ett kort streck över spalten, som ett sektionsmärke.
+      c.fillStyle = farg
+      c.fillRect(x, topp, 46, 4)
+      c.font = `600 20px ${SANS}`
+      c.fillStyle = farg
+      spartext(c, f.namn, x, topp + 18, 3)
+
+      let y = topp + 58
       for (const m of mina) {
-        if (y > H - pad - 30) break
+        if (y > H - pad - 24) break
         const aktiv = m.status === 'ok' && m.sistaLogg && nu - m.sistaLogg < AKTIV_MS
-        const farg = FARG[m.status] || FARG.okand
+        const sfarg = FARG[m.status] || FARG.okand
 
-        c.fillStyle = farg
+        c.fillStyle = sfarg
         c.beginPath()
-        c.arc(x + 7, y + 13, aktiv ? 7 : 5, 0, Math.PI * 2)
+        c.arc(x + 6, y + 13, aktiv ? 6.5 : 4.5, 0, Math.PI * 2)
         c.fill()
 
-        c.font = '600 25px ui-sans-serif, system-ui, sans-serif'
-        c.fillStyle = m.status === 'ok' ? CSS.cream : CSS.dampad
-        const namn = m.namn.replace(/^nexus-/, '')
-        c.fillText(namn, x + 24, y)
+        c.font = `500 24px ${SANS}`
+        c.fillStyle = m.status === 'ok' ? CSS.cream : rgba('cream', 0.42)
+        c.fillText(m.namn.replace(/^nexus-/, ''), x + 24, y)
 
-        c.font = '400 22px ui-sans-serif, system-ui, sans-serif'
-        c.fillStyle = CSS.dampad
-        const tid = m.status === 'ok' ? sedan(m.sistaLogg) : m.status === 'nere' ? 'nere' : 'fel'
+        c.font = `400 21px ${SANS}`
+        c.fillStyle = rgba('cream', 0.34)
         c.textAlign = 'right'
-        c.fillText(tid, x + spaltBredd - 24, y + 3)
+        c.fillText(m.status === 'ok' ? sedan(m.sistaLogg) : m.status === 'nere' ? 'nere' : 'fel', x + spaltBredd - 26, y + 3)
         c.textAlign = 'left'
 
-        y += 38
+        y += 37
       }
     })
+
+    c.font = `500 20px ${SANS}`
+    c.fillStyle = rgba('cream', 0.3)
+    spartext(c, 'NUC · DOCKER', pad, H - pad + 8, 4)
 
     this.textur.needsUpdate = true
   }
 
   update(dt, camera) {
     if (!this.grupp.visible) return
-    const mal = Math.atan2(camera.position.x - this.grupp.position.x, camera.position.z - this.grupp.position.z)
-    let diff = mal - this.riktning
-    while (diff > Math.PI) diff -= Math.PI * 2
-    while (diff < -Math.PI) diff += Math.PI * 2
-    this.riktning += diff * Math.min(1, dt * 1.2)
-    this.grupp.rotation.y = this.riktning
+    this.riktning = vridMot(this.grupp, camera, this.riktning, dt)
   }
 
   dispose() {

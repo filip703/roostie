@@ -9,13 +9,13 @@
  * timme gammalt. Till höger allt som väntar på någon — varje notis som är ställd till en
  * mottagare, med vem den kom ifrån och vem den ligger hos.
  *
- * Skärmen vrider sig långsamt mot kameran i stället för att snäppa: en byggnad i den här
- * storleken som hoppar runt sin axel ser ut som ett fel, och det är en skärm man ska kunna
- * gå fram till och läsa.
+ * Stommen och typografin kommer ur skyltverket, som alla skyltar i kolonin: samma ram, samma
+ * rubrikrad, samma tunna linjer. Skillnaden mellan tavlorna ska vara vad de säger, inte hur
+ * de är byggda.
  */
 import * as THREE from 'three'
-import { bryt } from './anslagstavla.js'
 import { CSS, FAS, TAL, rgba } from './palett.js'
+import { MONO, SANS, SERIF, byggDuk, byggPlank, bakgrund, bryt, huvud, regel, spartext, vridMot } from './skyltverk.js'
 
 const BREDD = 18
 const HOJD = 10
@@ -51,56 +51,31 @@ export class Tavlan {
     this.rader = []
     this.vantar = []
 
-    const stalMat = new THREE.MeshStandardMaterial({ color: TAL.stomme, roughness: 0.72, metalness: 0.35 })
-
-    for (const dx of [-BREDD / 2 + 1.8, BREDD / 2 - 1.8]) {
-      const ben = new THREE.Mesh(new THREE.BoxGeometry(0.55, BENHOJD + 1.2, 0.55), stalMat)
-      ben.position.set(dx, (BENHOJD + 1.2) / 2, 0)
-      ben.castShadow = true
-      this.grupp.add(ben)
-      const fot = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.3, 1.6), stalMat)
-      fot.position.set(dx, 0.15, 0)
-      fot.receiveShadow = true
-      this.grupp.add(fot)
-      // Snedsträva bakåt — en skylt i den här storleken behöver se ut att stå emot vind.
-      const strava = new THREE.Mesh(new THREE.BoxGeometry(0.28, BENHOJD * 1.2, 0.28), stalMat)
-      strava.position.set(dx, BENHOJD * 0.5, -1.6)
-      strava.rotation.x = 0.5
-      this.grupp.add(strava)
-    }
-
-    const mittY = BENHOJD + HOJD / 2
-    const ram = new THREE.Mesh(new THREE.BoxGeometry(BREDD + 0.5, HOJD + 0.5, 0.3), stalMat)
-    ram.position.set(0, mittY, 0)
-    ram.castShadow = true
-    this.grupp.add(ram)
-
-    this.duk = document.createElement('canvas')
-    this.duk.width = Math.round(BREDD * PIXLAR)
-    this.duk.height = Math.round(HOJD * PIXLAR)
-    this.textur = new THREE.CanvasTexture(this.duk)
-    this.textur.colorSpace = THREE.SRGBColorSpace
-    this.textur.anisotropy = 8
-
-    // MeshBasic: skärmen lyser av sig själv och ska gå att läsa också mitt i natten.
-    this.skarm = new THREE.Mesh(
-      new THREE.PlaneGeometry(BREDD, HOJD),
-      new THREE.MeshBasicMaterial({ map: this.textur, toneMapped: false })
-    )
-    this.skarm.position.set(0, mittY, 0.17)
-    this.grupp.add(this.skarm)
+    const { mittY, stal } = byggPlank(this.grupp, {
+      bredd: BREDD,
+      hojd: HOJD,
+      benhojd: BENHOJD,
+      accent: TAL.clay,
+    })
+    const duk = byggDuk(this.grupp, { bredd: BREDD, hojd: HOJD, pixlar: PIXLAR, mittY })
+    this.duk = duk.duk
+    this.textur = duk.textur
 
     // Två strålkastare på överkanten, ren rekvisita — de lyser inte, de ser ut att göra det.
     const lampMat = new THREE.MeshStandardMaterial({
       color: TAL.cream,
       emissive: TAL.honey,
-      emissiveIntensity: 0.5,
+      emissiveIntensity: 0.55,
       roughness: 0.5,
     })
     for (const dx of [-BREDD / 4, BREDD / 4]) {
-      const lampa = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 0.5), lampMat)
-      lampa.position.set(dx, mittY + HOJD / 2 + 0.45, 0.5)
-      lampa.rotation.x = 0.5
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 1.1), stal)
+      arm.position.set(dx, mittY + HOJD / 2 + 0.5, 0.45)
+      arm.rotation.x = -0.35
+      this.grupp.add(arm)
+      const lampa = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.34, 0.9, 8), lampMat)
+      lampa.position.set(dx, mittY + HOJD / 2 + 0.62, 0.92)
+      lampa.rotation.x = Math.PI / 2 - 0.55
       this.grupp.add(lampa)
     }
 
@@ -133,44 +108,40 @@ export class Tavlan {
     const c = this.duk.getContext('2d')
     const W = this.duk.width
     const H = this.duk.height
-    const pad = 46
+    const pad = 58
     const spalt = Math.round(W * 0.6)
 
     c.clearRect(0, 0, W, H)
-    const bak = c.createLinearGradient(0, 0, 0, H)
-    bak.addColorStop(0, CSS.natt)
-    bak.addColorStop(1, CSS.panel)
-    c.fillStyle = bak
-    c.fillRect(0, 0, W, H)
-    c.textBaseline = 'top'
-    c.textAlign = 'left'
+    bakgrund(c, W, H)
 
-    // ── rubrikrad ──────────────────────────────────────────────────────────────────
-    c.font = '700 58px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = CSS.cream
-    c.fillText('LOGGBOKEN', pad, pad - 4)
-    c.font = '500 28px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = CSS.dampad
-    c.fillText('tavlan trådarna delar', pad + 330, pad + 20)
+    const y0 = huvud(c, {
+      W,
+      pad,
+      nummer: 'No. 01 · LOGGBOKEN',
+      titel: 'Loggboken',
+      under: 'tavlan trådarna delar',
+      accent: CSS.clay,
+      hoger: 'LIVE',
+      hogerFarg: CSS.sage,
+    })
 
+    // Live-pricken ligger vid ordet, inte på egen plats — en detalj, inte en komponent.
     c.fillStyle = CSS.gron
     c.beginPath()
-    c.arc(W - pad - 10, pad + 20, 10, 0, Math.PI * 2)
+    c.arc(W - pad - 96, pad + 20, 9, 0, Math.PI * 2)
     c.fill()
-    c.textAlign = 'right'
-    c.font = '500 26px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = CSS.dampad
-    c.fillText('LIVE', W - pad - 32, pad + 6)
-    c.textAlign = 'left'
 
-    c.fillStyle = rgba('cream', 0.16)
-    c.fillRect(pad, pad + 76, W - pad * 2, 3)
     // Spaltlinjen mellan flödet och väntelistan.
     c.fillStyle = rgba('cream', 0.1)
-    c.fillRect(spalt - 30, pad + 96, 2, H - pad * 2 - 96)
+    c.fillRect(spalt - 34, y0 - 10, 2, H - y0 - pad + 10)
 
-    this._flode(c, pad, pad + 100, spalt - 70)
-    this._vantar(c, spalt, pad + 100, W - spalt - pad)
+    this._flode(c, pad, y0, spalt - 76 - pad)
+    this._vantar(c, spalt, y0, W - spalt - pad)
+
+    // Sidfot i editoriell stil: var raderna kommer ifrån, och var vi är i bläddringen.
+    c.font = `500 22px ${SANS}`
+    c.fillStyle = rgba('cream', 0.32)
+    spartext(c, 'ROOST · NX_LOGGBOK', pad, H - pad + 6, 4)
 
     this.textur.needsUpdate = true
   }
@@ -180,94 +151,89 @@ export class Tavlan {
     const start = (this.sida % sidor) * PER_SIDA
     const sida = this.rader.slice(start, start + PER_SIDA)
 
-    c.font = '600 26px ui-sans-serif, system-ui, sans-serif'
+    c.textAlign = 'left'
+    c.font = `600 24px ${SANS}`
     c.fillStyle = CSS.dampad
-    c.fillText('SENASTE', x, y0)
+    spartext(c, 'SENASTE', x, y0, 5)
     if (this.rader.length > PER_SIDA) {
       c.textAlign = 'right'
+      c.font = `500 24px ${MONO}`
       c.fillText(`${(this.sida % sidor) + 1} / ${sidor}`, x + bredd, y0)
       c.textAlign = 'left'
     }
 
-    let y = y0 + 48
-    const radhojd = 128
+    let y = y0 + 52
+    const radhojd = 126
     for (const r of sida) {
       const farg = FASFARG[r.fas] || CSS.dampad
 
-      c.font = '500 32px ui-monospace, SFMono-Regular, Menlo, monospace'
-      c.fillStyle = CSS.dampad
-      c.fillText(klocka(r.nar), x, y + 4)
+      c.font = `500 30px ${MONO}`
+      c.fillStyle = rgba('cream', 0.45)
+      c.fillText(klocka(r.nar), x, y + 6)
 
+      // Fasen är ett streck i marginalen, inte en bricka. Linjer, inte boxar.
       c.fillStyle = farg
-      c.fillRect(x + 128, y - 2, 7, radhojd - 34)
+      c.fillRect(x + 122, y + 2, 5, radhojd - 42)
 
-      c.font = '700 32px ui-sans-serif, system-ui, sans-serif'
+      c.font = `600 30px ${SANS}`
       c.fillStyle = farg
-      c.fillText(String(r.trad || '').toUpperCase(), x + 156, y)
+      spartext(c, String(r.trad || '').toUpperCase(), x + 150, y, 3)
 
-      c.font = '500 22px ui-sans-serif, system-ui, sans-serif'
-      c.fillStyle = CSS.dampad
-      c.fillText(FASNAMN[r.fas] || r.fas || '', x + 156, y + 40)
+      c.font = `500 21px ${SANS}`
+      c.fillStyle = rgba('cream', 0.38)
+      spartext(c, FASNAMN[r.fas] || r.fas || '', x + 150, y + 40, 4)
 
-      const x0 = x + 156 + 260
-      c.font = '400 32px ui-sans-serif, system-ui, sans-serif'
+      const x0 = x + 150 + 248
+      c.font = `400 33px ${SERIF}`
       c.fillStyle = CSS.cream
-      bryt(c, r.rubrik, bredd - (x0 - x), 2).forEach((rad, i) => c.fillText(rad, x0, y + i * 40))
+      bryt(c, r.rubrik, bredd - (x0 - x), 2).forEach((rad, i) => c.fillText(rad, x0, y + i * 42))
 
       y += radhojd
-      c.fillStyle = rgba('cream', 0.07)
-      c.fillRect(x, y - 22, bredd, 2)
+      regel(c, x, y - 24, bredd, 0.07)
     }
   }
 
   _vantar(c, x, y0, bredd) {
-    c.font = '600 26px ui-sans-serif, system-ui, sans-serif'
+    c.textAlign = 'left'
+    c.font = `600 24px ${SANS}`
     c.fillStyle = CSS.clay
-    c.fillText('VÄNTAR PÅ NÅGON', x, y0)
+    spartext(c, 'VÄNTAR PÅ NÅGON', x, y0, 5)
 
     if (!this.vantar.length) {
-      c.font = '400 30px ui-sans-serif, system-ui, sans-serif'
+      c.font = `italic 400 30px ${SERIF}`
       c.fillStyle = CSS.dampad
-      c.fillText('Ingenting ligger och väntar.', x, y0 + 54)
+      c.fillText('Ingenting ligger och väntar.', x, y0 + 56)
       return
     }
 
-    let y = y0 + 54
+    let y = y0 + 56
     for (const v of this.vantar) {
-      if (y > this.duk.height - 120) break
-      // Grön prick = mottagaren har skrivit något efteråt. Bärnsten = orörd.
+      if (y > this.duk.height - 130) break
+      // Grön prick = mottagaren har skrivit något efteråt. Lera = orörd.
       c.fillStyle = v.svarat ? CSS.gron : CSS.clay
       c.beginPath()
-      c.arc(x + 9, y + 16, 9, 0, Math.PI * 2)
+      c.arc(x + 8, y + 15, 8, 0, Math.PI * 2)
       c.fill()
 
-      c.font = '700 26px ui-sans-serif, system-ui, sans-serif'
+      c.font = `600 24px ${SANS}`
       c.fillStyle = v.svarat ? CSS.sage : CSS.clay
-      const huvud = `${String(v.fran || '').toUpperCase()} → ${v.till}`
-      c.fillText(huvud, x + 32, y)
+      spartext(c, `${String(v.fran || '').toUpperCase()} → ${String(v.till || '').toUpperCase()}`, x + 30, y, 3)
 
-      c.font = '400 28px ui-sans-serif, system-ui, sans-serif'
+      c.font = `400 29px ${SERIF}`
       c.fillStyle = v.svarat ? CSS.dampad : CSS.cream
       const utan = String(v.rubrik || '').replace(/^\s*TILL\s+[^:–—-]{1,28}\s*[:–—-]\s*/i, '')
-      const rader = bryt(c, utan, bredd - 32, 2)
-      rader.forEach((rad, i) => c.fillText(rad, x + 32, y + 36 + i * 34))
+      const rader = bryt(c, utan, bredd - 30, 2)
+      rader.forEach((rad, i) => c.fillText(rad, x + 30, y + 36 + i * 36))
 
-      y += 36 + rader.length * 34 + 26
-      c.fillStyle = rgba('cream', 0.06)
-      c.fillRect(x, y - 14, bredd, 2)
+      y += 36 + rader.length * 36 + 28
+      regel(c, x, y - 16, bredd, 0.06)
     }
   }
 
   /** Vrider sig mot kameran, och bläddrar flödet så att hela tavlan syns över tid. */
   update(dt, camera) {
     if (!this.grupp.visible) return
-
-    const mal = Math.atan2(camera.position.x - this.grupp.position.x, camera.position.z - this.grupp.position.z)
-    let diff = mal - this.riktning
-    while (diff > Math.PI) diff -= Math.PI * 2
-    while (diff < -Math.PI) diff += Math.PI * 2
-    this.riktning += diff * Math.min(1, dt * 1.2)
-    this.grupp.rotation.y = this.riktning
+    this.riktning = vridMot(this.grupp, camera, this.riktning, dt)
 
     if (this.rader.length > PER_SIDA) {
       this.sidklocka += dt
