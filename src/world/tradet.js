@@ -625,6 +625,38 @@ export class Tradet {
     return ut
   }
 
+  /**
+   * Var barnens holkar hänger på barken.
+   *
+   * Ovanför grenfläkten (som slutar på y=25) och åt var sitt håll, på den del av stammen som
+   * vetter mot kameran. Uppe är den enda ytan i bilden som är tom — grenarna, lövet och
+   * kronmassan ligger under bonas plan, och det var med flit. Holkarna får den ytan.
+   */
+  holkplatser(i, antal) {
+    const n = Math.max(1, antal)
+    // Symmetriskt kring mitten: ett barn hamnar mitt på, två flankerar, fler fördelas jämnt.
+    const spann = Math.PI * 0.42
+    const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1
+    const vinkel = Math.PI / 2 - t * spann * 0.5
+    // Utanför barkribborna, inte på cylindern. Ribborna sticker ut till drygt 63 enheter,
+    // så en holk på stammens egen radie hamnar BAKOM barken och syns inte alls — det var
+    // precis vad första bilden visade: två namnskyltar som svävade framför en tom vägg.
+    const rad = STAM_R * 1.22
+    return {
+      punkt: new THREE.Vector3(Math.cos(vinkel) * rad, 36 - Math.abs(t) * 2, Math.sin(vinkel) * rad),
+      /**
+       * Holken tittar MEST MOT KAMERAN, inte rakt ut från stammen.
+       *
+       * Rakt ut är det riktiga svaret för en holk på ett träd, och det var det första
+       * försöket — men då vände holken längst till vänster sin framsida uppåt vänster, och
+       * mätaren på framsidan gick inte att läsa. En mätare som bara går att läsa från ena
+       * hållet är ingen mätare. En tredjedel av vinkeln räcker för att den ska sitta på
+       * stammen och inte sväva framför den.
+       */
+      vinkel: (Math.PI / 2 - vinkel) * 0.35,
+    }
+  }
+
   /** Hålet i stammen. Kvar för kolonins skull; i mega-trädet är det barkens mitt i bild. */
   stamhal() {
     return new THREE.Vector3(0, 14, STAM_R * 1.02)

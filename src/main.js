@@ -537,7 +537,9 @@ engine.canvas.addEventListener('pointermove', (e) => {
   const p = ndc(e)
   const agent = colony.pick(p.x, p.y, p.aspect)
   hoverId = agent?.id ?? null
-  colony.astronauts.setHover(agent)
+  // Hover-ringen hör astronauterna till och ligger på marken. I trädet finns varken ring
+  // eller mark, så en träff utan `pos` får inte skickas dit.
+  colony.astronauts.setHover(agent?.pos ? agent : null)
   // Pointing at a quiet plot is what makes its name appear.
   const plot = plotUnder(e, p)
   colony.setHoveredPlot(plot)

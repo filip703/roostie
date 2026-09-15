@@ -37,12 +37,22 @@ const konfig = () => ({
 })
 
 /**
- * Barnens egna färger.
+ * Barnens egna färger, och varför ordningen är omvänd mot vad jag bad om.
  *
- * Bill är blå och Tod är grön i Roost, och kolonin ska inte hitta på egna. Färgen hör hemma i
- * Roosts data — kommer den med i budgeten (`farg`) vinner den. Tills läsvägen bär den läses
- * `ROOSTIE_BARNFARGER` ur miljön: en JSON-karta namn→#rrggbb. Saknas båda får fyren använda
- * statusfärgen som förut, och då ljuger den inte — den säger bara mindre.
+ * Bill är blå och Tod är grön i Roost — Filips egna ord den 15 september. Kolonin ska inte
+ * hitta på egna färger, så jag bad Ledning (tavlans rad 174) att lägga färgen i läsvägen och
+ * tänkte låta den vinna över kopian i miljön.
+ *
+ * DEN 15 SEPTEMBER BÖRJADE `/api/roostie` BÄRA `farg` — men den säger `#B5562B` för Bill och
+ * `#6B6B3A` för Tod. Det är rost och oliv ur Roosts palett, inte blått och grönt. Läsvägen
+ * bär alltså EN färg, men inte den färg Filip sagt att barnen har, och köksskärmen ritade
+ * Bill i rost i några timmar innan det upptäcktes.
+ *
+ * Därför vinner `ROOSTIE_BARNFARGER` tills vidare: en uttalad uppgift från Filip slår ett
+ * värde ingen bekräftat. Kopian är fortfarande fel plats för färgen, och raden till Ledning
+ * står kvar — den dagen läsvägen säger blått och grönt tas miljövariabeln bort och det här
+ * stycket med. Saknas båda får fyren statusfärgen som förut; då ljuger den inte, den säger
+ * bara mindre.
  */
 const HEX = /^#[0-9a-f]{6}$/i
 let barnfargerCache = null
@@ -138,11 +148,10 @@ function tolka(rad) {
       kvar,
       // Andelen mot ram, aldrig mot tak. Se filhuvudet.
       andel: ram > 0 ? Math.max(0, Math.min(1, kvar / ram)) : 0,
-      // Barnets egen färg när någon vet den: läsvägen först, miljön sedan, annars ingen.
+      // Filips uttalade färg först, läsvägen sedan, annars ingen. Se filhuvudet.
       farg:
-        typeof b?.farg === 'string' && HEX.test(b.farg.trim())
-          ? b.farg.trim().toLowerCase()
-          : barnfarger().get(String(b?.namn || '')) || null,
+        barnfarger().get(String(b?.namn || '')) ||
+        (typeof b?.farg === 'string' && HEX.test(b.farg.trim()) ? b.farg.trim().toLowerCase() : null),
     }
   })
 

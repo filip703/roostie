@@ -22,6 +22,7 @@ import { Skarmtidsfyr } from '../world/skarmtidsfyr.js'
 import { Tradmatare } from '../world/tradmatare.js'
 import { Tradet, arstidNu } from '../world/tradet.js'
 import { Faglar } from '../world/faglar.js'
+import { Holkar } from '../world/holkar.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
 import { MAX_AGENT_CAP } from '../core/settings.js'
@@ -177,6 +178,8 @@ export class Colony {
      */
     this.tradet = new Tradet(scene)
     this.faglar = new Faglar(scene)
+    // Barnens holkar hänger på trädets bark och får sina platser av trädet självt.
+    this.holkar = new Holkar(scene, (i, n) => this.tradet.holkplatser(i, n))
     this.varld = 'koloni'
     this.astronauts = new Astronauts(scene, settings)
     this.astronauts.world = this._world()
@@ -348,6 +351,7 @@ export class Colony {
       varld: this.varld,
       faglar: this.faglar.faglar.size,
       trad: this.varld === 'trad' ? this.tradet.diagnos() : null,
+      holkar: this.varld === 'trad' ? this.holkar.diagnos() : null,
       sysslor:
         this.varld === 'trad'
           ? this.faglar.oversikt().map((b) => `${b.namn}: ${b.ord}`)
@@ -409,6 +413,7 @@ export class Colony {
 
     this.tradet.setVisible(trad)
     this.faglar.setVisible(trad)
+    this.holkar.setVisible(trad)
 
     /**
      * Kronans egen luft.
@@ -593,6 +598,9 @@ export class Colony {
    */
   setPuls(data) {
     this.skarmtidsfyr.set(data)
+    // Samma data, två världar: fyren står i kolonin, holkarna hänger i trädet. Båda räknar
+    // med samma regler, så de kan aldrig säga olika saker om samma barn.
+    this.holkar.set(data)
     // Samma slag i barken. Fyren och trädet får aldrig säga olika saker om samma minut.
     if (this.skarmtidsfyr.slagKo > 0 || [...this.skarmtidsfyr.barn.values()].some((b) => b.slagKo > 0)) this.tradet.slag()
     this.maskinpark.setPuls(data)
@@ -1086,6 +1094,7 @@ export class Colony {
       this.tradet.setNatt(night)
       this.tradet.update(dt)
       this.faglar.update(dt, this.camera, night)
+      this.holkar.update(dt, this.camera)
     }
 
     this._growBuildings(dt)
@@ -1223,7 +1232,11 @@ export class Colony {
       if (!this._strale) this._strale = new THREE.Raycaster()
       this._strale.setFromCamera({ x: ndcX, y: ndcY }, this.camera)
       const trad = this.faglar.traffa(this._strale)
-      return trad ? trad.id : null
+      // Samma FORM som kolonins träff, inte bara id:t. Kolonin lämnade en sträng här, och
+      // sidan kastade på varje musrörelse över en fågel (`setHover` läser `pos.x`) medan
+      // klicket valde `undefined`. En funktion som returnerar två olika sorters svar i två
+      // världar är ett fel som väntar på att hända — det gjorde det samma dag.
+      return trad ? { id: trad.id, trad, itradet: true } : null
     }
     return this.astronauts.pick(this.camera, ndcX, ndcY, aspect)
   }
@@ -1253,6 +1266,7 @@ export class Colony {
     this.tradmatare.dispose()
     this.tradet.dispose()
     this.faglar.dispose()
+    this.holkar.dispose()
     this.astronauts.dispose()
     this.indicators.dispose()
     this.particles.dispose()
