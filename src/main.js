@@ -11,6 +11,8 @@ import { crewRig, loadCrew } from './agents/crew.js'
 import { TIMES } from './world/sky.js'
 import {
   fetchThreads,
+  fetchTavlan,
+  fetchMaskiner,
   fetchState,
   saveState,
   openThread,
@@ -657,6 +659,14 @@ async function poll() {
     const res = await fetchThreads()
     applyThreads(res.threads || [])
     hud.removeBoot()
+    // Billboarden och maskinparken hämtas i samma varv, men får inte kunna fälla pollen:
+    // astronauterna är det viktiga, de två andra är utsikt.
+    fetchTavlan()
+      .then((t) => colony.setTavla(t))
+      .catch(() => {})
+    fetchMaskiner()
+      .then((m) => colony.setMaskiner(m.maskiner || []))
+      .catch(() => {})
   } catch (err) {
     hud.toast(err.message || 'Could not reach the thread scanner', 'err')
     hud.removeBoot()

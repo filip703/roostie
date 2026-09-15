@@ -15,6 +15,8 @@ import {
 import { createBuilding, buildingUniforms, Scaffolds } from '../world/buildings.js'
 import { Ship } from '../world/ship.js'
 import { Anslagstavla } from '../world/anslagstavla.js'
+import { Tavlan } from '../world/tavlan.js'
+import { Maskinpark } from '../world/maskinpark.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
 import { MAX_AGENT_CAP } from '../core/settings.js'
@@ -142,6 +144,11 @@ export class Colony {
     // landar, inte bara ovanför den astronaut som råkar hålla upp handen.
     const tavlaPlats = shipPosition()
     this.anslagstavla = new Anslagstavla(scene, { x: tavlaPlats.x + 8.2, y: 0, z: tavlaPlats.z + 5.2 })
+    // Billboarden står utanför plätterna, bakom skeppet sett från kolonin, så den syns över
+    // taken utan att stå i vägen för en enda tomt.
+    this.tavlan = new Tavlan(scene, { x: tavlaPlats.x - 15, y: 0, z: tavlaPlats.z - 6 })
+    // Maskinparken: NUC:ens containrar, på egen mark bredvid kolonin.
+    this.maskinpark = new Maskinpark(scene, { x: tavlaPlats.x + 4, y: 0, z: tavlaPlats.z + 26 })
     this.astronauts = new Astronauts(scene, settings)
     this.astronauts.world = this._world()
     // Sized for the largest preset rather than the current one: unlike the astronaut meshes these
@@ -193,8 +200,11 @@ export class Colony {
     const ship = shipPosition()
     this.ship.group.position.y = terrainHeight(ship.x, ship.z, this.planet)
     // Samma sak för skylten: stolparna ska stå i marken, inte i luften ovanför den.
-    const tavla = this.anslagstavla.grupp.position
-    tavla.y = terrainHeight(tavla.x, tavla.z, this.planet)
+    for (const sak of [this.anslagstavla, this.tavlan, this.maskinpark]) {
+      const p = sak.grupp.position
+      p.y = terrainHeight(p.x, p.z, this.planet)
+    }
+    this.maskinpark.markhojd((x, z) => terrainHeight(x, z, this.planet))
 
     this._dustTint.set(this.planet.ground.high)
   }
@@ -221,6 +231,16 @@ export class Colony {
     }
     const ship = shipPosition()
     clear.push({ x: ship.x, z: ship.z, r: 7.5 })
+    // Roosts egna byggen håller undan stenarna själva: en billboard med ett block genom
+    // duken, eller en maskinpark full av buskar, ser ut som ett fel snarare än som natur.
+    for (const [sak, r] of [
+      [this.tavlan, 11],
+      [this.anslagstavla, 4],
+      [this.maskinpark, this.maskinpark.radie()],
+    ]) {
+      const p = sak.grupp.position
+      clear.push({ x: p.x, z: p.z, r })
+    }
     this.scatterGroup = createScatter(this.planet, this.settings.get('scatterDensity'), clear)
     this.worldGroup.add(this.scatterGroup)
     this._scatterFootprint = this._plotFootprint()
@@ -262,6 +282,16 @@ export class Colony {
     this.particles.onSettingsChanged(changed)
     if (changed.has('showLabels')) this._syncLabels()
     if (changed.has('timeOfDay')) this.sky.setTime(this.settings.get('timeOfDay'))
+  }
+
+  /** Loggbokens rader och väntelista → billboarden. */
+  setTavla(data) {
+    this.tavlan.set(data)
+  }
+
+  /** NUC:ens containrar → maskinparken. */
+  setMaskiner(maskiner) {
+    this.maskinpark.set(maskiner)
   }
 
   // ── roster ──────────────────────────────────────────────────────────────────────────
@@ -733,6 +763,8 @@ export class Colony {
     buildingUniforms.uTime.value = elapsed
     this.ship.update(dt, elapsed, night)
     this.anslagstavla.update(this.camera)
+    this.tavlan.update(dt, this.camera)
+    this.maskinpark.update(dt, this.camera)
 
     this._growBuildings(dt)
     this.astronauts.update(dt, elapsed)
@@ -886,6 +918,8 @@ export class Colony {
     this.sky.dispose()
     this.ship.dispose()
     this.anslagstavla.dispose()
+    this.tavlan.dispose()
+    this.maskinpark.dispose()
     this.astronauts.dispose()
     this.indicators.dispose()
     this.particles.dispose()

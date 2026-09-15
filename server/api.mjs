@@ -11,6 +11,8 @@ import {
   openThread as harnessOpenThread,
   scanThreads,
 } from './scan.mjs'
+import { senasteRader } from './harnesses/roost-loggbok.mjs'
+import { laesMaskiner } from './maskiner.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.BOT_CROSSING_DATA || path.join(here, '..', 'data')
@@ -372,6 +374,19 @@ export async function apiMiddleware(req, res, next) {
 
     if (url.pathname === '/api/harnesses' && req.method === 'GET') {
       return send(res, 200, { harnesses: await harnessStatus() })
+    }
+
+    /**
+     * Roosts egna två vyer: raderna på Loggboken (billboarden) och NUC:ens containrar
+     * (maskinparken). De hör inte till harness-sömmen — en harness beskriver trådar — så de
+     * ligger som egna moduler och är det enda stället den här filen känner till Roost.
+     */
+    if (url.pathname === '/api/tavlan' && req.method === 'GET') {
+      return send(res, 200, await senasteRader(Number(url.searchParams.get('antal')) || 40))
+    }
+
+    if (url.pathname === '/api/maskiner' && req.method === 'GET') {
+      return send(res, 200, await laesMaskiner())
     }
 
     if (url.pathname === '/api/state' && req.method === 'GET') {

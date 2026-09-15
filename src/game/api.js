@@ -16,6 +16,12 @@ const post = (url, payload) =>
 
 export const fetchThreads = () => req('/api/threads')
 
+/** Loggbokens senaste rader — det billboarden i kolonin visar. */
+export const fetchTavlan = () => req('/api/tavlan')
+
+/** NUC:ens containrar, som maskinparken ritar. */
+export const fetchMaskiner = () => req('/api/maskiner')
+
 /**
  * The colony file, and the base every later save is measured against.
  *

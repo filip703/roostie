@@ -69,6 +69,24 @@ function tid(varde) {
 const text = (v, max) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, max)
 
 /**
+ * Vem en notis är ställd till.
+ *
+ * Trådarna skriver sina förfrågningar i tre former: "TILL FILIP: …", "TILL NEXUS: …" och
+ * rapportformatets "Säg till Produkt att …" / "Be Box & moln kolla …". Alla tre är samma
+ * sak — någon väntar på någon — och kolonin ska kunna visa dem utan att man öppnar chatten.
+ *
+ * Hittas ingen mottagare är raden ett meddelande till alla, inte en förfrågan.
+ */
+function mottagare(rubrik) {
+  const r = String(rubrik || '')
+  const till = /^\s*TILL\s+([^:–—-]{1,28})\s*[:–—-]/i.exec(r)
+  if (till) return till[1].trim().toUpperCase()
+  const sag = /\b(?:säg till|be)\s+([A-Za-zÅÄÖåäö&\s-]{2,24}?)\s+(?:att|kolla|ta|höra|bygga|svara|besluta)/i.exec(r)
+  if (sag) return sag[1].trim().toUpperCase()
+  return ''
+}
+
+/**
  * Trådens eget samtal i claude.ai, ur ROOSTIE_CHATTAR. Bara https till claude.ai släpps
  * igenom — adressen kommer ur miljön, men den hamnar i en länk som öppnas med ett klick,
  * och en länk man inte läst innan man klickar ska inte kunna peka vart som helst.
@@ -185,12 +203,22 @@ async function scanThreads() {
     // med som `notis` — det är den som hamnar på anslagstavlan vid landningsplattan.
     const tillFilip = r.filter((x) => x.fas === 'notis' && /TILL FILIP/i.test(x.rubrik))
     const vinkar = tillFilip.length > 0
+    const sista = tillFilip[tillFilip.length - 1]
+
+    // Allt tråden bett någon om, inte bara Filip — det är det som gör tavlan läsbar utifrån.
+    const vantar = r
+      .filter((x) => x.fas === 'notis' && mottagare(x.rubrik))
+      .slice(-5)
+      .reverse()
+      .map((x) => ({ till: mottagare(x.rubrik), rubrik: text(x.rubrik, 160), text: text(x.text, 300), nar: x.nar }))
 
     const projectPath = await repoSokvag(info.repo)
     tradar.push({
       id: ID(trad),
       title: info.namn,
-      preview: text(senaste.rubrik, 240),
+      // Håller tråden upp handen är det frågan som ska stå på kortet, inte det senaste den
+      // gjorde: ett `?` man måste öppna chatten för att förstå är bara en prick.
+      preview: vinkar ? text(`${sista.rubrik} — ${sista.text}`, 240) : text(senaste.rubrik, 240),
       project: info.zon,
       projectPath,
       worktree: '',
@@ -204,7 +232,9 @@ async function scanThreads() {
       lastFocusedAt: 0,
       running: pagar,
       unread: vinkar,
-      notis: vinkar ? text(tillFilip[tillFilip.length - 1].rubrik, 160) : '',
+      notis: vinkar ? text(sista.rubrik, 160) : '',
+      notisText: vinkar ? text(sista.text, 400) : '',
+      vantar,
       hasError: senaste.fas === 'stoppat',
       starred: false,
       routine: '',
@@ -248,6 +278,46 @@ async function detect() {
 /** Syns i HUD:en när tavlan går att nå men inte att läsa. */
 async function diagnostic() {
   return cache.fel || ''
+}
+
+/**
+ * De senaste raderna på tavlan, trimmade — kolonins billboard läser dem.
+ *
+ * Samma cache som skanningen, så billboarden kostar inget extra anrop mot Loggboken.
+ */
+export async function senasteRader(antal = 40) {
+  const { rader, fardig } = await tavlan()
+  if (!rader) return { rader: [], vantar: [], fel: cache.fel }
+  const alla = rader
+    .map((r) => ({
+      trad: String(r?.trad || '').trim().toLowerCase(),
+      fas: String(r?.fas || ''),
+      rubrik: text(r?.rubrik, 180),
+      text: text(r?.text, 240),
+      nar: tid(r?.created_at),
+    }))
+    .filter((r) => r.nar > 0 && TRAD_OK.test(r.trad))
+    .sort((a, b) => b.nar - a.nar)
+
+  /**
+   * Allt som väntar på någon — inte bara på Filip.
+   *
+   * En notis med en mottagare är en fråga som ligger kvar tills den som fick den skriver
+   * något efteråt. Det är trubbigt och det är med flit: tavlan har ingen "besvarad"-kolumn,
+   * så kolonin visar frågan tills mottagaren rört sig, och låter människan avgöra resten.
+   */
+  const rort = new Map()
+  for (const r of alla) if (!rort.has(r.trad)) rort.set(r.trad, r.nar)
+  const vantar = []
+  for (const r of alla) {
+    const till = mottagare(r.rubrik)
+    if (r.fas !== 'notis' || !till) continue
+    const nyckel = till.toLowerCase().replace(/\s+/g, '-').replace('&', '')
+    const svarat = [...rort.entries()].some(([t, nar]) => nyckel.startsWith(t.slice(0, 5)) && nar > r.nar)
+    vantar.push({ fran: r.trad, till, rubrik: r.rubrik, text: r.text, nar: r.nar, svarat })
+  }
+
+  return { rader: alla.slice(0, Math.max(1, Math.min(60, antal))), vantar: vantar.slice(0, 12), fel: fardig ? '' : cache.fel }
 }
 
 /** Bara för testerna: tvinga en ny läsning vid nästa skanning, men behåll senast kända läge. */
