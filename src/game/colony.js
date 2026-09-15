@@ -289,6 +289,29 @@ export class Colony {
     if (changed.has('timeOfDay')) this.sky.setTime(this.settings.get('timeOfDay'))
   }
 
+  /**
+   * Utsikterna köksskärmen turnerar mellan.
+   *
+   * Kolonin har vuxit förbi en enda kamerabana: billboarden står bakom skeppet, gårdarna
+   * ligger utanför plätterna och Filips skylt syns bara framifrån. En skärm som står still i
+   * ett kök ska visa allt det där i tur och ordning i stället för att stirra på mitten.
+   *
+   * Det som inte finns att se hoppas över — en tom gård eller en släckt skylt är ingen utsikt.
+   */
+  utsiktspunkter() {
+    const ut = [{ namn: 'kolonin', punkt: new THREE.Vector3(0, 0, 0), avstand: 64 }]
+    const kandidater = [
+      ['loggboken', this.tavlan, 30],
+      ['filips skylt', this.anslagstavla, 20],
+      ['agenterna', this.agenttavla, 28],
+      ['maskinparken', this.maskinpark, 58],
+    ]
+    for (const [namn, sak, avstand] of kandidater) {
+      if (sak?.grupp?.visible) ut.push({ namn, punkt: sak.grupp.position.clone(), avstand })
+    }
+    return ut
+  }
+
   /** Loggbokens rader och väntelista → billboarden, och Filips egen skylt vid skeppet. */
   setTavla(data) {
     this.tavlan.set(data)

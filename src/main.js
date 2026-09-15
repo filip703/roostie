@@ -740,6 +740,23 @@ async function boot() {
     localStorage.setItem('botcrossing.seen-help', '1')
     hud.toggleUi(false)
     hud.setOrbit(actions.toggleOrbit())
+
+    /**
+     * Rundturen. Kolonin har vuxit förbi en enda kamerabana — billboarden står bakom skeppet,
+     * gårdarna ligger utanför plätterna — så köksskärmen flyttar blicken en gång i minuten
+     * och hinner runt hela kolonin på några minuter.
+     *
+     * Banan fortsätter mellan hållplatserna, så bilden står aldrig still.
+     */
+    let vy = 0
+    const turnera = () => {
+      const punkter = colony.utsiktspunkter()
+      if (!punkter.length) return
+      const v = punkter[vy++ % punkter.length]
+      rig.focus(v.punkt, { distance: v.avstand })
+    }
+    setTimeout(turnera, 6000)
+    setInterval(turnera, 45000)
     return
   }
 
