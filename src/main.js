@@ -76,6 +76,7 @@ if (new URLSearchParams(location.search).get('debug') === '1') {
   window.addEventListener('unhandledrejection', (e) => notera(e.reason?.stack || e.reason))
   // Också som ett attribut på <html>: ett verktyg som granskar sidan utifrån delar DOM med
   // den, men inte `window` — och redovisningen är värdelös om den bara går att läsa inifrån.
+  window.__roostieRig = rig
   setInterval(() => {
     try {
       // Tidsstämplad: Chrome strypar timers i en bakgrundsflik, så en diagnos kan vara en
@@ -218,7 +219,7 @@ const actions = {
   flygTill: (namn) => {
     const v = colony.flygTill(namn)
     if (!v) return
-    rig.focus(v.punkt, { distance: v.avstand, polar: v.lutning })
+    rig.focus(v.punkt, { distance: v.avstand, polar: v.lutning, azimuth: v.azimut })
   },
 
   /**
@@ -834,12 +835,26 @@ async function boot() {
    */
   if (new URLSearchParams(location.search).get('varld') === 'trad') {
     colony.setVarld('trad')
-    // Kameran byter karaktär: den kretsar kring en STAM i stället för att panorera på en
-    // mark, och målet får ha en höjd. Utan det går kronan inte att titta på.
-    rig.setTradlage(true, TRADHOJD * 0.95)
+    /**
+     * Kameraburen. Måtten kommer ur scenen i `tradet.js`: barkväggen står på z=55, bona
+     * ligger mellan z=88 och z=105, och överblicken står på z=158. Burens uppgift är att
+     * inget drag och ingen scroll ska kunna ta bilden dit det inte finns något att se.
+     */
+    rig.setScen({
+      bredd: 58,
+      hojdMin: -16,
+      hojdMax: 46,
+      djupMin: 60,
+      djupMax: 112,
+      azimut: 0.42,
+      polarMin: 1.12,
+      polarMax: 1.96,
+      avstandMin: 14,
+      avstandMax: 96,
+    })
     hudTrad()
-    // Första bilden är ÖVERBLICKEN, hela trädet i ram. Det var det Filip inte fick.
-    actions.flygTill?.('hela trädet')
+    // Första bilden är ÖVERBLICKEN: sju bon i en ram. Det var det Filip inte fick.
+    actions.flygTill?.('överblick')
   }
 
   /**

@@ -552,7 +552,10 @@ export class Hud {
     block.hidden = !utsikter.length && !bon.length
     if (block.hidden) return
 
-    const nyckel = utsikter.map((u) => u.namn).join('|') + '~' + bon.map((b) => `${b.id}:${b.lage}:${b.rader}`).join('|')
+    const nyckel =
+      utsikter.map((u) => u.namn).join('|') +
+      '~' +
+      bon.map((b) => `${b.id}:${b.lage}:${b.rader}:${b.ungar}:${b.skatter}`).join('|')
     if (this._last.trad === nyckel) return
     this._last.trad = nyckel
 
@@ -577,7 +580,7 @@ export class Hud {
       b.innerHTML =
         `<i class="swatch" style="background:${hex(bo.farg)};color:${hex(bo.farg)}"></i>` +
         `<span class="n">${escapeHtml(bo.namn)}</span>` +
-        `<span class="lage ${bo.lage}">${lageOrd(bo.lage)}</span>`
+        `<span class="lage ${bo.lage}">${lageOrd(bo.lage)}${bo.skatter > 0 ? ` (${bo.skatter})` : ''}</span>`
       b.addEventListener('click', () => this.actions.flygTill?.(bo.id))
       bWrap.appendChild(b)
     }
@@ -1014,12 +1017,26 @@ function nearestTime(value) {
 }
 
 /** Fågelns läge i ett ord, för trädets karta. */
+/**
+ * Sysslan i ord.
+ *
+ * Panelen är den överblick Filip bad om — "bra att se alla fåglar samtidigt eller iaf i en
+ * överblick". En fågel kan vara skymd av ett löv för stunden; raden här kan inte. Orden är
+ * desamma som `sysslor.js` använder, för en tråd ska inte heta en sak i bilden och en annan
+ * i listan.
+ */
 function lageOrd(lage) {
-  if (lage === 'flyger') return 'flyger'
-  if (lage === 'sjunger') return 'vill dig'
-  if (lage === 'stoppat') return 'stoppat'
-  if (lage === 'sover') return 'sover'
-  return 'sitter'
+  return (
+    {
+      larmar: 'larmar',
+      ruvar: 'ruvar åt dig',
+      sjunger: 'vill dig',
+      matar: 'matar ungarna',
+      bygger: 'bygger boet',
+      pysslar: 'pysslar',
+      sover: 'sover',
+    }[lage] || lage
+  )
 }
 
 /** Statusen på svenska — samma ord som resten av kolonin använder. */

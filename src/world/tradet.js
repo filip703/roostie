@@ -1,53 +1,69 @@
 /**
- * Trädet — Roostie 2.0:s värld.
+ * MEGA-TRÄDET — Roosts krona, sedd inifrån.
  *
- * Kolonins plättar och maskinpark var en plats där saker STOD. Filips besked 15 sep var att
- * det här ska LEVA: "allt rörligt, super epic", och ett kolossalt träd sett underifrån.
+ * DET SOM VAR FEL. Första trädet var ett helt träd: sextiotvå enheter från rot till topp,
+ * hela silhuetten i bild. Det gav tre fel på en gång, och alla tre var samma fel i olika
+ * förklädnad. Fåglarna blev några pixlar (de skulle rymmas i samma bild som ett helt träd).
+ * Navigeringen blev omöjlig (det fanns inget att titta PÅ, bara något att titta på UTIFRÅN).
+ * Överblicken fanns inte (sju bon på var sitt håll runt en stam går inte att se samtidigt).
  *
- * Det är en kravlista, inte en stämning:
- *   · trädet rör sig HELA TIDEN, inte bara när data ändras. Ett träd som står still mellan
- *     två polls är ett diagram med bark på.
- *   · kronan fyller himlen. Kameran börjar nere vid roten och tittar upp.
- *   · på natten lyser det inifrån. Bioluminiscens i barken, i lövkanterna, i fröna som
- *     driver uppåt — det är det som gör att ögat läser "levande" och inte "modell".
+ * DET SOM ÄR NYTT, och det är Filips idé: trädet är så stort att det inte får plats. Vi ser
+ * en barkvägg som går ur bild uppåt och nedåt, och sju grenar som sticker ut ur den mot oss.
+ * Det är allt. Resten av trädet finns — det anas i diset ovanför och under — men det ska
+ * aldrig in i bilden, för i samma sekund som hela trädet får plats är fågeln en pixel igen.
  *
- * Det är VÅRT träd. Idén om ett jättelikt levande träd är allmän; Avatars faktiska design är
- * någon annans, och kolonin ritar Roosts former i Roosts palett.
+ * Vinsten är hela problemet löst på en gång:
+ *   · Bona kommer till kameran i stället för tvärtom. Sju bon, en bild, inget sökande.
+ *   · Måttet är satt av fågeln, inte av trädet. En fågel är fyrtio pixlar hög i överblicken
+ *     och två hundra när man flyger dit — och det är den siffran bygget är kontrollerat mot.
+ *   · "Mega" blir en upplevelse i stället för ett tal. En stam som går ur bild är större än
+ *     en stam man ser hela, hur hög man än gör den.
  *
- * HUR DET HÅLLER SEXTIO BILDER I SEKUNDEN PÅ EN KÖKSSKÄRM: allt trä är EN sammanslagen
- * geometri och ett anrop, alla löv är EN instansierad mesh, alla frön en till. Vinden ligger
- * i shadern — varje vertex bär hur böjlig den är (`aBoj`), noll vid rotens fäste och ett ute
- * i bladspetsen, så hela trädet vaggar av en enda uniform i stället för av hundra
- * matrisuppdateringar per bild.
+ * SCENEN (allt i enheter, kameran står i +Z och tittar mot -Z):
+ *   stammen    en cylinder med radie 55 kring origo, från -190 till +190 i höjd
+ *   grenarna   sju, ut ur barken mellan z=+40 och z=+55, med boet 90–110 enheter fram
+ *   kameran    överblicken står i (0, 18, 158) och tittar på (0, 16, 88)
+ *
+ * TRÄDET LEVER. Avatar-tråden Filip drog är inte lövverk, den är ÅDROR: ljus som vandrar
+ * uppåt i barken, starkare på natten, och som flammar till när något händer i Roost. Vinden
+ * går genom varje löv och varje hängande liana i samma shader, så hela kronan andas i takt
+ * utan att kosta ett enda extra ritanrop.
  */
 import * as THREE from 'three'
-import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { TAL } from './palett.js'
 
-/** Trädets höjd i världsenheter. Kolonins astronauter är ~1,7 — det här är ett berg. */
+/** Stammens radie. Den enda siffra som avgör om trädet känns som en vägg eller som ett träd. */
+export const STAM_R = 55
+/** Hur långt upp och ner stammen går. Den ska aldrig ta slut inom bild. */
+const STAM_H = 380
+/** Kronans mått, för kamerans spärrar. */
 export const TRADHOJD = 62
-/**
- * Stammens radie vid foten.
- *
- * Första försöket var 3,4 och blev en ek: en pinne med kvistar. Ett kolossalt träd känns
- * kolossalt på PROPORTIONEN — en stam som är nästan en åttondel av höjden, som en ceiba eller
- * ett banyanträd. Det är de träden Filip menar när han säger Avatar; filmens egen design är
- * någon annans, men silhuetten den bygger på är verklighetens, och den får vi rita.
- */
-const STAMRADIE = 7.2
-/** Så högt upp stammen går innan den delar sig. En lång ren pelare är halva intrycket. */
-const FORSTA_GRENEN = 0.52
-const MAXDJUP = 5
 
-/** Årstiderna. Lövfärgen är det enda som byts — formen är trädets, året runt. */
+/**
+ * Var de sju bona hänger — scenens komposition, i klartext.
+ *
+ * Hand­satta, inte utslumpade. Avstånden till kameran ligger mellan 62 och 78 enheter för
+ * alla sju, vilket är vad som gör att ingen fågel är stor och ingen är en prick. Höjderna
+ * växlar (hög, låg, hög, låg …) så att grenarna inte skymmer varandra, och de yttre står
+ * längre fram än de inre så att fläkten böjer sig kring kameran i stället för bort från den.
+ */
+export const SLOTTAR = [
+  { x: -27, y: 22, z: 101, vrid: -0.5 },
+  { x: -18, y: 7, z: 95, vrid: -0.3 },
+  { x: -9, y: 24, z: 91, vrid: -0.14 },
+  { x: 1, y: 9, z: 87, vrid: 0.02 },
+  { x: 10, y: 25, z: 92, vrid: 0.16 },
+  { x: 19, y: 8, z: 96, vrid: 0.32 },
+  { x: 28, y: 21, z: 102, vrid: 0.5 },
+]
+
 export const ARSTIDER = {
-  var: { lov: [0x8fb07a, 0xa3bd84, 0x7fa07f], blom: 0xe6c7c0, tathet: 0.92, glod: 0.55 },
-  sommar: { lov: [0x6e8f72, 0x7fa07f, 0x5f8069], blom: null, tathet: 1, glod: 0.45 },
-  host: { lov: [0xc9785e, 0xd7a85f, 0xb0693e], blom: null, tathet: 0.9, glod: 0.7 },
-  vinter: { lov: [0x8ea19a, 0x7d938c], blom: 0xe8ede8, tathet: 0.24, glod: 0.9 },
+  var: { lov: 0x7fa07f, under: 0x92a68e, ton: 0.22 },
+  sommar: { lov: 0x5f8a63, under: 0x7fa07f, ton: 0.16 },
+  host: { lov: 0xa85f40, under: 0x8a6634, ton: 0.3 },
+  vinter: { lov: 0x6f7f78, under: 0x92a68e, ton: 0.1 },
 }
 
-/** Vilken årstid kalendern säger. Trädet följer huset, inte en inställning. */
 export function arstidNu(datum = new Date()) {
   const m = datum.getMonth()
   if (m <= 1 || m === 11) return 'vinter'
@@ -56,562 +72,686 @@ export function arstidNu(datum = new Date()) {
   return 'host'
 }
 
+const BARK = 0x6b5748
+const BARK_DJUP = 0x3a2e25
+const GREN = 0x6d5744
+
 const fro = (seed) => {
   let s = seed >>> 0
   return () => ((s = (s * 1664525 + 1013904223) >>> 0), s / 4294967296)
 }
 
-const UPP = new THREE.Vector3(0, 1, 0)
-
 /**
- * Vindshadern.
+ * Vinden, injicerad i vilket standardmaterial som helst.
  *
- * Läggs på vilket standardmaterial som helst med `onBeforeCompile`, precis som byggnadernas
- * avslöjandeshader i 1.0. Två vågor med olika takt, för att en enda sinus läser som en
- * maskin som svänger — inte som luft.
+ * Varje vertex bär `aBoj` — noll vid fästet, ett längst ut — och böjs av två vågor med olika
+ * period. Två vågor och inte en, för en enda våg får hela kronan att vifta i takt som en
+ * publik, medan två som inte går jämnt ut aldrig upprepar sig synligt.
  */
-function vindShader(mat, uniforms, instansierad = false) {
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uTid = uniforms.uTid
-    shader.uniforms.uVind = uniforms.uVind
-    shader.vertexShader = shader.vertexShader
+function vindShader(mat, u, instansierad = false) {
+  mat.onBeforeCompile = (s) => {
+    s.uniforms.uTid = u.tid
+    s.uniforms.uVind = u.vind
+    s.vertexShader = s.vertexShader
       .replace(
         '#include <common>',
         `#include <common>
-         uniform float uTid;
-         uniform float uVind;
          attribute float aBoj;
-         vec3 roostVind(vec3 p, float boj, float fas) {
-           float b = boj * uVind;
-           p.x += sin(uTid * 0.9 + p.y * 0.055 + fas) * b;
-           p.z += cos(uTid * 0.62 + p.y * 0.041 + fas * 1.7) * b * 0.8;
-           p.x += sin(uTid * 2.3 + p.y * 0.2 + fas * 3.0) * b * 0.22;
-           return p;
-         }`
+         uniform float uTid;
+         uniform float uVind;`
       )
       .replace(
         '#include <begin_vertex>',
-        instansierad
-          ? `#include <begin_vertex>
-             float roostFas = instanceMatrix[3][0] * 0.7 + instanceMatrix[3][2] * 0.4;
-             transformed = roostVind(transformed + vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]) * 0.0, aBoj, roostFas);`
-          : `#include <begin_vertex>
-             transformed = roostVind(transformed, aBoj, position.x * 0.3 + position.z * 0.2);`
+        `#include <begin_vertex>
+         float b = aBoj;
+         ${instansierad ? 'vec3 wp = (instanceMatrix * vec4(transformed, 1.0)).xyz;' : 'vec3 wp = transformed;'}
+         float f1 = sin(uTid * 0.9 + wp.x * 0.035 + wp.y * 0.02);
+         float f2 = sin(uTid * 1.63 + wp.z * 0.041);
+         transformed.x += b * uVind * (f1 * 1.0 + f2 * 0.55);
+         transformed.z += b * uVind * (f2 * 0.8 - f1 * 0.35);
+         transformed.y -= b * uVind * abs(f1) * 0.25;`
       )
   }
-  mat.customProgramCacheKey = () => 'roost-vind' + (instansierad ? '-i' : '')
+  mat.customProgramCacheKey = () => (instansierad ? 'vind-i' : 'vind')
+  return mat
 }
 
 /**
- * Bioluminiscensen i barken.
+ * Ådrorna i barken — det som gör att trädet lever och inte bara står.
  *
- * Ådror som vandrar uppåt längs stammen och slocknar i dagsljus. Skrivet som ett tillägg i
- * fragmentshadern i stället för en textur: trädet är procedurellt och har ingen UV-karta
- * värd namnet, och en ådra som följer HÖJDEN läser som sav som stiger.
+ * Ljus som vandrar uppför stammen i smala band. Dagtid är de nätt och jämnt synliga, som
+ * fukt i veden; på natten lyser de. `uPuls` flammar när Roost gör något — det är samma slag
+ * som fyren och tavlan får, så hela scenen reagerar på samma händelse.
  */
-function adershader(mat, uniforms) {
-  const gammal = mat.onBeforeCompile
-  mat.onBeforeCompile = (shader) => {
-    if (gammal) gammal(shader)
-    shader.uniforms.uTid = uniforms.uTid
-    shader.uniforms.uNatt = uniforms.uNatt
-    shader.uniforms.uPuls = uniforms.uPuls
-    shader.uniforms.uAdra = uniforms.uAdra
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\n varying float vHojd;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\n vHojd = position.y;')
-    shader.fragmentShader = shader.fragmentShader
+function adershader(mat, u) {
+  mat.onBeforeCompile = (s) => {
+    s.uniforms.uTid = u.tid
+    s.uniforms.uNatt = u.natt
+    s.uniforms.uPuls = u.puls
+    s.vertexShader = s.vertexShader
+      .replace('#include <common>', '#include <common>\n varying vec3 vAder;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n vAder = position;')
+    s.fragmentShader = s.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
-         varying float vHojd;
+         varying vec3 vAder;
          uniform float uTid;
          uniform float uNatt;
-         uniform float uPuls;
-         uniform vec3 uAdra;`
+         uniform float uPuls;`
       )
       .replace(
         '#include <dithering_fragment>',
         `#include <dithering_fragment>
-         float v = sin(vHojd * 0.42 - uTid * 1.1) * 0.5 + 0.5;
-         v = pow(v, 6.0);
-         float stig = smoothstep(0.0, 14.0, vHojd) * (1.0 - smoothstep(34.0, 58.0, vHojd));
-         gl_FragColor.rgb += uAdra * v * stig * uNatt * (0.35 + uPuls * 0.85);`
+         float vink = atan(vAder.z, vAder.x);
+         // Tre band med olika varv, så mönstret aldrig går jämnt upp och upprepar sig.
+         float band = sin(vink * 7.0 + vAder.y * 0.07) * 0.5
+                    + sin(vink * 13.0 - vAder.y * 0.045) * 0.3
+                    + sin(vink * 3.0 + vAder.y * 0.02) * 0.2;
+         float ader = smoothstep(0.62, 0.97, band);
+         // Vandringen uppåt: ljuset går mot kronan, aldrig ner.
+         float vag = 0.45 + 0.55 * sin(vAder.y * 0.11 - uTid * 0.75);
+         float styrka = ader * vag * (0.1 + uNatt * 0.5 + uPuls * 0.7);
+         gl_FragColor.rgb += vec3(0.42, 0.78, 0.66) * styrka;`
       )
   }
-  mat.customProgramCacheKey = () => 'roost-adror'
+  mat.customProgramCacheKey = () => 'ader'
+  return mat
+}
+
+/** En avsmalnande gren längs en kurva. Tube ger jämntjockt; ringarna skalas om efteråt. */
+function grenGeometri(kurva, r0, r1, langd = 26, radiella = 7) {
+  const g = new THREE.TubeGeometry(kurva, langd, 1, radiella, false)
+  const pos = g.attributes.position
+  const boj = new Float32Array(pos.count)
+  const mitt = new THREE.Vector3()
+  for (let i = 0; i <= langd; i++) {
+    const t = i / langd
+    kurva.getPointAt(t, mitt)
+    const r = THREE.MathUtils.lerp(r0, r1, t * t * 0.7 + t * 0.3)
+    for (let j = 0; j <= radiella; j++) {
+      const k = i * (radiella + 1) + j
+      pos.setXYZ(
+        k,
+        mitt.x + (pos.getX(k) - mitt.x) * r,
+        mitt.y + (pos.getY(k) - mitt.y) * r,
+        mitt.z + (pos.getZ(k) - mitt.z) * r
+      )
+      // Böjningen växer med kuben av avståndet ut: stammen står stilla, spetsen svajar.
+      boj[k] = t * t * t
+    }
+  }
+  g.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
+  g.computeVertexNormals()
+  return g
 }
 
 export class Tradet {
   constructor(scene) {
     this.scene = scene
     this.grupp = new THREE.Group()
-    this.grupp.name = 'tradet'
+    this.grupp.name = 'megatrad'
     this.grupp.visible = false
     scene.add(this.grupp)
 
-    this.uniforms = {
-      uTid: { value: 0 },
-      uVind: { value: 1 },
-      uNatt: { value: 0.8 },
-      uPuls: { value: 0 },
-      uAdra: { value: new THREE.Color(TAL.honey) },
+    this.u = {
+      tid: { value: 0 },
+      vind: { value: 0.5 },
+      natt: { value: 0 },
+      puls: { value: 0 },
     }
-    this.arstid = arstidNu()
-    this.natt = 0.8
-    this.puls = 0
+    this.arstid = ARSTIDER.sommar
+    this.tid = 0
+    this._pulsKo = 0
+    this._grenar = []
+    this._material = []
+    this._geometrier = []
 
-    /** Grenändar som något kan sitta på: bon, holkar, lianor. Fylls av skelettet. */
-    this.grenar = []
-    this.toppar = []
-
-    this._bygg()
+    this._stam()
+    this._grenfläkt()
+    this._hang()
+    this._dis()
   }
 
-  // ── skelettet ────────────────────────────────────────────────────────────────────────
-  /**
-   * Grenverket, fröat.
-   *
-   * Samma frö ger samma träd varje gång containern startar — en koloni som ser annorlunda ut
-   * efter varje omstart går inte att känna igen, och att känna igen sitt eget träd är halva
-   * poängen med att ha ett.
-   */
-  _skelett() {
-    const r = fro(0x7a11d)
-    const bitar = []
-
-    const gren = (start, riktning, langd, radie, djup) => {
-      const slut = start.clone().addScaledVector(riktning, langd)
-      bitar.push({ start: start.clone(), slut, radie, djup, riktning: riktning.clone() })
-      this.grenar.push({ start: start.clone(), slut: slut.clone(), radie, djup, riktning: riktning.clone() })
-
-      if (djup >= MAXDJUP || langd < 2.2) {
-        this.toppar.push({ p: slut.clone(), djup, riktning: riktning.clone() })
-        return
-      }
-      /**
-       * Kronan svepar UT och sedan NER.
-       *
-       * En vanlig rekursion som bara pekar uppåt ger en ek. Ett jätteträd har en krona som
-       * vecklar ut sig som ett paraply och vars yttersta grenar hänger — det är den
-       * silhuetten ögat känner igen som "urskog", och den kommer av två saker: en kraftig
-       * utsvepning på djup ett, och en lutning som blir NEGATIV längst ut.
-       */
-      const antal = djup === 0 ? 6 : djup === 1 ? 3 : r() < 0.34 ? 3 : 2
-      for (let i = 0; i < antal; i++) {
-        const varv = (i / antal) * Math.PI * 2 + r() * 0.9 + djup * 1.3
-        // lut mäts från lodrätt: liten = uppåt, stor = utåt, över PI/2 = nedåt.
-        const lut =
-          djup === 0
-            ? 1.02 + r() * 0.3 // första grenarna nästan vågräta — paraplyt öppnar sig
-            : djup === 1
-              ? 1.15 + r() * 0.35
-              : 1.25 + r() * 0.55 // längst ut hänger de
-        const ny = new THREE.Vector3(Math.cos(varv) * Math.sin(lut), Math.cos(lut), Math.sin(varv) * Math.sin(lut))
-        // Dra mot förälderns riktning, annars startar varje gren om från noll och trädet
-        // blir en buske. Svagare dragning på djup noll, så paraplyt får öppna sig.
-        ny.lerp(riktning, djup === 0 ? 0.18 : 0.4).normalize()
-        gren(slut, ny, langd * (djup === 0 ? 0.82 : 0.72 + r() * 0.12), radie * (djup === 0 ? 0.44 : 0.62), djup + 1)
-      }
-    }
-
-    // En lång, ren pelare först. Sedan öppnar sig kronan.
-    gren(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.01, 1, 0.008).normalize(), TRADHOJD * FORSTA_GRENEN, STAMRADIE, 0)
-    return bitar
+  _mat(m) {
+    this._material.push(m)
+    return m
   }
 
-  /** Hur böjlig en punkt är: noll vid rotfästet, ett i bladspetsen. Det är vinden. */
-  _boj(djup, y) {
-    const avDjup = djup / MAXDJUP
-    const avHojd = Math.min(1, Math.max(0, y / TRADHOJD))
-    return Math.pow(avDjup * 0.62 + avHojd * 0.38, 1.6)
+  _geo(g) {
+    this._geometrier.push(g)
+    return g
   }
 
-  _bygg() {
-    const bitar = this._skelett()
+  // ── stammen ───────────────────────────────────────────────────────────────────────────
 
-    // ── trät: en enda sammanslagen geometri, ett anrop ──────────────────────────────
-    // (grenarna först, sedan rötterna — luftrötterna hänger i grenar som måste finnas)
-    const geos = []
-    for (const b of bitar) {
-      const langd = b.start.distanceTo(b.slut)
-      const sidor = b.djup === 0 ? 11 : b.djup === 1 ? 8 : 5
-      const g = new THREE.CylinderGeometry(b.radie * 0.68, b.radie, langd, sidor, 1, false)
-      const q = new THREE.Quaternion().setFromUnitVectors(UPP, b.riktning.clone().normalize())
-      const m = new THREE.Matrix4().compose(
-        b.start.clone().addScaledVector(b.riktning, langd / 2),
-        q,
-        new THREE.Vector3(1, 1, 1)
+  _stam() {
+    const r = fro(0x5eed)
+    const g = new THREE.Group()
+
+    const barkMat = this._mat(
+      adershader(
+        new THREE.MeshStandardMaterial({ color: BARK, roughness: 0.95, metalness: 0, flatShading: true }),
+        this.u
       )
-      g.applyMatrix4(m)
-      const n = g.attributes.position.count
-      const boj = new Float32Array(n)
-      for (let i = 0; i < n; i++) boj[i] = this._boj(b.djup, g.attributes.position.getY(i))
-      g.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
-      geos.push(g)
+    )
+
+    // Själva pelaren. Lågt antal segment med flatShading ger fasetterna som resten av
+    // kolonin är byggd av — den här scenen ska se ut som samma värld, inte som ett annat spel.
+    const stam = new THREE.Mesh(this._geo(new THREE.CylinderGeometry(STAM_R * 1.04, STAM_R * 1.22, STAM_H, 26, 6, true)), this._mat(adershader(new THREE.MeshStandardMaterial({ color: BARK_DJUP, roughness: 0.98, metalness: 0, flatShading: true }), this.u)))
+    stam.receiveShadow = true
+    g.add(stam)
+
+    // Barkribborna. Det är de, inte cylindern, som gör att ytan läses som bark när man står
+    // sju enheter ifrån den — en slät cylinder är en pelare, en räfflad är ett träd.
+    const ribbMat = this._mat(
+      adershader(
+        new THREE.MeshStandardMaterial({ color: BARK, roughness: 1, metalness: 0, flatShading: true }),
+        this.u
+      )
+    )
+    const ribbor = []
+    for (let i = 0; i < 60; i++) {
+      const v = (i / 60) * Math.PI * 2 + r() * 0.05
+      const bred = 4.5 + r() * 7
+      const djup = 4.5 + r() * 6
+      const h = STAM_H * (0.7 + r() * 0.5)
+      const geo = new THREE.BoxGeometry(bred, h, djup)
+      geo.translate(0, (r() - 0.5) * 40, 0)
+      geo.rotateY(-v)
+      geo.translate(Math.cos(v) * STAM_R * 1.06, 0, Math.sin(v) * STAM_R * 1.06)
+      ribbor.push(geo)
     }
+    const ribb = new THREE.Mesh(this._geo(sammanfoga(ribbor)), ribbMat)
+    ribb.castShadow = true
+    ribb.receiveShadow = true
+    g.add(ribb)
 
-    /**
-     * Strävrötterna.
-     *
-     * Inte koner — PLATTOR. En ceibas strävrötter är tunna, höga skivor som löper ut från
-     * stammen som stödmurar, och mellanrummen mellan dem är rum man kan gå in i. Det är det
-     * som ger ett jätteträd sin skala: något litet får plats under det.
-     */
-    const rr = fro(0x110c7)
-    const ROTPLATTOR = 11
-    for (let i = 0; i < ROTPLATTOR; i++) {
-      const a = (i / ROTPLATTOR) * Math.PI * 2 + rr() * 0.12
-      const hojd = 15 + rr() * 8
-      const langd = 13 + rr() * 7
-      // En skiva som är hög vid stammen och tunnar ut mot marken: en kil, lagd på kant.
-      const platta = new THREE.BoxGeometry(langd, hojd, 1.5 + rr() * 1.1, 1, 3, 1)
-      const pos = platta.attributes.position
-      for (let v = 0; v < pos.count; v++) {
-        const x = pos.getX(v)
-        const y = pos.getY(v)
-        // Överkanten lutar ner mot marken, underkanten följer marken: en stödmur.
-        const ut = (x + langd / 2) / langd // 0 vid stammen, 1 längst ut
-        pos.setY(v, y > 0 ? hojd / 2 - ut * hojd * 0.92 : -hojd / 2 + ut * hojd * 0.44)
-        pos.setZ(v, pos.getZ(v) * (1 - ut * 0.55))
-      }
-      platta.computeVertexNormals()
-      platta.translate(langd / 2 + STAMRADIE * 0.55, hojd / 2, 0)
-      platta.rotateY(-a)
-      const n = platta.attributes.position.count
-      const boj = new Float32Array(n) // rötter rör sig inte
-      platta.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
-      geos.push(platta)
+    // Mossa och lav i fläckar, bara på den sida som vetter mot kameran — det är den enda
+    // som syns, och en fläck på baksidan är en ritkostnad utan en enda betraktare.
+    const mossMat = this._mat(new THREE.MeshStandardMaterial({ color: 0x4f6b53, roughness: 1, flatShading: true }))
+    const moss = []
+    for (let i = 0; i < 26; i++) {
+      const v = Math.PI * 0.18 + r() * Math.PI * 0.64
+      const y = (r() - 0.5) * 210
+      const s = 4 + r() * 11
+      const geo = new THREE.IcosahedronGeometry(s, 0)
+      geo.scale(1, 0.55 + r() * 0.5, 0.26)
+      geo.rotateY(-v)
+      geo.translate(Math.cos(v) * STAM_R * 1.1, y, Math.sin(v) * STAM_R * 1.1)
+      moss.push(geo)
     }
+    g.add(new THREE.Mesh(this._geo(sammanfoga(moss)), mossMat))
 
-    /**
-     * Luftrötterna: pelare som går från de tunga grenarna rakt ner i marken, som på ett
-     * banyanträd. De är det som gör att kronan känns TUNG — den bärs, den svävar inte.
-     */
-    const la = fro(0x4e77)
-    const barande = this.grenar.filter((g) => g.djup === 1 && g.slut.y > TRADHOJD * 0.5)
-    for (let i = 0; i < 14; i++) {
-      const g = barande[Math.floor(la() * barande.length)]
-      if (!g) continue
-      const topp = g.slut.clone().lerp(g.start, la() * 0.5)
-      const markpunkt = new THREE.Vector3(topp.x * (0.82 + la() * 0.25), 0, topp.z * (0.82 + la() * 0.25))
-      const h = topp.y
-      const rot = new THREE.CylinderGeometry(0.42 + la() * 0.3, 1.1 + la() * 0.6, h, 6, 1, false)
-      const mitt = topp.clone().add(markpunkt).multiplyScalar(0.5)
-      const riktning = topp.clone().sub(markpunkt).normalize()
-      const q = new THREE.Quaternion().setFromUnitVectors(UPP, riktning)
-      rot.applyMatrix4(new THREE.Matrix4().compose(mitt, q, new THREE.Vector3(1, 1, 1)))
-      const n = rot.attributes.position.count
-      const boj = new Float32Array(n)
-      rot.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
-      geos.push(rot)
-    }
-
-    const traMat = new THREE.MeshStandardMaterial({ color: 0x4a3726, roughness: 0.94, metalness: 0.02, flatShading: true })
-    vindShader(traMat, this.uniforms)
-    adershader(traMat, this.uniforms)
-    this.traMat = traMat
-
-    const tra = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(geos, false), traMat)
-    tra.castShadow = true
-    tra.receiveShadow = true
-    this.grupp.add(tra)
-    this.tra = tra
-    geos.forEach((g) => g.dispose())
-
-    this._lov()
-    this._lianor()
-    this._fron()
-    this._markljus()
+    this.stam = g
+    this.grupp.add(g)
   }
 
-  // ── lövverket ────────────────────────────────────────────────────────────────────────
-  /**
-   * Löven, som en enda instansierad mesh.
-   *
-   * Ett löv per instans hade varit tiotusen anrop. En klump per grenände, instansierad, är
-   * ett — och i den här stilen är en klump ändå sanningen: kolonins byggnader är också
-   * fasetterade block, inte tegelstenar.
-   */
-  _lov() {
-    const r = fro(0xb1adf)
-    const platser = []
-    for (const t of this.toppar) {
-      const n = t.djup >= MAXDJUP ? 6 : 3
-      for (let i = 0; i < n; i++) {
-        platser.push({
-          // Bred spridning i sidled, smal i höjd: kronan blir en skiva, inte en boll. Det är
-          // paraplyformen som gör att man ser att man står UNDER något.
-          p: t.p.clone().add(new THREE.Vector3((r() - 0.5) * 13, (r() - 0.5) * 5, (r() - 0.5) * 13)),
-          s: 3.4 + r() * 3.6,
-          rx: r() * 6.28,
-          ry: r() * 6.28,
-          slump: r(),
-        })
+  // ── grenarna ──────────────────────────────────────────────────────────────────────────
+
+  _grenfläkt() {
+    const r = fro(0x9a17)
+    const barkMat = this._mat(
+      vindShader(
+        new THREE.MeshStandardMaterial({ color: GREN, roughness: 0.92, metalness: 0, flatShading: true }),
+        this.u
+      )
+    )
+    const lovMat = this._mat(
+      vindShader(
+        new THREE.MeshStandardMaterial({
+          color: this.arstid.lov,
+          roughness: 0.82,
+          metalness: 0,
+          flatShading: true,
+        }),
+        this.u
+      )
+    )
+    this.lovMat = lovMat
+
+    const grenDelar = []
+    const lovDelar = []
+    const lovDelar2 = []
+
+    SLOTTAR.forEach((s, i) => {
+      const bo = new THREE.Vector3(s.x, s.y, s.z)
+      const vinkel = Math.atan2(bo.z, bo.x)
+      // Fästet sitter på barken, en bit under boet: grenar går uppåt när de går utåt.
+      const fot = new THREE.Vector3(
+        Math.cos(vinkel) * STAM_R * 0.94,
+        s.y - 13 - r() * 7,
+        Math.sin(vinkel) * STAM_R * 0.94
+      )
+      const ut = bo.clone().sub(fot)
+      const langd = ut.length()
+      const riktning = ut.clone().normalize()
+      const sida = new THREE.Vector3(-riktning.z, 0, riktning.x).normalize()
+
+      // Grenen slutar vid boet, och `t` betyder därför alltid samma sak: noll är barken, ett
+      // är boet. Det är inte kosmetik — lövklasar, fågelns stig och kvistarna placeras alla
+      // på `t`, och när fortsättningen låg i samma kurva hamnade allt det EFTER boet, ute
+      // framför kameran. Första bilden på mega-trädet blev ett lövverk i närbild.
+      const kurva = new THREE.CatmullRomCurve3([
+        fot.clone(),
+        fot.clone().addScaledVector(riktning, langd * 0.32).add(new THREE.Vector3(0, 3, 0)).addScaledVector(sida, (r() - 0.5) * 6),
+        fot.clone().addScaledVector(riktning, langd * 0.7).add(new THREE.Vector3(0, 4.5, 0)).addScaledVector(sida, (r() - 0.5) * 8),
+        bo.clone().add(new THREE.Vector3(0, -1.9, 0)),
+      ])
+      grenDelar.push(grenGeometri(kurva, 5.2, 1.35, 30, 7))
+
+      // Fortsättningen bortom boet. Ingen gren i naturen slutar där någon satt ett bo — men
+      // den får inte gå rakt mot kameran heller, så den viker av kraftigt åt sidan och uppåt
+      // och lämnar bilden i kanten i stället för att lägga sig framför scenen.
+      const bortRikt = riktning
+        .clone()
+        .multiplyScalar(-0.3)
+        .addScaledVector(sida, s.x < 0 ? -1.15 : 1.15)
+        .add(new THREE.Vector3(0, -0.3, 0))
+        .normalize()
+      const forts = new THREE.CatmullRomCurve3([
+        bo.clone().add(new THREE.Vector3(0, -1.9, 0)),
+        bo.clone().addScaledVector(bortRikt, 8).add(new THREE.Vector3(0, -1, 0)),
+        bo.clone().addScaledVector(bortRikt, 17).add(new THREE.Vector3(0, -2.5, 0)),
+      ])
+      grenDelar.push(grenGeometri(forts, 0.95, 0.25, 12, 5))
+
+      // Kvistar ut från grenen: två åt sidorna, en uppåt. De bär lövklasarna och ger fågeln
+      // något att hoppa till som inte är boet.
+      const kvistar = []
+      for (let k = 0; k < 3; k++) {
+        const t = 0.46 + k * 0.16 + r() * 0.05
+        const p = kurva.getPointAt(Math.min(0.9, t))
+        const rikt = sida
+          .clone()
+          .multiplyScalar(k === 2 ? (r() - 0.5) * 0.8 : k === 0 ? 1 : -1)
+          .add(new THREE.Vector3(0, k === 2 ? -0.5 : -0.25, 0))
+          .addScaledVector(riktning, -0.35)
+          .normalize()
+        const l = 9 + r() * 8
+        const kv = new THREE.CatmullRomCurve3([
+          p.clone(),
+          p.clone().addScaledVector(rikt, l * 0.5).add(new THREE.Vector3(0, -0.8, 0)),
+          p.clone().addScaledVector(rikt, l).add(new THREE.Vector3(0, -1.8, 0)),
+        ])
+        grenDelar.push(grenGeometri(kv, 1.7, 0.6, 10, 5))
+        kvistar.push(kv.getPointAt(1))
       }
-    }
-    this.lovPlatser = platser
 
-    const geo = new THREE.IcosahedronGeometry(1, 0)
-    const n = geo.attributes.position.count
-    const boj = new Float32Array(n)
-    // Hela klumpen är lika böjlig: den sitter längst ut, och dess fas kommer ur instansen.
-    boj.fill(1)
-    geo.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
-
-    const mat = new THREE.MeshStandardMaterial({ roughness: 0.86, metalness: 0, flatShading: true, vertexColors: true })
-    vindShader(mat, this.uniforms, true)
-    this.lovMat = mat
-
-    const mesh = new THREE.InstancedMesh(geo, mat, platser.length)
-    mesh.castShadow = true
-    mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage)
-    const m = new THREE.Matrix4()
-    const q = new THREE.Quaternion()
-    const e = new THREE.Euler()
-    platser.forEach((l, i) => {
-      e.set(l.rx, l.ry, l.rx * 0.5)
-      q.setFromEuler(e)
-      m.compose(l.p, q, new THREE.Vector3(l.s, l.s * 0.8, l.s))
-      mesh.setMatrixAt(i, m)
-    })
-    mesh.instanceMatrix.needsUpdate = true
-    this.grupp.add(mesh)
-    this.lovMesh = mesh
-    this.satArstid(this.arstid)
-  }
-
-  /** Lövfärgerna per instans. Årstidsbytet är en färgskrivning, inte ett ombygge. */
-  satArstid(namn) {
-    const A = ARSTIDER[namn] || ARSTIDER.sommar
-    this.arstid = namn
-    const farger = A.lov.map((c) => new THREE.Color(c))
-    const blom = A.blom ? new THREE.Color(A.blom) : null
-    const mesh = this.lovMesh
-    if (!mesh) return
-    const f = new THREE.Color()
-    this.lovPlatser.forEach((l, i) => {
-      // Gles vinter: klumpar som "fallit" göms genom att skalas till noll — billigare än att
-      // bygga om instansbufferten, och de kommer tillbaka på våren.
-      const kvar = l.slump < A.tathet
-      f.copy(kvar ? (blom && l.slump > A.tathet - 0.08 ? blom : farger[i % farger.length]) : farger[0])
-      mesh.setColorAt(i, f)
-      if (!kvar) {
-        const m = new THREE.Matrix4()
-        mesh.getMatrixAt(i, m)
-        m.scale(new THREE.Vector3(0.0001, 0.0001, 0.0001))
-        mesh.setMatrixAt(i, m)
+      // Lövklasarna. De sitter UNDER boet och bakom det, aldrig framför och aldrig ovanför —
+      // grönska mellan kameran och ett bo är exakt det som gjorde fåglarna osynliga. Därför
+      // ligger varje klase minst fyra enheter under grenen och närmare stammen än boet är.
+      /**
+       * LUFTREGELN, och den är hela skillnaden mellan den här versionen och den förra.
+       *
+       * Inget lövverk får hamna mellan kameran och ett bo. Bona ligger på z 88–105 och
+       * kameran på z 156, så allt grönt hålls på z under boets — och därtill minst åtta
+       * enheter under grenen. Utan regeln blir kronan tät och vacker och fåglarna borta,
+       * vilket var precis vad skärmbilden visade.
+       */
+      /**
+       * LUFTREGELN, och den är hela skillnaden mellan den här versionen och de tre förra.
+       *
+       * Lövet sitter bara där en kvist tar slut, och bara på kvistar som pekar bakåt eller
+       * nedåt. Ingenting grönt får hamna mellan kameran och ett bo. Varje gång den regeln
+       * varit lösare har kronan blivit tät och vacker och fåglarna borta — det är exakt det
+       * skärmbilderna den 15 september visade, tre gånger i rad.
+       */
+      const klasPunkter = kvistar.filter((k) => k.z < bo.z - 3)
+      for (const p of klasPunkter) {
+        for (let k = 0; k < 2; k++) {
+          const s2 = 2.6 + r() * 2.2
+          const geo = new THREE.IcosahedronGeometry(s2, 0)
+          geo.scale(1.15, 0.78, 1.05)
+          geo.rotateY(r() * 3)
+          geo.translate(p.x + (r() - 0.5) * 3.5, p.y + (r() - 0.5) * 2.2 - 0.8, p.z + (r() - 0.5) * 3)
+          const b = new Float32Array(geo.attributes.position.count).fill(0.85 + r() * 0.3)
+          geo.setAttribute('aBoj', new THREE.BufferAttribute(b, 1))
+          ;(r() < 0.55 ? lovDelar : lovDelar2).push(geo)
+        }
       }
-    })
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
-    mesh.instanceMatrix.needsUpdate = true
-    this.uniforms.uAdra.value.set(namn === 'vinter' ? TAL.petrol : TAL.honey)
-  }
 
-  // ── lianor ───────────────────────────────────────────────────────────────────────────
-  /** Hängande rankor från de tunga grenarna. De är det som gör att luften under kronan känns. */
-  _lianor() {
-    const r = fro(0x1a6a)
-    const geos = []
-    // Från kronans yttersta grenar, där de redan pekar nedåt: ridån under paraplyt.
-    const bar = this.grenar.filter((g) => g.djup >= 2 && g.slut.y > TRADHOJD * 0.45)
-    for (let i = 0; i < 90; i++) {
-      const g = bar[Math.floor(r() * bar.length)]
-      if (!g) continue
-      const langd = 8 + r() * 26
-      const geo = new THREE.CylinderGeometry(0.05, 0.13, langd, 4, 1, false)
-      geo.translate(g.slut.x + (r() - 0.5) * 2, g.slut.y - langd / 2, g.slut.z + (r() - 0.5) * 2)
-      const n = geo.attributes.position.count
-      const boj = new Float32Array(n)
-      for (let j = 0; j < n; j++) {
-        // En ranka svajar mest längst ned: böjligheten är omvänd mot trädets.
-        const y = geo.attributes.position.getY(j)
-        boj[j] = 0.35 + Math.max(0, (g.slut.y - y) / langd) * 1.5
-      }
-      geo.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
-      geos.push(geo)
-    }
-    if (!geos.length) return
-    const mat = new THREE.MeshStandardMaterial({ color: 0x3f5540, roughness: 0.9, flatShading: true })
-    vindShader(mat, this.uniforms)
-    const mesh = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(geos, false), mat)
-    this.grupp.add(mesh)
-    this.lianor = mesh
-    geos.forEach((g) => g.dispose())
-  }
-
-  // ── frön ─────────────────────────────────────────────────────────────────────────────
-  /**
-   * Fröna som driver uppåt genom kronan.
-   *
-   * De bär ingen data — och det är med flit. Kolonins regel är att det som betyder något
-   * kommer ur tavlan; fröna är luft och ljus, som löven. De är där för att ett levande träd
-   * har något som rör sig även när ingen tråd skriver en rad.
-   */
-  _fron() {
-    const ANTAL = 220
-    const r = fro(0xf20e)
-    const geo = new THREE.OctahedronGeometry(0.16, 0)
-    const boj = new Float32Array(geo.attributes.position.count)
-    geo.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
-    const mat = new THREE.MeshBasicMaterial({
-      color: TAL.cream,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      toneMapped: false,
-    })
-    const mesh = new THREE.InstancedMesh(geo, mat, ANTAL)
-    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-    mesh.frustumCulled = false
-    this.fron = []
-    for (let i = 0; i < ANTAL; i++) {
-      const a = r() * Math.PI * 2
-      const d = 4 + r() * 46
-      this.fron.push({
-        x: Math.cos(a) * d,
-        z: Math.sin(a) * d,
-        y: r() * TRADHOJD,
-        fart: 1.1 + r() * 2.4,
-        sving: r() * 6.28,
-        s: 0.6 + r() * 1.1,
+      const bofot = kurva.getPointAt(0.86)
+      this._grenar.push({
+        i,
+        bo,
+        fot,
+        kurva,
+        forts,
+        riktning,
+        sida,
+        kvistar,
+        // Ut längs grenen och tillbaka — fågelns arbetsrunda. Alltid i bild, aldrig ur den.
+        gron: klasPunkter.map((p) => p.clone()),
+        // Fågelns arbetsväg: fyra fästen längs grenen in mot stammen, plus en bit ut på
+        // fortsättningen. Allt inom bild — en fågel som flyger ur bild går inte att räkna.
+        stig: [
+          kurva.getPointAt(0.5).add(new THREE.Vector3(0, 2.2, 0)),
+          kurva.getPointAt(0.68).add(new THREE.Vector3(0, 2.2, 0)),
+          kurva.getPointAt(0.86).add(new THREE.Vector3(0, 2, 0)),
+          forts.getPointAt(0.35).add(new THREE.Vector3(0, 1.8, 0)),
+        ],
+        bofot,
       })
-    }
-    this.grupp.add(mesh)
-    this.fronMesh = mesh
-    this.fronMat = mat
-  }
-
-  /** Marken under trädet lyser svagt när rötterna arbetar — kolonins databasskrivningar. */
-  _markljus() {
-    const mat = new THREE.MeshBasicMaterial({
-      color: TAL.honey,
-      transparent: true,
-      opacity: 0.12,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
     })
-    const skiva = new THREE.Mesh(new THREE.CircleGeometry(34, 32), mat)
-    skiva.rotation.x = -Math.PI / 2
-    skiva.position.y = 0.15
-    this.grupp.add(skiva)
-    this.markMat = mat
+
+    /**
+     * Kronmassan. Ett bälte av lövverk runt stammen, bakom och under grenfläkten.
+     *
+     * Den bär hela intrycket av "mega": bilden slutar inte i en tom himmel bakom bona, den
+     * slutar i mer träd. Och den kostar ingenting i läsbarhet, för den står bakom bonas plan.
+     */
+    const massa = []
+    for (let k = 0; k < 110; k++) {
+      const v = -Math.PI * 0.08 + r() * Math.PI * 1.16
+      const rad = STAM_R * (1.05 + r() * 1.5)
+      // UNDER bonas plan, aldrig ovanför. Ovanför bona ska det vara bark och luft — det är
+      // den luften som gör att ett bo syns, och den fanns inte i de tre första försöken.
+      const y = -96 + r() * 96
+      const p = new THREE.Vector3(Math.cos(v) * rad, y, Math.sin(v) * rad)
+      if (p.z > 76) continue
+      const s2 = 6 + r() * 12
+      const geo = new THREE.IcosahedronGeometry(s2, 0)
+      geo.scale(1.2, 0.8, 1.15)
+      geo.rotateY(r() * 3)
+      geo.translate(p.x, p.y, p.z)
+      const b = new Float32Array(geo.attributes.position.count).fill(0.4 + r() * 0.35)
+      geo.setAttribute('aBoj', new THREE.BufferAttribute(b, 1))
+      massa.push(geo)
+    }
+    const massaMat = this._mat(
+      vindShader(
+        new THREE.MeshStandardMaterial({ color: 0x3a3f2e, roughness: 0.95, metalness: 0, flatShading: true }),
+        this.u
+      )
+    )
+    this.massaMat = massaMat
+    this.grupp.add(new THREE.Mesh(this._geo(sammanfoga(massa)), massaMat))
+
+    const grenar = new THREE.Mesh(this._geo(sammanfoga(grenDelar)), barkMat)
+    grenar.castShadow = true
+    grenar.receiveShadow = true
+    this.grupp.add(grenar)
+
+    const lov = new THREE.Mesh(this._geo(sammanfoga(lovDelar)), lovMat)
+    lov.castShadow = true
+    this.lov = lov
+    this.grupp.add(lov)
+
+    const lovMat2 = this._mat(
+      vindShader(
+        new THREE.MeshStandardMaterial({ color: this.arstid.under, roughness: 0.85, metalness: 0, flatShading: true }),
+        this.u
+      )
+    )
+    this.lovMat2 = lovMat2
+    const lov2 = new THREE.Mesh(this._geo(sammanfoga(lovDelar2)), lovMat2)
+    lov2.castShadow = true
+    this.grupp.add(lov2)
   }
 
-  // ── plats för det som ska sitta i trädet ─────────────────────────────────────────────
-  /**
-   * Grenändar att sätta bon på: en per tråd, spridda runt stammen så inga två skymmer
-   * varandra sett från marken. Sorterade på vinkel, sedan jämnt utplockade.
-   */
-  boplatser(antal) {
-    const kand = this.grenar
-      .filter((g) => g.djup === 2 && g.slut.y > TRADHOJD * 0.3)
-      .sort((a, b) => Math.atan2(a.slut.z, a.slut.x) - Math.atan2(b.slut.z, b.slut.x))
-    if (!kand.length) return []
-    const ut = []
-    const steg = kand.length / Math.max(1, antal)
+  // ── hängande ──────────────────────────────────────────────────────────────────────────
+
+  _hang() {
+    const r = fro(0x31c7)
+    const mat = this._mat(
+      vindShader(
+        new THREE.MeshStandardMaterial({ color: 0x3d4a39, roughness: 0.98, flatShading: true }),
+        this.u
+      )
+    )
+    const delar = []
+    const hang = (x, y, z, langd, tjock) => {
+      // Framför bonas plan hänger ingenting. En liana på z=100 är ett grönt streck tvärs
+      // över en fågel, och sådana streck var halva bruset i de första bilderna.
+      if (z > 76) return
+      const geo = new THREE.CylinderGeometry(tjock, tjock * 0.55, langd, 4, 3, false)
+      const b = new Float32Array(geo.attributes.position.count)
+      const pos = geo.attributes.position
+      for (let i = 0; i < pos.count; i++) b[i] = Math.max(0, 0.5 - pos.getY(i) / langd) * 1.6
+      geo.setAttribute('aBoj', new THREE.BufferAttribute(b, 1))
+      geo.translate(x, y - langd / 2, z)
+      delar.push(geo)
+    }
+
+    // Lianer från grenarna, och långa rep uppifrån bild. De uppifrån är viktigast: de säger
+    // "det finns mer träd ovanför" utan att något av det behöver ritas.
+    for (const g of this._grenar) {
+      for (let k = 0; k < 2; k++) {
+        const p = g.kurva.getPointAt(0.25 + r() * 0.4)
+        hang(p.x + (r() - 0.5) * 6, p.y - 1, p.z + (r() - 0.5) * 6, 16 + r() * 40, 0.18 + r() * 0.14)
+      }
+    }
+    for (let k = 0; k < 16; k++) {
+      const v = Math.PI * 0.12 + r() * Math.PI * 0.76
+      const rad = STAM_R * (1.05 + r() * 0.8)
+      hang(Math.cos(v) * rad, 96 + r() * 30, Math.sin(v) * rad, 60 + r() * 100, 0.22 + r() * 0.2)
+    }
+    const m = new THREE.Mesh(this._geo(sammanfoga(delar)), mat)
+    this.grupp.add(m)
+  }
+
+  // ── dis, ljus och skräp i luften ──────────────────────────────────────────────────────
+
+  _dis() {
+    const r = fro(0x77aa)
+
+    // Grenar i fjärran, bara som siluetter. De ligger utanför fläkten och långt ner/upp, och
+    // de är hela beviset för att trädet fortsätter utanför bilden.
+    const silMat = this._mat(
+      new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 1, flatShading: true, transparent: true, opacity: 0.55 })
+    )
+    const sil = []
+    for (let k = 0; k < 9; k++) {
+      const v = -Math.PI * 0.15 + r() * Math.PI * 1.3
+      const y = k < 5 ? -70 - r() * 90 : 88 + r() * 90
+      const fot = new THREE.Vector3(Math.cos(v) * STAM_R, y, Math.sin(v) * STAM_R)
+      const ut = new THREE.Vector3(Math.cos(v), 0, Math.sin(v)).multiplyScalar(90 + r() * 90)
+      const kurva = new THREE.CatmullRomCurve3([
+        fot.clone(),
+        fot.clone().addScaledVector(ut, 0.4).add(new THREE.Vector3(0, 8 - r() * 20, 0)),
+        fot.clone().add(ut).add(new THREE.Vector3(0, 14 - r() * 34, 0)),
+      ])
+      sil.push(grenGeometri(kurva, 6.5, 1.4, 12, 5))
+    }
+    const s = new THREE.Mesh(this._geo(sammanfoga(sil)), silMat)
+    this.grupp.add(s)
+
+    // Frön och damm i luften. De rör sig långsamt uppåt och driver i sidled — det är det som
+    // gör att luften mellan kameran och barken känns som luft och inte som tomrum.
+    const antal = 420
+    const geo = this._geo(new THREE.BufferGeometry())
+    const p = new Float32Array(antal * 3)
+    this._froFart = new Float32Array(antal)
     for (let i = 0; i < antal; i++) {
-      const g = kand[Math.min(kand.length - 1, Math.floor(i * steg + steg / 2))]
-      ut.push({ punkt: g.slut.clone(), riktning: g.riktning.clone() })
+      p[i * 3] = (r() - 0.5) * 300
+      p[i * 3 + 1] = (r() - 0.5) * 180
+      p[i * 3 + 2] = 40 + r() * 150
+      this._froFart[i] = 1.4 + r() * 3.6
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(p, 3))
+    const froMat = this._mat(
+      new THREE.PointsMaterial({ color: 0xd8c9a0, size: 0.85, transparent: true, opacity: 0.6, depthWrite: false, fog: false })
+    )
+    this.fron = new THREE.Points(geo, froMat)
+    this.grupp.add(this.fron)
+
+    // Ljuset i scenen. Kronan har sitt eget — solen i himlen står för långt bort för att ge
+    // barken form på det här avståndet, och utan det blir väggen en platt brun yta.
+    const fram = new THREE.DirectionalLight(0xffe6c4, 2.1)
+    fram.position.set(90, 130, 200)
+    this.grupp.add(fram)
+    const kant = new THREE.DirectionalLight(0x9fd8c8, 0.85)
+    kant.position.set(-130, 40, -60)
+    this.grupp.add(kant)
+    const mjuk = new THREE.HemisphereLight(0xbfe0d0, 0x2a2318, 0.75)
+    this.grupp.add(mjuk)
+    this._ljus = { fram, kant, mjuk }
+  }
+
+  // ── det kolonin frågar om ─────────────────────────────────────────────────────────────
+
+  /** Boplatserna, i ordning. Fler trådar än grenar får dela på grenarna längst ut. */
+  boplatser(antal = SLOTTAR.length) {
+    const n = Math.max(1, antal)
+    const ut = []
+    /**
+     * Arbetsvägen hålls innanför ramen.
+     *
+     * "Bra att se alla fåglar samtidigt" går inte ihop med en fågel som flyger ur bild för
+     * att hämta en pinne. Hämtpunkterna klipps därför till fläktens bredd — den yttersta
+     * fågeln hämtar inåt i stället för utåt, och det syns inte på henne att hon gör det.
+     */
+    const iRam = (p) => {
+      p.x = THREE.MathUtils.clamp(p.x, -32, 34)
+      return p
+    }
+    for (let i = 0; i < n; i++) {
+      const g = this._grenar[i % this._grenar.length]
+      const extra = Math.floor(i / this._grenar.length)
+      const punkt = g.bo.clone().addScaledVector(g.sida, extra * 9)
+      ut.push({
+        punkt,
+        gren: g.i,
+        riktning: g.riktning.clone(),
+        sida: g.sida.clone(),
+        gron: g.gron.map((p) => iRam(p.clone())),
+        stig: g.stig.map((p) => iRam(p.clone())),
+        spets: iRam(g.forts.getPointAt(0.5).clone()),
+      })
     }
     return ut
   }
 
-  /** Stamhålet högst upp i stammen — Lednings plats, som beställt. */
+  /** Hålet i stammen. Kvar för kolonins skull; i mega-trädet är det barkens mitt i bild. */
   stamhal() {
-    const stam = this.grenar.find((g) => g.djup === 0)
-    const p = stam ? stam.slut.clone() : new THREE.Vector3(0, TRADHOJD * 0.4, 0)
-    p.y -= 4
-    return p
+    return new THREE.Vector3(0, 14, STAM_R * 1.02)
   }
 
-  /** Kraftiga grenar att hänga något tungt i: holkarna, skyltarna. */
-  hangplatser(antal) {
-    const kand = this.grenar.filter((g) => g.djup === 1).sort((a, b) => b.slut.y - a.slut.y)
-    return kand.slice(0, antal).map((g) => g.slut.clone())
-  }
-
-  /** Utsiktspunkter för köksläget: roten, kronan, stamhålet. */
   /**
-   * Utsikterna.
+   * Utsikterna — kamerans fasta platser.
    *
-   * `lutning` är kamerans polarvinkel: stor = kameran står lågt och tittar UPP, vilket är
-   * hela poängen med ett träd. Överblicken kommer först och är den man alltid kan ta sig
-   * tillbaka till — Filips första invändning var att han inte fick någon.
+   * `överblick` är scenens hemläge och det enda som måste stämma: därifrån ska alla sju bon
+   * synas samtidigt, och det är den bilden bygget kontrolleras mot.
    */
   utsikter() {
     return [
-      { namn: 'hela trädet', punkt: new THREE.Vector3(0, TRADHOJD * 0.46, 0), avstand: TRADHOJD * 1.9, lutning: 1.28 },
-      { namn: 'under kronan', punkt: new THREE.Vector3(0, TRADHOJD * 0.3, 0), avstand: 34, lutning: 1.42 },
-      { namn: 'roten', punkt: new THREE.Vector3(0, 7, 0), avstand: 38, lutning: 1.35 },
-      { namn: 'kronan', punkt: new THREE.Vector3(0, TRADHOJD * 0.78, 0), avstand: 58, lutning: 1.05 },
-      { namn: 'stamhålet', punkt: this.stamhal(), avstand: 24, lutning: 1.3 },
+      // Målet står en bit till höger om mitten med flit: sidopanelen täcker den högra
+      // fjärdedelen av skärmen, så en fläkt som centreras i VÄRLDEN hamnar snett i BILDEN
+      // och de två yttersta bona försvinner bakom panelen. Kiosken har ingen panel och
+      // tappar inget på förskjutningen.
+      { namn: 'överblick', punkt: new THREE.Vector3(7, 14, 84), avstand: 88, lutning: 1.42, azimut: 0 },
+      { namn: 'barken', punkt: new THREE.Vector3(0, 20, 62), avstand: 40, lutning: 1.5, azimut: 0.2 },
+      { namn: 'underifrån', punkt: new THREE.Vector3(6, 4, 82), avstand: 58, lutning: 1.86, azimut: -0.06 },
+      { namn: 'kronan', punkt: new THREE.Vector3(6, 28, 88), avstand: 58, lutning: 1.2, azimut: 0.05 },
     ]
   }
 
-  // ── liv ──────────────────────────────────────────────────────────────────────────────
-  /**
-   * Natten och pulsen utifrån.
-   *
-   * `natt` kommer ur himlen (samma `nightFactor` som resten av kolonin lyser efter), `puls`
-   * ur skärmtiden: ett slag när en minut lämnat någons konto. Trädet blossar då — det är
-   * samma regel som fyrens, flyttad in i barken.
-   */
-  setNatt(natt) {
-    this.natt = Math.min(1, Math.max(0, natt))
+  satArstid(namn) {
+    const a = ARSTIDER[namn] || ARSTIDER.sommar
+    this.arstid = a
+    this.lovMat?.color.setHex(a.lov)
+    this.lovMat2?.color.setHex(a.under)
+    this.massaMat?.color.setHex(a.lov).lerp(new THREE.Color(0x232a20), 0.68)
   }
 
+  setVisible(v) {
+    this.grupp.visible = Boolean(v)
+  }
+
+  setNatt(n) {
+    this.u.natt.value = THREE.MathUtils.clamp(Number(n) || 0, 0, 1)
+    if (this._ljus) {
+      this._ljus.fram.intensity = THREE.MathUtils.lerp(2.1, 0.4, this.u.natt.value)
+      this._ljus.kant.intensity = THREE.MathUtils.lerp(0.85, 1.05, this.u.natt.value)
+      this._ljus.mjuk.intensity = THREE.MathUtils.lerp(0.75, 0.3, this.u.natt.value)
+    }
+  }
+
+  /** Ett slag genom trädet — ådrorna flammar. Samma händelse som fyren och tavlan får. */
   slag() {
-    this.puls = 1
+    this._pulsKo = 1
   }
 
   update(dt) {
     if (!this.grupp.visible) return
-    const u = this.uniforms
-    u.uTid.value += dt
-    this.puls = Math.max(0, this.puls - dt * 1.1)
-    u.uPuls.value = this.puls
-    const A = ARSTIDER[this.arstid] || ARSTIDER.sommar
-    u.uNatt.value = this.natt * A.glod
-    // Vinden andas: byar som kommer och går, annars läser rörelsen som en motor.
-    u.uVind.value = 0.85 + Math.sin(u.uTid.value * 0.13) * 0.5 + Math.sin(u.uTid.value * 0.41) * 0.22
-
-    if (this.markMat) this.markMat.opacity = (0.06 + this.puls * 0.2) * (0.35 + this.natt * 0.65)
-
-    // Fröna driver uppåt och börjar om nere. Enda stället kolonin räknar per objekt — hundra
-    // femtio matriser i en instansbuffert är billigare än en shader som ingen kan läsa.
-    if (this.fronMesh) {
-      const m = new THREE.Matrix4()
-      const q = new THREE.Quaternion()
-      const skala = new THREE.Vector3()
-      const p = new THREE.Vector3()
-      this.fron.forEach((f, i) => {
-        f.y += dt * f.fart
-        if (f.y > TRADHOJD * 1.05) f.y = -2
-        const sv = Math.sin(u.uTid.value * 0.7 + f.sving) * 2.2
-        p.set(f.x + sv, f.y, f.z + Math.cos(u.uTid.value * 0.5 + f.sving) * 2.2)
-        q.setFromAxisAngle(UPP, u.uTid.value * 0.8 + f.sving)
-        skala.setScalar(f.s)
-        m.compose(p, q, skala)
-        this.fronMesh.setMatrixAt(i, m)
-      })
-      this.fronMesh.instanceMatrix.needsUpdate = true
-      this.fronMat.opacity = 0.14 + this.natt * 0.72
+    this.tid += dt
+    this.u.tid.value = this.tid
+    // Vinden är inte konstant. Byar som kommer och går gör att kronan aldrig ser loopad ut.
+    this.u.vind.value = 0.42 + Math.sin(this.tid * 0.21) * 0.2 + Math.sin(this.tid * 0.07) * 0.16
+    if (this._pulsKo > 0) {
+      this.u.puls.value = this._pulsKo
+      this._pulsKo = Math.max(0, this._pulsKo - dt * 0.9)
+    } else if (this.u.puls.value > 0) {
+      this.u.puls.value = Math.max(0, this.u.puls.value - dt * 0.9)
     }
+
+    const p = this.fron.geometry.attributes.position
+    for (let i = 0; i < p.count; i++) {
+      let y = p.getY(i) + this._froFart[i] * dt
+      let x = p.getX(i) + Math.sin(this.tid * 0.4 + i) * dt * 2.2
+      if (y > 110) {
+        y = -110
+        x = (Math.random() - 0.5) * 300
+      }
+      p.setY(i, y)
+      p.setX(i, x)
+    }
+    p.needsUpdate = true
   }
 
-  setVisible(pa) {
-    this.grupp.visible = pa
+  diagnos() {
+    return {
+      grenar: this._grenar.length,
+      stamR: STAM_R,
+      lov: Boolean(this.lov),
+      natt: Number(this.u.natt.value.toFixed(2)),
+    }
   }
 
   dispose() {
     this.scene.remove(this.grupp)
-    this.grupp.traverse((o) => {
-      o.geometry?.dispose()
-      if (Array.isArray(o.material)) o.material.forEach((m) => m.dispose())
-      else o.material?.dispose()
-    })
+    this._geometrier.forEach((g) => g.dispose())
+    this._material.forEach((m) => m.dispose())
   }
+}
+
+/** Slår ihop geometrier till en enda. Ett ritanrop i stället för fyrahundra. */
+function sammanfoga(delar) {
+  if (!delar.length) return new THREE.BufferGeometry()
+  const nycklar = ['position', 'normal', 'aBoj']
+  let antal = 0
+  let index = 0
+  for (const d of delar) {
+    antal += d.attributes.position.count
+    index += d.index ? d.index.count : d.attributes.position.count
+  }
+  const pos = new Float32Array(antal * 3)
+  const nor = new Float32Array(antal * 3)
+  const boj = new Float32Array(antal)
+  const idx = new Uint32Array(index)
+  let vo = 0
+  let io = 0
+  for (const d of delar) {
+    const p = d.attributes.position
+    const n = d.attributes.normal
+    const b = d.attributes.aBoj
+    pos.set(p.array.subarray(0, p.count * 3), vo * 3)
+    if (n) nor.set(n.array.subarray(0, n.count * 3), vo * 3)
+    if (b) boj.set(b.array.subarray(0, b.count), vo)
+    if (d.index) {
+      for (let i = 0; i < d.index.count; i++) idx[io++] = d.index.array[i] + vo
+    } else {
+      for (let i = 0; i < p.count; i++) idx[io++] = i + vo
+    }
+    vo += p.count
+    d.dispose()
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3))
+  g.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
+  g.setIndex(new THREE.BufferAttribute(idx, 1))
+  void nycklar
+  return g
 }

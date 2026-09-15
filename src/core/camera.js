@@ -85,6 +85,20 @@ export class CameraRig {
      */
     this.tradlage = false
     this.maxHojd = 60
+    /**
+     * SCENEN — trädets kamerabur.
+     *
+     * Filips första invändning mot trädet var "hard to navigate, no overview". Den hade en
+     * teknisk orsak: kameran var fri. En fri kamera kring ett träd låter dig hamna bakom
+     * det, under det, eller så långt bort att det är en kvist — och i tre av fyra lägen ser
+     * du ingenting av det du kom för att titta på.
+     *
+     * Mega-trädet har en scen i stället: kameran står framför barkväggen, får vrida sig en
+     * halv radian åt vardera hållet, luta mellan att titta upp och lite ner, och zooma
+     * mellan en närbild på ett bo och överblicken över alla sju. Utanför det finns inget
+     * att se, så det går inte att komma dit.
+     */
+    this.scen = null
     this._last = new THREE.Vector2()
     this._pinch = 0
     this._moved = 0
@@ -198,15 +212,15 @@ export class CameraRig {
 
     if (this.suppressed) return
     e.preventDefault()
-    if (this.tradlage) {
-      // Runt stammen i sidled, upp och ner längs den i höjdled. Klättringen skalas med
-      // avståndet, så ett drag känns lika långt nära roten som ute på håll.
-      this.desiredAzimuth -= dx * 0.006
-      this.desiredTarget.y = THREE.MathUtils.clamp(
-        this.desiredTarget.y + dy * this.distance * 0.0022,
-        0.5,
-        this.maxHojd
-      )
+    if (this.scen) {
+      // I scenen panorerar draget i bildplanet: i sidled längs fläkten, i höjdled upp och
+      // ner längs barken. Ingen bana runt stammen — det finns ingen baksida att titta på.
+      const k = this.distance * 0.0022
+      this.desiredTarget.x -= dx * k
+      this.desiredTarget.y += dy * k
+      this._clampTarget()
+      this.target.copy(this.desiredTarget)
+      this._sync()
       return
     }
     this._dragGround(e.clientX, e.clientY)
@@ -285,12 +299,39 @@ export class CameraRig {
     }
     // I trädläge är höjden halva navigeringen och får inte nollas.
     t.y = this.tradlage ? THREE.MathUtils.clamp(t.y, 0.5, this.maxHojd) : 0
+    const sc = this.scen
+    if (!sc) return
+    t.x = THREE.MathUtils.clamp(t.x, -sc.bredd, sc.bredd)
+    t.y = THREE.MathUtils.clamp(t.y, sc.hojdMin, sc.hojdMax)
+    t.z = THREE.MathUtils.clamp(t.z, sc.djupMin, sc.djupMax)
   }
 
   /** Slår om till att kretsa kring en stam i stället för att panorera på en mark. */
   setTradlage(on, maxHojd = 60) {
     this.tradlage = Boolean(on)
     this.maxHojd = maxHojd
+  }
+
+  /** Sätter eller släpper scenen. Null = kolonins fria kamera tillbaka. */
+  setScen(scen) {
+    this.scen = scen || null
+    this.tradlage = Boolean(scen)
+    if (!scen) return
+    this.maxHojd = scen.hojdMax
+    this._clampTarget()
+    this._spanner()
+  }
+
+  /** Drar tillbaka allt som får vandra ut ur scenen. Körs efter varje ändring och varje bild. */
+  _spanner() {
+    const sc = this.scen
+    if (!sc) return
+    this.desiredAzimuth = THREE.MathUtils.clamp(this.desiredAzimuth, -sc.azimut, sc.azimut)
+    this.azimuth = THREE.MathUtils.clamp(this.azimuth, -sc.azimut, sc.azimut)
+    this.desiredPolar = THREE.MathUtils.clamp(this.desiredPolar, sc.polarMin, sc.polarMax)
+    this.polar = THREE.MathUtils.clamp(this.polar, sc.polarMin, sc.polarMax)
+    this.desiredDistance = THREE.MathUtils.clamp(this.desiredDistance, sc.avstandMin, sc.avstandMax)
+    this.distance = THREE.MathUtils.clamp(this.distance, sc.avstandMin, sc.avstandMax)
   }
 
   /** True when the pointer went down and up without really moving — a click, not a drag. */
@@ -308,6 +349,7 @@ export class CameraRig {
     // är en annan kamera än att titta ner på en plätt.
     if (polar !== undefined) this.desiredPolar = THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR)
     if (azimuth !== undefined) this.desiredAzimuth = azimuth
+    this._spanner()
     this._zoom = null
     // I trädläge ska den inte snäppa tillbaka till isometrin — det är den easingen som
     // drar blicken ner i marken igen så fort man släppt musen.
@@ -371,7 +413,7 @@ export class CameraRig {
     // The sweep yields while you are working the camera and eases back in a couple of
     // seconds after you let go. Cutting it in and out at full rate reads as a glitch — and
     // fighting a drag for the whole drag reads as the camera arguing with you.
-    if (this.orbiting) {
+    if (this.orbiting && !this.scen) {
       const wants = !this.interacting && this.idleFor >= ORBIT_RESUME_DELAY ? 1 : 0
       this.orbitBlend = damp(this.orbitBlend, wants, wants ? ORBIT_RAMP_UP : ORBIT_RAMP_DOWN, dt)
       const rate = ORBIT_RATE * this.orbitBlend
@@ -383,12 +425,15 @@ export class CameraRig {
 
     // Rest back to isometric: after a beat of no input the heading walks to the nearest
     // clean 45° and the tilt returns to the iso angle. Position and zoom are left alone.
-    if (!this.orbiting && this.settings.get('autoFrame') && this.idleFor > 2.2 && !this.interacting) {
+    // Isometrin hör kolonin till. I scenen skulle den dra blicken bort från barken var
+    // gång man släpper musen, vilket är exakt den kamera som kändes omöjlig att styra.
+    if (!this.scen && !this.orbiting && this.settings.get('autoFrame') && this.idleFor > 2.2 && !this.interacting) {
       const ease = Math.min(1.4, (this.idleFor - 2.2) * 0.7)
       this.desiredAzimuth = damp(this.desiredAzimuth, this._nearestIso(), ease, dt)
       this.desiredPolar = damp(this.desiredPolar, ISO_POLAR, ease, dt)
     }
 
+    this._spanner()
     const lambda = this.settings.get('reducedMotion') ? 40 : 9
     this.azimuth = damp(this.azimuth, this.desiredAzimuth, lambda, dt)
     this.polar = damp(this.polar, this.desiredPolar, lambda, dt)

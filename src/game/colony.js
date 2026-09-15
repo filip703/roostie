@@ -347,6 +347,11 @@ export class Colony {
       tradmatare: this.tradmatare.diagnos(),
       varld: this.varld,
       faglar: this.faglar.faglar.size,
+      trad: this.varld === 'trad' ? this.tradet.diagnos() : null,
+      sysslor:
+        this.varld === 'trad'
+          ? this.faglar.oversikt().map((b) => `${b.namn}: ${b.ord}`)
+          : null,
       maskinpark: this.maskinpark.diagnos(),
     }
   }
@@ -404,9 +409,74 @@ export class Colony {
 
     this.tradet.setVisible(trad)
     this.faglar.setVisible(trad)
+
+    /**
+     * Kronans egen luft.
+     *
+     * Marken hör inte hit — vi står trettio meter upp i ett träd, och en månyta under
+     * grenarna var en av sakerna som gjorde att den första versionen inte lästes som ett
+     * träd alls. Dimman flyttas också ut: kolonins fog börjar på nittio enheter, och i
+     * trädet ligger barken drygt hundra bort, så den gamla inställningen åt upp hela stammen.
+     */
+    for (const g of [this.terrain, this.scatterGroup].filter(Boolean)) {
+      if (trad) {
+        this._markSynlig = this._markSynlig ?? g.visible
+        g.visible = false
+      } else {
+        g.visible = this._markSynlig ?? true
+      }
+    }
+    if (!trad) this._markSynlig = null
+    if (this.scene.fog) {
+      if (trad) {
+        this._fog = this._fog || { near: this.scene.fog.near, far: this.scene.fog.far }
+        this.scene.fog.near = 95
+        this.scene.fog.far = 300
+        this._fogFarg = this._fogFarg || this.scene.fog.color.clone()
+        // Varm dimma, inte svart. Svart fog gör bakgrunden till ett hål; en varm gör den
+        // till mer träd längre bort, vilket är hela poängen med ett träd som inte får plats.
+        this.scene.fog.color.setHex(0x2a2119)
+      } else if (this._fog) {
+        this.scene.fog.near = this._fog.near
+        this.scene.fog.far = this._fog.far
+        if (this._fogFarg) this.scene.fog.color.copy(this._fogFarg)
+        this._fog = null
+      }
+    }
+
     if (trad) {
       this.tradet.satArstid(arstidNu())
       this._satFaglar()
+    }
+  }
+
+  /**
+   * Håller kolonin gömd så länge trädet står framme.
+   *
+   * `setVarld` körs vid start, innan trådarna kommit — och plättarna byggs EFTER det. Utan
+   * det här anropet dyker kolonin upp bakom trädet så fort första pollen landar, vilket är
+   * precis vad skärmbilden den 15 september visade: hexagoner i nedre vänstra hörnet av en
+   * bild som skulle föreställa en krona.
+   */
+  _hallVarld() {
+    if (this.varld !== 'trad') return
+    for (const g of [
+      this.plotGroup,
+      this.labelGroup,
+      this.ship.group,
+      this.astronauts.group,
+      this.indicators?.group,
+      this.scaffolds?.group,
+      this.maskinpark.grupp,
+      this.agenttavla.grupp,
+      this.tradmatare.grupp,
+      this.tavlan.grupp,
+      this.anslagstavla.grupp,
+      this.skarmtidsfyr.grupp,
+      this.terrain,
+      this.scatterGroup,
+    ]) {
+      if (g && g.visible) g.visible = false
     }
   }
 
@@ -435,12 +505,17 @@ export class Colony {
         notis: Boolean(t.notis),
         hasError: Boolean(t.hasError),
         archived: Boolean(t.archived),
+        // Tidsstämpeln avgör om fågeln matar, bygger, pysslar eller sover — utan den kan
+        // sysslan bara gissas, och en gissning som ser ut som en mätning är en lögn.
+        sist: Number(t.lastActivityAt) || 0,
+        // Rader på tavlan som är ställda till Filip. Det är dem fågeln ruvar på.
+        vantar: Array.isArray(t.vantar) ? t.vantar : [],
         openUrl: t.openUrl || '',
         thread: t,
       })
     }
     lista.sort((a, b) => a.namn.localeCompare(b.namn))
-    this.faglar.set(lista, this.tradet.boplatser(Math.max(1, lista.length - 1)), this.tradet.stamhal())
+    this.faglar.set(lista, this.tradet.boplatser(lista.length), this.tradet.stamhal())
     this.tradlista = lista
   }
 
@@ -453,17 +528,7 @@ export class Colony {
    */
   tradpunkter() {
     if (this.varld !== 'trad') return { utsikter: [], bon: [] }
-    return {
-      utsikter: this.tradet.utsikter(),
-      bon: [...this.faglar.faglar.values()].map((f) => ({
-        id: f.trad.id,
-        namn: f.trad.namn,
-        farg: f.trad.farg,
-        lage: f.lage,
-        rader: f.trad.rader,
-        punkt: f.hem.clone(),
-      })),
-    }
+    return { utsikter: this.tradet.utsikter(), bon: this.faglar.oversikt() }
   }
 
   /** Flyger till en namngiven utsikt eller till en tråds bo. Null när den inte finns. */
@@ -474,7 +539,10 @@ export class Colony {
     const f = [...this.faglar.faglar.values()].find((x) => x.trad.id === namn || x.trad.namn === namn)
     if (!f) return null
     // Lite utanför boet och en aning under, så grenen syns under fågeln.
-    return { namn: f.trad.namn, punkt: f.hem.clone(), avstand: 17, lutning: 1.24 }
+    // Utanför boet och en aning under, med kameran vänd inåt mot barken — då står fågeln
+    // mot stammen i stället för mot tom himmel, och man ser vilken gren hon sitter på.
+    const p = f.hem.clone()
+    return { namn: f.trad.namn, punkt: p, avstand: 26, lutning: 1.5, azimut: Math.atan2(p.x, p.z) * 0.55 }
   }
 
   /** Var en agent står, för panelens klick. Null när maskinen inte finns i parken. */
@@ -1002,6 +1070,7 @@ export class Colony {
     this.agenttavla.update(dt, this.camera)
     this.skarmtidsfyr.update(dt, this.camera)
     this.tradmatare.update(dt, this.camera)
+    this._hallVarld()
     if (this.varld === 'trad') {
       // Trädet lyser efter samma natt som resten av kolonin, och blossar på samma slag som
       // skärmtidsfyren: en minut som lämnat någons konto syns i barken.
