@@ -8,6 +8,7 @@ import { Hud } from './ui/hud.js'
 import { PLANETS } from './world/planet.js'
 import { loadKit } from './world/kit.js'
 import { FALTLISTA, JOBB } from './world/maskinpark.js'
+import { TRADHOJD } from './world/tradet.js'
 import { crewRig, loadCrew } from './agents/crew.js'
 import { TIMES } from './world/sky.js'
 import {
@@ -202,6 +203,19 @@ const actions = {
     } catch (err) {
       hud.toast(err.message || 'Could not open that folder', 'err')
     }
+  },
+
+  /**
+   * Klick i trädets karta: kameran flyger till utsikten eller till trådens bo.
+   *
+   * Utsikterna bär sin egen lutning — att titta UPP i en krona är en annan kamera än att
+   * titta ner på en plätt, och det är den skillnaden som gjorde trädet obegripligt att
+   * navigera i första versionen.
+   */
+  flygTill: (namn) => {
+    const v = colony.flygTill(namn)
+    if (!v) return
+    rig.focus(v.punkt, { distance: v.avstand, polar: v.lutning })
   },
 
   /**
@@ -645,6 +659,12 @@ window.addEventListener('keydown', (e) => {
 
 // ── data ──────────────────────────────────────────────────────────────────────────────
 
+/** Trädets karta in i panelen. Anropas när världen byts och när trådarna ändrats. */
+function hudTrad() {
+  if (colony.varld !== 'trad') return
+  hud.setTrad(colony.tradpunkter())
+}
+
 function applyThreads(list) {
   // A thread you have said you looked at stops counting as unread until it moves on again.
   // Done here rather than in `statusFor` so the card, the badge and the astronaut all agree.
@@ -709,6 +729,7 @@ async function poll() {
   try {
     const res = await fetchThreads()
     applyThreads(res.threads || [])
+    hudTrad()
     hud.removeBoot()
     // Billboarden och maskinparken hämtas i samma varv, men får inte kunna fälla pollen:
     // astronauterna är det viktiga, de två andra är utsikt.
@@ -810,9 +831,12 @@ async function boot() {
    */
   if (new URLSearchParams(location.search).get('varld') === 'trad') {
     colony.setVarld('trad')
-    // Nere vid roten och blicken uppåt: trädet ska kännas kolossalt i första bilden, inte
-    // ligga som en modell på ett bord.
-    rig.focus(new THREE.Vector3(0, 16, 0), { distance: 62 })
+    // Kameran byter karaktär: den kretsar kring en STAM i stället för att panorera på en
+    // mark, och målet får ha en höjd. Utan det går kronan inte att titta på.
+    rig.setTradlage(true, TRADHOJD * 0.95)
+    hudTrad()
+    // Första bilden är ÖVERBLICKEN, hela trädet i ram. Det var det Filip inte fick.
+    actions.flygTill?.('hela trädet')
   }
 
   /**

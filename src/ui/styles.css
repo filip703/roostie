@@ -1588,3 +1588,46 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .side .agent .lampa.pa { animation: none; }
 }
+
+/* ── Trädets karta i sidopanelen ─────────────────────────────────────────────────────
+   Ett träd går inte att skanna av som en koloni: bona sitter på olika grenar, på olika höjd,
+   bakom varandra. Listan ÄR överblicken, och ett klick är resan dit. */
+.side .trad-block { flex: none; border-bottom: 1px solid var(--line); }
+.side .trad-block[hidden] { display: none; }
+.side .trad-hint { font-size: 9.5px; text-transform: none; letter-spacing: 0; color: var(--dim); }
+
+.side .trad-utsikter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 12px 10px;
+}
+
+.side .trad-vy {
+  font: 500 11.5px var(--sans, inherit);
+  padding: 5px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+.side .trad-vy:hover { color: var(--text); border-color: var(--line-strong); }
+.side .trad-vy:focus-visible { outline: 2px solid var(--blue, #4e7f8a); outline-offset: 2px; }
+
+.side .trad-bon { padding: 0 9px 10px; display: flex; flex-direction: column; gap: 2px; }
+
+/* Läget står i klartext till höger, som agentlistans tid. En prick räcker inte när raden
+   också är en resa man kan ta. */
+.side .trad-bon .lage {
+  font-size: 10.5px;
+  color: var(--dim);
+  flex: none;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.side .trad-bon .lage.flyger { color: #d7a85f; }
+.side .trad-bon .lage.sjunger { color: #c9785e; }
+.side .trad-bon .lage.stoppat { color: #b65c57; }

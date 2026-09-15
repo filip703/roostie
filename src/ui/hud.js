@@ -538,6 +538,51 @@ export class Hud {
     }
   }
 
+  /**
+   * Trädets karta.
+   *
+   * Ett träd går inte att skanna av som en koloni — bona sitter på olika grenar, på olika
+   * höjd, bakom varandra. Listan ÄR överblicken: utsikterna först, sedan ett bo per tråd med
+   * vad tråden gör just nu, och ett klick tar kameran dit.
+   */
+  setTrad(data) {
+    const utsikter = data?.utsikter || []
+    const bon = data?.bon || []
+    const block = this.$('.trad-block')
+    block.hidden = !utsikter.length && !bon.length
+    if (block.hidden) return
+
+    const nyckel = utsikter.map((u) => u.namn).join('|') + '~' + bon.map((b) => `${b.id}:${b.lage}:${b.rader}`).join('|')
+    if (this._last.trad === nyckel) return
+    this._last.trad = nyckel
+
+    const uWrap = this.$('.trad-utsikter')
+    uWrap.innerHTML = ''
+    for (const u of utsikter) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'trad-vy'
+      b.textContent = u.namn
+      b.addEventListener('click', () => this.actions.flygTill?.(u.namn))
+      uWrap.appendChild(b)
+    }
+
+    const bWrap = this.$('.trad-bon')
+    bWrap.innerHTML = ''
+    for (const bo of bon) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'repo'
+      b.title = `Flyg till ${bo.namn}s bo`
+      b.innerHTML =
+        `<i class="swatch" style="background:${hex(bo.farg)};color:${hex(bo.farg)}"></i>` +
+        `<span class="n">${escapeHtml(bo.namn)}</span>` +
+        `<span class="lage ${bo.lage}">${lageOrd(bo.lage)}</span>`
+      b.addEventListener('click', () => this.actions.flygTill?.(bo.id))
+      bWrap.appendChild(b)
+    }
+  }
+
   toggleAgentList() {
     const knapp = this.$('#btn-agents-toggle')
     const oppen = knapp.getAttribute('aria-expanded') === 'true'
@@ -968,6 +1013,15 @@ function nearestTime(value) {
   return bestD < 0.03 ? best.id : null
 }
 
+/** Fågelns läge i ett ord, för trädets karta. */
+function lageOrd(lage) {
+  if (lage === 'flyger') return 'flyger'
+  if (lage === 'sjunger') return 'vill dig'
+  if (lage === 'stoppat') return 'stoppat'
+  if (lage === 'sover') return 'sover'
+  return 'sitter'
+}
+
 /** Statusen på svenska — samma ord som resten av kolonin använder. */
 function statusOrd(status) {
   if (status === 'fel') return 'fel'
@@ -1010,6 +1064,12 @@ const TEMPLATE = `
   <div class="side-body">
     <div class="projects-pane">
       <div class="sec-head"><span>Repos</span></div>
+      <div class="trad-block" hidden>
+        <div class="sec-head"><span>Trädet</span><span class="trad-hint">klicka för att flyga dit</span></div>
+        <div class="trad-utsikter"></div>
+        <div class="sec-head"><span>Bona</span></div>
+        <div class="trad-bon"></div>
+      </div>
       <div class="projects"></div>
       <div class="agent-block" hidden>
         <button type="button" class="agent-toggle" id="btn-agents-toggle" aria-expanded="false">

@@ -441,6 +441,40 @@ export class Colony {
     }
     lista.sort((a, b) => a.namn.localeCompare(b.namn))
     this.faglar.set(lista, this.tradet.boplatser(Math.max(1, lista.length - 1)), this.tradet.stamhal())
+    this.tradlista = lista
+  }
+
+  /**
+   * Överblicken i trädet: allt man kan flyga till, i en lista.
+   *
+   * Filips andra invändning var att han inte fick någon överblick — ett träd med sju bon på
+   * olika grenar går inte att skanna av som en koloni med plättar bredvid varandra. Panelen
+   * blir kartan: utsikterna först, sedan en rad per tråd som tar kameran till just det boet.
+   */
+  tradpunkter() {
+    if (this.varld !== 'trad') return { utsikter: [], bon: [] }
+    return {
+      utsikter: this.tradet.utsikter(),
+      bon: [...this.faglar.faglar.values()].map((f) => ({
+        id: f.trad.id,
+        namn: f.trad.namn,
+        farg: f.trad.farg,
+        lage: f.lage,
+        rader: f.trad.rader,
+        punkt: f.hem.clone(),
+      })),
+    }
+  }
+
+  /** Flyger till en namngiven utsikt eller till en tråds bo. Null när den inte finns. */
+  flygTill(namn) {
+    if (this.varld !== 'trad') return null
+    const u = this.tradet.utsikter().find((x) => x.namn === namn)
+    if (u) return u
+    const f = [...this.faglar.faglar.values()].find((x) => x.trad.id === namn || x.trad.namn === namn)
+    if (!f) return null
+    // Lite utanför boet och en aning under, så grenen syns under fågeln.
+    return { namn: f.trad.namn, punkt: f.hem.clone(), avstand: 17, lutning: 1.24 }
   }
 
   /** Var en agent står, för panelens klick. Null när maskinen inte finns i parken. */

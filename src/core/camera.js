@@ -73,6 +73,18 @@ export class CameraRig {
 
     this._pointers = new Map()
     this._mode = null
+
+    /**
+     * Trädläge.
+     *
+     * Kolonins kamera är byggd för en MARK: den drar i marken, och målet tvingas alltid till
+     * y=0. På ett träd som är sextio enheter högt betyder det att man aldrig kan centrera på
+     * kronan — man står och panorerar runt på skogsbotten och undrar var allting tog vägen.
+     * Det var precis vad Filip såg. I trädläge blir vänsterdraget i stället "gå runt stammen
+     * och klättra", och målet får ha en höjd.
+     */
+    this.tradlage = false
+    this.maxHojd = 60
     this._last = new THREE.Vector2()
     this._pinch = 0
     this._moved = 0
@@ -186,6 +198,17 @@ export class CameraRig {
 
     if (this.suppressed) return
     e.preventDefault()
+    if (this.tradlage) {
+      // Runt stammen i sidled, upp och ner längs den i höjdled. Klättringen skalas med
+      // avståndet, så ett drag känns lika långt nära roten som ute på håll.
+      this.desiredAzimuth -= dx * 0.006
+      this.desiredTarget.y = THREE.MathUtils.clamp(
+        this.desiredTarget.y + dy * this.distance * 0.0022,
+        0.5,
+        this.maxHojd
+      )
+      return
+    }
     this._dragGround(e.clientX, e.clientY)
   }
 
@@ -260,7 +283,14 @@ export class CameraRig {
       t.x = (t.x / len) * WORLD_LIMIT
       t.z = (t.z / len) * WORLD_LIMIT
     }
-    t.y = 0
+    // I trädläge är höjden halva navigeringen och får inte nollas.
+    t.y = this.tradlage ? THREE.MathUtils.clamp(t.y, 0.5, this.maxHojd) : 0
+  }
+
+  /** Slår om till att kretsa kring en stam i stället för att panorera på en mark. */
+  setTradlage(on, maxHojd = 60) {
+    this.tradlage = Boolean(on)
+    this.maxHojd = maxHojd
   }
 
   /** True when the pointer went down and up without really moving — a click, not a drag. */
@@ -269,13 +299,19 @@ export class CameraRig {
   }
 
   /** Glide the view to a world point without yanking it — used when you pick an astronaut. */
-  focus(point, { distance } = {}) {
+  focus(point, { distance, polar, azimuth } = {}) {
     this.desiredTarget.copy(point)
-    this.desiredTarget.y = 0
+    if (!this.tradlage) this.desiredTarget.y = 0
     this._clampTarget()
     if (distance) this.desiredDistance = THREE.MathUtils.clamp(distance, MIN_DIST, MAX_DIST)
+    // En utsikt mot ett träd behöver få bestämma sin egen lutning: att titta UPP i en krona
+    // är en annan kamera än att titta ner på en plätt.
+    if (polar !== undefined) this.desiredPolar = THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR)
+    if (azimuth !== undefined) this.desiredAzimuth = azimuth
     this._zoom = null
-    this.idleFor = 99 // settle to isometric right away rather than after a pause
+    // I trädläge ska den inte snäppa tillbaka till isometrin — det är den easingen som
+    // drar blicken ner i marken igen så fort man släppt musen.
+    this.idleFor = this.tradlage ? 0 : 99
   }
 
   resetView() {

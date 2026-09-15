@@ -25,8 +25,18 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { TAL } from './palett.js'
 
 /** Trädets höjd i världsenheter. Kolonins astronauter är ~1,7 — det här är ett berg. */
-export const TRADHOJD = 58
-const STAMRADIE = 3.4
+export const TRADHOJD = 62
+/**
+ * Stammens radie vid foten.
+ *
+ * Första försöket var 3,4 och blev en ek: en pinne med kvistar. Ett kolossalt träd känns
+ * kolossalt på PROPORTIONEN — en stam som är nästan en åttondel av höjden, som en ceiba eller
+ * ett banyanträd. Det är de träden Filip menar när han säger Avatar; filmens egen design är
+ * någon annans, men silhuetten den bygger på är verklighetens, och den får vi rita.
+ */
+const STAMRADIE = 7.2
+/** Så högt upp stammen går innan den delar sig. En lång ren pelare är halva intrycket. */
+const FORSTA_GRENEN = 0.52
 const MAXDJUP = 5
 
 /** Årstiderna. Lövfärgen är det enda som byts — formen är trädets, året runt. */
@@ -179,20 +189,34 @@ export class Tradet {
         this.toppar.push({ p: slut.clone(), djup, riktning: riktning.clone() })
         return
       }
-      // Stammen delar sig i fyra huvudgrenar; längre ut blir det två eller tre.
-      const antal = djup === 0 ? 4 : djup === 1 ? 3 : r() < 0.34 ? 3 : 2
+      /**
+       * Kronan svepar UT och sedan NER.
+       *
+       * En vanlig rekursion som bara pekar uppåt ger en ek. Ett jätteträd har en krona som
+       * vecklar ut sig som ett paraply och vars yttersta grenar hänger — det är den
+       * silhuetten ögat känner igen som "urskog", och den kommer av två saker: en kraftig
+       * utsvepning på djup ett, och en lutning som blir NEGATIV längst ut.
+       */
+      const antal = djup === 0 ? 6 : djup === 1 ? 3 : r() < 0.34 ? 3 : 2
       for (let i = 0; i < antal; i++) {
-        const varv = (i / antal) * Math.PI * 2 + r() * 1.1 + djup * 1.3
-        const lut = (djup === 0 ? 0.58 : 0.46) + r() * 0.36
+        const varv = (i / antal) * Math.PI * 2 + r() * 0.9 + djup * 1.3
+        // lut mäts från lodrätt: liten = uppåt, stor = utåt, över PI/2 = nedåt.
+        const lut =
+          djup === 0
+            ? 1.02 + r() * 0.3 // första grenarna nästan vågräta — paraplyt öppnar sig
+            : djup === 1
+              ? 1.15 + r() * 0.35
+              : 1.25 + r() * 0.55 // längst ut hänger de
         const ny = new THREE.Vector3(Math.cos(varv) * Math.sin(lut), Math.cos(lut), Math.sin(varv) * Math.sin(lut))
         // Dra mot förälderns riktning, annars startar varje gren om från noll och trädet
-        // blir en buske.
-        ny.lerp(riktning, djup === 0 ? 0.3 : 0.44).normalize()
-        gren(slut, ny, langd * (0.7 + r() * 0.11), radie * (djup === 0 ? 0.52 : 0.63), djup + 1)
+        // blir en buske. Svagare dragning på djup noll, så paraplyt får öppna sig.
+        ny.lerp(riktning, djup === 0 ? 0.18 : 0.4).normalize()
+        gren(slut, ny, langd * (djup === 0 ? 0.82 : 0.72 + r() * 0.12), radie * (djup === 0 ? 0.44 : 0.62), djup + 1)
       }
     }
 
-    gren(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.015, 1, 0.01).normalize(), TRADHOJD * 0.42, STAMRADIE, 0)
+    // En lång, ren pelare först. Sedan öppnar sig kronan.
+    gren(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.01, 1, 0.008).normalize(), TRADHOJD * FORSTA_GRENEN, STAMRADIE, 0)
     return bitar
   }
 
@@ -207,6 +231,7 @@ export class Tradet {
     const bitar = this._skelett()
 
     // ── trät: en enda sammanslagen geometri, ett anrop ──────────────────────────────
+    // (grenarna först, sedan rötterna — luftrötterna hänger i grenar som måste finnas)
     const geos = []
     for (const b of bitar) {
       const langd = b.start.distanceTo(b.slut)
@@ -226,23 +251,60 @@ export class Tradet {
       geos.push(g)
     }
 
-    // Strävrötterna: de gör trädet kolossalt. Utan dem står stammen på marken som en stolpe.
+    /**
+     * Strävrötterna.
+     *
+     * Inte koner — PLATTOR. En ceibas strävrötter är tunna, höga skivor som löper ut från
+     * stammen som stödmurar, och mellanrummen mellan dem är rum man kan gå in i. Det är det
+     * som ger ett jätteträd sin skala: något litet får plats under det.
+     */
     const rr = fro(0x110c7)
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * Math.PI * 2 + rr() * 0.3
-      const ut = new THREE.Vector3(Math.cos(a), 0, Math.sin(a))
-      const hojd = 7 + rr() * 5
-      const langd = 9 + rr() * 6
-      const strava = new THREE.CylinderGeometry(0.5, STAMRADIE * 0.75, hojd * 1.5, 5, 1, false)
-      const riktning = new THREE.Vector3().copy(ut).multiplyScalar(0.72).add(new THREE.Vector3(0, 0.7, 0)).normalize()
-      const q = new THREE.Quaternion().setFromUnitVectors(UPP, riktning)
-      strava.applyMatrix4(
-        new THREE.Matrix4().compose(new THREE.Vector3(ut.x * langd * 0.36, hojd * 0.42, ut.z * langd * 0.36), q, new THREE.Vector3(1, 1, 1))
-      )
-      const n = strava.attributes.position.count
+    const ROTPLATTOR = 11
+    for (let i = 0; i < ROTPLATTOR; i++) {
+      const a = (i / ROTPLATTOR) * Math.PI * 2 + rr() * 0.12
+      const hojd = 15 + rr() * 8
+      const langd = 13 + rr() * 7
+      // En skiva som är hög vid stammen och tunnar ut mot marken: en kil, lagd på kant.
+      const platta = new THREE.BoxGeometry(langd, hojd, 1.5 + rr() * 1.1, 1, 3, 1)
+      const pos = platta.attributes.position
+      for (let v = 0; v < pos.count; v++) {
+        const x = pos.getX(v)
+        const y = pos.getY(v)
+        // Överkanten lutar ner mot marken, underkanten följer marken: en stödmur.
+        const ut = (x + langd / 2) / langd // 0 vid stammen, 1 längst ut
+        pos.setY(v, y > 0 ? hojd / 2 - ut * hojd * 0.92 : -hojd / 2 + ut * hojd * 0.44)
+        pos.setZ(v, pos.getZ(v) * (1 - ut * 0.55))
+      }
+      platta.computeVertexNormals()
+      platta.translate(langd / 2 + STAMRADIE * 0.55, hojd / 2, 0)
+      platta.rotateY(-a)
+      const n = platta.attributes.position.count
       const boj = new Float32Array(n) // rötter rör sig inte
-      strava.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
-      geos.push(strava)
+      platta.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
+      geos.push(platta)
+    }
+
+    /**
+     * Luftrötterna: pelare som går från de tunga grenarna rakt ner i marken, som på ett
+     * banyanträd. De är det som gör att kronan känns TUNG — den bärs, den svävar inte.
+     */
+    const la = fro(0x4e77)
+    const barande = this.grenar.filter((g) => g.djup === 1 && g.slut.y > TRADHOJD * 0.5)
+    for (let i = 0; i < 14; i++) {
+      const g = barande[Math.floor(la() * barande.length)]
+      if (!g) continue
+      const topp = g.slut.clone().lerp(g.start, la() * 0.5)
+      const markpunkt = new THREE.Vector3(topp.x * (0.82 + la() * 0.25), 0, topp.z * (0.82 + la() * 0.25))
+      const h = topp.y
+      const rot = new THREE.CylinderGeometry(0.42 + la() * 0.3, 1.1 + la() * 0.6, h, 6, 1, false)
+      const mitt = topp.clone().add(markpunkt).multiplyScalar(0.5)
+      const riktning = topp.clone().sub(markpunkt).normalize()
+      const q = new THREE.Quaternion().setFromUnitVectors(UPP, riktning)
+      rot.applyMatrix4(new THREE.Matrix4().compose(mitt, q, new THREE.Vector3(1, 1, 1)))
+      const n = rot.attributes.position.count
+      const boj = new Float32Array(n)
+      rot.setAttribute('aBoj', new THREE.BufferAttribute(boj, 1))
+      geos.push(rot)
     }
 
     const traMat = new THREE.MeshStandardMaterial({ color: 0x4a3726, roughness: 0.94, metalness: 0.02, flatShading: true })
@@ -275,11 +337,13 @@ export class Tradet {
     const r = fro(0xb1adf)
     const platser = []
     for (const t of this.toppar) {
-      const n = t.djup >= MAXDJUP ? 4 : 2
+      const n = t.djup >= MAXDJUP ? 6 : 3
       for (let i = 0; i < n; i++) {
         platser.push({
-          p: t.p.clone().add(new THREE.Vector3((r() - 0.5) * 7, (r() - 0.5) * 5.5, (r() - 0.5) * 7)),
-          s: 2.6 + r() * 2.8,
+          // Bred spridning i sidled, smal i höjd: kronan blir en skiva, inte en boll. Det är
+          // paraplyformen som gör att man ser att man står UNDER något.
+          p: t.p.clone().add(new THREE.Vector3((r() - 0.5) * 13, (r() - 0.5) * 5, (r() - 0.5) * 13)),
+          s: 3.4 + r() * 3.6,
           rx: r() * 6.28,
           ry: r() * 6.28,
           slump: r(),
@@ -349,12 +413,13 @@ export class Tradet {
   _lianor() {
     const r = fro(0x1a6a)
     const geos = []
-    const bar = this.grenar.filter((g) => g.djup === 2)
-    for (let i = 0; i < 26; i++) {
+    // Från kronans yttersta grenar, där de redan pekar nedåt: ridån under paraplyt.
+    const bar = this.grenar.filter((g) => g.djup >= 2 && g.slut.y > TRADHOJD * 0.45)
+    for (let i = 0; i < 90; i++) {
       const g = bar[Math.floor(r() * bar.length)]
       if (!g) continue
-      const langd = 6 + r() * 16
-      const geo = new THREE.CylinderGeometry(0.07, 0.16, langd, 4, 1, false)
+      const langd = 8 + r() * 26
+      const geo = new THREE.CylinderGeometry(0.05, 0.13, langd, 4, 1, false)
       geo.translate(g.slut.x + (r() - 0.5) * 2, g.slut.y - langd / 2, g.slut.z + (r() - 0.5) * 2)
       const n = geo.attributes.position.count
       const boj = new Float32Array(n)
@@ -384,7 +449,7 @@ export class Tradet {
    * har något som rör sig även när ingen tråd skriver en rad.
    */
   _fron() {
-    const ANTAL = 150
+    const ANTAL = 220
     const r = fro(0xf20e)
     const geo = new THREE.OctahedronGeometry(0.16, 0)
     const boj = new Float32Array(geo.attributes.position.count)
@@ -403,7 +468,7 @@ export class Tradet {
     this.fron = []
     for (let i = 0; i < ANTAL; i++) {
       const a = r() * Math.PI * 2
-      const d = 4 + r() * 30
+      const d = 4 + r() * 46
       this.fron.push({
         x: Math.cos(a) * d,
         z: Math.sin(a) * d,
@@ -428,7 +493,7 @@ export class Tradet {
       depthWrite: false,
       side: THREE.DoubleSide,
     })
-    const skiva = new THREE.Mesh(new THREE.CircleGeometry(26, 32), mat)
+    const skiva = new THREE.Mesh(new THREE.CircleGeometry(34, 32), mat)
     skiva.rotation.x = -Math.PI / 2
     skiva.position.y = 0.15
     this.grupp.add(skiva)
@@ -469,12 +534,20 @@ export class Tradet {
   }
 
   /** Utsiktspunkter för köksläget: roten, kronan, stamhålet. */
+  /**
+   * Utsikterna.
+   *
+   * `lutning` är kamerans polarvinkel: stor = kameran står lågt och tittar UPP, vilket är
+   * hela poängen med ett träd. Överblicken kommer först och är den man alltid kan ta sig
+   * tillbaka till — Filips första invändning var att han inte fick någon.
+   */
   utsikter() {
     return [
-      { namn: 'trädet', punkt: new THREE.Vector3(0, TRADHOJD * 0.42, 0), avstand: TRADHOJD * 1.25 },
-      { namn: 'roten', punkt: new THREE.Vector3(0, 5, 0), avstand: 30 },
-      { namn: 'kronan', punkt: new THREE.Vector3(0, TRADHOJD * 0.74, 0), avstand: 44 },
-      { namn: 'stamhålet', punkt: this.stamhal(), avstand: 22 },
+      { namn: 'hela trädet', punkt: new THREE.Vector3(0, TRADHOJD * 0.46, 0), avstand: TRADHOJD * 1.9, lutning: 1.28 },
+      { namn: 'under kronan', punkt: new THREE.Vector3(0, TRADHOJD * 0.3, 0), avstand: 34, lutning: 1.42 },
+      { namn: 'roten', punkt: new THREE.Vector3(0, 7, 0), avstand: 38, lutning: 1.35 },
+      { namn: 'kronan', punkt: new THREE.Vector3(0, TRADHOJD * 0.78, 0), avstand: 58, lutning: 1.05 },
+      { namn: 'stamhålet', punkt: this.stamhal(), avstand: 24, lutning: 1.3 },
     ]
   }
 
