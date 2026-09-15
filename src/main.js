@@ -740,6 +740,24 @@ async function boot() {
    * Ingen hjälpruta heller: den lägger sig över hela bilden och ingen är där för att stänga
    * den. Den räknas som sedd, så en människa som öppnar samma URL slipper den också.
    */
+  /**
+   * `?vy=maskinparken` — kameran går direkt till en utsiktspunkt.
+   *
+   * Kolonin är stor nog att något kan vara byggt och ändå osynligt: rundturen hinner dit
+   * efter några minuter, och den som ska titta på gårdarna vill inte vänta ut den. Namnen är
+   * utsiktspunkternas egna: kolonin, loggboken, filips skylt, agenterna, maskinparken.
+   */
+  const onskadVy = new URLSearchParams(location.search).get('vy')
+  if (onskadVy) {
+    const gaTill = () => {
+      const v = colony.utsiktspunkter().find((p) => p.namn === onskadVy.toLowerCase())
+      if (v) rig.focus(v.punkt, { distance: v.avstand })
+      return Boolean(v)
+    }
+    // Gårdarna finns först när första pollen kommit hem, så vi försöker en gång till sedan.
+    if (!gaTill()) setTimeout(gaTill, 4000)
+  }
+
   if (new URLSearchParams(location.search).get('kiosk') === '1') {
     localStorage.setItem('botcrossing.seen-help', '1')
     hud.toggleUi(false)
@@ -759,7 +777,8 @@ async function boot() {
       const v = punkter[vy++ % punkter.length]
       rig.focus(v.punkt, { distance: v.avstand })
     }
-    setTimeout(turnera, 6000)
+    // Har någon bett om en bestämd vy får den stå kvar en stund innan rundturen tar över.
+    setTimeout(turnera, onskadVy ? 90000 : 6000)
     setInterval(turnera, 45000)
     return
   }
