@@ -39,6 +39,10 @@ const SORTER = ['antenna', 'solar', 'greenhouse', 'tower', 'reactor']
 
 /** En liten lykta ovanför varje maskin — status som går att läsa tvärs över kolonin. */
 const FYR_GEO = new THREE.SphereGeometry(0.22, 10, 8)
+/** Paketet som åker längs kabeln när en maskin rapporterar in. */
+const PAKET_GEO = new THREE.SphereGeometry(0.13, 8, 6)
+/** Varje maskin står på sin egen box. */
+const BOX_GEO = new THREE.BoxGeometry(2.3, 0.22, 2.3)
 
 /**
  * Vad maskinen gör, på svenska.
@@ -120,8 +124,21 @@ export class Maskinpark {
       const etikett = createLabel(namn, farg)
       etikett.visible = false
       etikett.material.opacity = 0
-      this.grupp.add(platta, etikett)
-      this.plattor[grupp] = { platta, etikett, farg }
+
+      /**
+       * Masten i mitten av fältet. Varje maskin har en kabel dit, och det som åker längs
+       * kabeln är maskinens rapport — det är så man ser att de arbetar ihop och inte var
+       * för sig. Masten blinkar när ett paket kommer fram.
+       */
+      const mast = createBuilding({ seed: grupp === 'roost' ? 7 : 11, accent: farg, kind: 'antenna' })
+      mast.scale.setScalar(0.5)
+      mast.castShadow = true
+      mast.visible = false
+      const masttid = { value: 0 }
+      mast.userData.uniforms.uTime = masttid
+
+      this.grupp.add(platta, etikett, mast)
+      this.plattor[grupp] = { platta, etikett, farg, mast, masttid, blink: 0, navY: 0, navZ: 0 }
     }
   }
 
@@ -138,8 +155,8 @@ export class Maskinpark {
   /** Kolonin lämnar en markhöjdsfunktion hit, så maskinerna står på marken och inte i den. */
   markhojd(fn) {
     this.hojd = fn || (() => 0)
-    for (const m of this.maskiner.values()) this._placera(m)
     this._plattor()
+    for (const m of this.maskiner.values()) this._placera(m)
   }
 
   set(lista) {
@@ -153,6 +170,10 @@ export class Maskinpark {
     const grupper = { roost: [], nexus: [] }
     for (const m of rader) (grupper[m.grupp] || grupper.nexus).push(m)
     this.antal = { roost: grupper.roost.length, nexus: grupper.nexus.length }
+
+    // Fälten och masterna först: maskinerna drar sina kablar dit, så gården måste finnas
+    // innan den möbleras.
+    this._plattor()
 
     for (const [grupp, medlemmar] of Object.entries(grupper)) {
       medlemmar.forEach((m, i) => {
@@ -175,10 +196,14 @@ export class Maskinpark {
 
     for (const namn of kvar) {
       const post = this.maskiner.get(namn)
-      this.grupp.remove(post.mesh, post.etikett, post.fyr)
+      this.grupp.remove(post.mesh, post.etikett, post.fyr, post.box, post.kabel, post.paket)
       post.mesh.geometry.dispose()
       post.mesh.material.dispose()
       post.fyr.material.dispose()
+      post.box.material.dispose()
+      post.kabel.geometry.dispose()
+      post.kabel.material.dispose()
+      post.paket.material.dispose()
       post.etikett.userData.dispose?.()
       this.maskiner.delete(namn)
     }
@@ -211,11 +236,32 @@ export class Maskinpark {
     )
     fyr.userData.hojd = (mesh.userData.height || 2) * SKALA + 0.55
 
-    this.grupp.add(mesh, etikett, fyr)
+    // Egen box att stå på, och en kabel in till fältets mast.
+    const box = new THREE.Mesh(
+      BOX_GEO,
+      new THREE.MeshStandardMaterial({ color: 0x2f2922, roughness: 0.88, metalness: 0.12 })
+    )
+    box.receiveShadow = true
+
+    const kabel = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+      new THREE.LineBasicMaterial({ color: 0x4a4138, transparent: true, opacity: 0.45 })
+    )
+    const paket = new THREE.Mesh(
+      PAKET_GEO,
+      new THREE.MeshBasicMaterial({ color: FARG.ok, transparent: true, opacity: 0, toneMapped: false })
+    )
+
+    this.grupp.add(mesh, etikett, fyr, box, kabel, paket)
     return {
       mesh,
       etikett,
       fyr,
+      box,
+      kabel,
+      paket,
+      // Fasen är slumpad från start, annars åker fyrtio paket i takt som ett tåg.
+      fas: Math.random(),
       tid,
       status: 'okand',
       farg: new THREE.Color(FARG.okand),
@@ -236,9 +282,19 @@ export class Maskinpark {
         ? -FALTAVSTAND / 2 - RUTA / 2 - rad * RUTA
         : FALTAVSTAND / 2 + RUTA / 2 + rad * RUTA
     const y = this.hojd(this.grupp.position.x + x, this.grupp.position.z + z) - this.grupp.position.y
-    post.mesh.position.set(x, y, z)
+    post.mesh.position.set(x, y + 0.11, z)
     post.etikett.position.set(x, y + 1.9, z)
     post.fyr.position.set(x, y + post.fyr.userData.hojd, z)
+    post.box.position.set(x, y, z)
+
+    // Kabeln dras från maskinens lykta in till fältets mast, och paketet åker den vägen.
+    const falt = this.plattor[grupp]
+    const fran = new THREE.Vector3(x, y + post.fyr.userData.hojd * 0.8, z)
+    const till = new THREE.Vector3(0, (falt?.navY ?? 0) + 1.6, falt?.navZ ?? 0)
+    post.kabel.geometry.setFromPoints([fran, till])
+    post.kabel.geometry.computeBoundingSphere()
+    post.fran = fran
+    post.till = till
   }
 
   /** Plattorna växer med fälten, så en ny agent inte hamnar utanför gården. */
@@ -257,6 +313,14 @@ export class Maskinpark {
       p.platta.scale.set(bredd, 1, djup)
       p.platta.position.set(0, y - 0.12, z)
       p.etikett.position.set(0, y + 0.9, z + (grupp === 'roost' ? -djup / 2 - 0.9 : djup / 2 + 0.9))
+
+      // Masten står vid gatan mellan fälten, där alla kablar möts.
+      const mastZ = grupp === 'roost' ? -FALTAVSTAND / 2 + 0.9 : FALTAVSTAND / 2 - 0.9
+      const mastY = this.hojd(this.grupp.position.x, this.grupp.position.z + mastZ) - this.grupp.position.y
+      p.mast.position.set(0, mastY, mastZ)
+      p.mast.visible = true
+      p.navZ = mastZ
+      p.navY = mastY
     }
   }
 
@@ -284,6 +348,32 @@ export class Maskinpark {
         accent.copy(grund).multiplyScalar(Math.min(1.6, puls + post.blixt * 0.9))
       } else {
         accent.set(SLACKT)
+      }
+
+      /**
+       * Paketet på kabeln. En maskin som arbetar skickar tätt, en som går på tomgång sällan,
+       * och en som är nere skickar inget alls — det är den rörelsen som gör att fältet ser
+       * ut att jobba ihop i stället för att bara stå och lysa.
+       */
+      const pm = post.paket.material
+      if (post.status === 'ok' && post.fran) {
+        const fart = arbetar ? 0.55 : 0.14
+        const fore = post.fas
+        post.fas = (post.fas + dt * fart) % 1
+        if (post.fas < fore) {
+          const falt = this.plattor[post.plats.grupp]
+          if (falt) falt.blink = 1 // paketet kom fram
+        }
+        // Lite båge på vägen, annars ser kabeln ut som en pinne.
+        const t = post.fas
+        post.paket.position.lerpVectors(post.fran, post.till, t)
+        post.paket.position.y += Math.sin(t * Math.PI) * 0.9
+        pm.opacity = arbetar ? 0.95 : 0.4
+        post.paket.visible = true
+        post.kabel.material.opacity = arbetar ? 0.6 : 0.3
+      } else {
+        post.paket.visible = false
+        post.kabel.material.opacity = 0.16
       }
 
       // Lyktan: den enda statusen som går att se på håll.
@@ -315,6 +405,12 @@ export class Maskinpark {
     }
     for (const falt of Object.values(this.plattor)) {
       if (!falt.platta.visible) continue
+
+      // Masten snurrar så länge fältet lever, och lyser upp när ett paket kommer fram.
+      falt.masttid.value += dt
+      falt.blink = Math.max(0, falt.blink - dt * 2.2)
+      falt.mast.userData.uniforms.uAccent.value.set(falt.farg).multiplyScalar(0.7 + falt.blink * 1.1)
+
       falt.etikett.getWorldPosition(p)
       const mal = p.distanceTo(camera.position) < 90 ? 1 : 0
       const m = falt.etikett.material
@@ -328,11 +424,17 @@ export class Maskinpark {
       post.mesh.geometry.dispose()
       post.mesh.material.dispose()
       post.fyr.material.dispose()
+      post.box.material.dispose()
+      post.kabel.geometry.dispose()
+      post.kabel.material.dispose()
+      post.paket.material.dispose()
       post.etikett.userData.dispose?.()
     }
     for (const falt of Object.values(this.plattor)) {
       falt.platta.geometry.dispose()
       falt.platta.material.dispose()
+      falt.mast.geometry.dispose()
+      falt.mast.material.dispose()
       falt.etikett.userData.dispose?.()
     }
     this.maskiner.clear()

@@ -1418,3 +1418,25 @@ kbd {
   }
 }
 .bot-crossing-canvas { cursor: grab; }
+
+/* Raden på trådkortet: det tråden senast skrev, eller frågan den väntar svar på.
+   En astronaut med ett ? ska gå att förstå utan att man öppnar chatten. */
+.thread-pop .rad {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+}
+
+.thread-pop .rad.vantar {
+  color: #cfe0ff;
+  border-left: 2px solid var(--blue);
+  padding-left: 8px;
+}
+
+.thread-pop .rad[hidden] {
+  display: none;
+}

@@ -597,6 +597,13 @@ export class Hud {
     bits.push(`<span>${ago(thread.lastActivityAt)}</span>`)
     meta.innerHTML = bits.join('')
 
+    // Raden under mätaren: frågan när tråden vinkar, annars det den senast skrev.
+    const rad = this.$('.thread-pop .rad')
+    const text = thread.notis ? `${thread.notis}${thread.notisText ? ` — ${thread.notisText}` : ''}` : thread.preview || ''
+    rad.textContent = text
+    rad.classList.toggle('vantar', Boolean(thread.notis))
+    rad.hidden = !text
+
     const pct = Math.round((this.actions.progressFor?.(thread.id) ?? 0) * 100)
     this.$('.thread-pop .progress > i').style.width = `${pct}%`
     this.$('.thread-pop .progress > i').style.background = hex(agent.trim.getHex())
@@ -975,6 +982,9 @@ const TEMPLATE = `
     <button class="btn icon ghost" id="btn-deselect" title="Deselect (Esc)">${ICON.close}</button>
   </div>
   <div class="progress"><i></i></div>
+  <!-- Vad tråden senast skrev på tavlan, och framför allt vad den ber om när den håller upp
+       handen: ett ? man måste öppna chatten för att förstå är bara en prick. -->
+  <div class="rad"></div>
   <div class="pair">
     <button class="btn primary" id="btn-open" title="Open this thread in the harness it came from (Enter)">${ICON.open} Open</button>
     <button class="btn" id="btn-viewed" title="Stop this thread asking for you until it moves on again (V)">${ICON.eye} Viewed</button>
