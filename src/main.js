@@ -13,6 +13,7 @@ import {
   fetchThreads,
   fetchTavlan,
   fetchMaskiner,
+  fetchPuls,
   fetchState,
   saveState,
   openThread,
@@ -666,6 +667,9 @@ async function poll() {
       .catch(() => {})
     fetchMaskiner()
       .then((m) => colony.setMaskiner(m.maskiner || []))
+      .catch(() => {})
+    fetchPuls()
+      .then((p) => colony.setPuls(p))
       .catch(() => {})
   } catch (err) {
     hud.toast(err.message || 'Could not reach the thread scanner', 'err')

@@ -144,6 +144,18 @@ export class Maskinpark {
     this.roverT = 0
     this.roverRiktning = 1
 
+    /**
+     * Roosts läsväg (`/api/roostie`) när den svarar: agenternas riktiga puls och kommandokön.
+     *
+     * Docker kan bara säga att en container kör. Pulsen säger att agenten *arbetar*, mätt mot
+     * agentens egen takt — doctor med 820 sekunder sedan är frisk med intervall 900, medan
+     * screentime med samma siffra vore död. Finns pulsen vinner den över loggraden; saknas
+     * den faller maskinen tillbaka på loggen, som är trubbig men ärlig.
+     */
+    this.puls = new Map()
+    this.ko = null
+    this.pulsFardig = false
+
     // Två plattor, en per fält. Utan dem ser maskinerna ut som skrot någon tappat i
     // terrängen; med dem är det en gård.
     this.plattor = {}
@@ -182,6 +194,26 @@ export class Maskinpark {
         nav: new THREE.Vector3(),
       }
     }
+  }
+
+  /** Roosts läsväg in: pulsen per agent och kommandokön. */
+  setPuls(data) {
+    this.puls = new Map((Array.isArray(data?.puls) ? data.puls : []).map((p) => [`nexus-${p.agent}`, p]))
+    this.ko = data?.ko || null
+    this.pulsFardig = Boolean(data?.fardig)
+  }
+
+  /**
+   * Om maskinen arbetar just nu.
+   *
+   * Pulsen är sanningen när den finns — den mäter mot agentens egen takt. Utan puls får
+   * loggraden duga: trubbig, men den är vad docker kan se.
+   */
+  _arbetar(post, namn, nu) {
+    if (post.status !== 'ok') return false
+    const p = this.pulsFardig ? this.puls.get(namn) : null
+    if (p) return p.status === 'ok' && !p.tyst
+    return post.sistaLogg > 0 && nu - post.sistaLogg < AKTIV_MS
   }
 
   /**
@@ -422,8 +454,8 @@ export class Maskinpark {
     const nu = Date.now()
     const sekunder = performance.now() / 1000
 
-    for (const post of this.maskiner.values()) {
-      const arbetar = post.status === 'ok' && post.sistaLogg > 0 && nu - post.sistaLogg < AKTIV_MS
+    for (const [namn, post] of this.maskiner) {
+      const arbetar = this._arbetar(post, namn, nu)
       // Bara det som går får sin klocka framflyttad. Den som arbetar snurrar i full fart,
       // den som bara står och kör går på tomgång, och den som är nere står stilla.
       if (post.status === 'ok') post.tid.value += dt * (arbetar ? 1 : 0.18)
@@ -491,7 +523,14 @@ export class Maskinpark {
     if (this.rover && kommando) {
       const hem = new THREE.Vector3(kommando.mesh.position.x + 1.6, kommando.mesh.position.y, kommando.mesh.position.z)
       const ute = new THREE.Vector3(0, hem.y, 0) // gatan där de fyra gårdarna möts
-      const kor = kommando.status === 'ok' && kommando.sistaLogg > 0 && nu - kommando.sistaLogg < AKTIV_MS
+      /**
+       * Rovern kör när det FINNS NÅGOT ATT KÖRA. Med Roosts läsväg uppe är det kön som
+       * avgör — pending eller running — precis som Ledning skrev. Svarar läsvägen inte får
+       * agentens loggrad duga, och då betyder rörelsen bara att agenten arbetar.
+       */
+      const kor = this.pulsFardig
+        ? kommando.status === 'ok' && (this.ko?.pending > 0 || this.ko?.running > 0)
+        : this._arbetar(kommando, 'nexus-commands', nu)
 
       if (kor) {
         this.roverT += dt * 0.16 * this.roverRiktning

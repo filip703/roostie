@@ -18,6 +18,7 @@ import { Anslagstavla } from '../world/anslagstavla.js'
 import { Tavlan } from '../world/tavlan.js'
 import { Agenttavla } from '../world/agenttavla.js'
 import { Maskinpark, FALTLISTA } from '../world/maskinpark.js'
+import { Skarmtidsfyr } from '../world/skarmtidsfyr.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
 import { MAX_AGENT_CAP } from '../core/settings.js'
@@ -153,6 +154,9 @@ export class Colony {
     // Agenterna får en egen tavla vid gården: de skriver inga rader i Loggboken, så det här
     // är enda stället deras uppdrag och läge går att läsa på ett ställe.
     this.agenttavla = new Agenttavla(scene, { x: tavlaPlats.x + 2, y: 0, z: tavlaPlats.z + 25 }, FALTLISTA)
+    // Skärmtidsfyren står mitt i kolonin, där plätterna möts — Roost handlar om en enda sak,
+    // och den ska stå i mitten, inte i utkanten bland maskinerna.
+    this.skarmtidsfyr = new Skarmtidsfyr(scene, { x: 0, y: 0, z: 0 })
     this.astronauts = new Astronauts(scene, settings)
     this.astronauts.world = this._world()
     // Sized for the largest preset rather than the current one: unlike the astronaut meshes these
@@ -204,7 +208,7 @@ export class Colony {
     const ship = shipPosition()
     this.ship.group.position.y = terrainHeight(ship.x, ship.z, this.planet)
     // Samma sak för skylten: stolparna ska stå i marken, inte i luften ovanför den.
-    for (const sak of [this.anslagstavla, this.tavlan, this.maskinpark, this.agenttavla]) {
+    for (const sak of [this.anslagstavla, this.tavlan, this.maskinpark, this.agenttavla, this.skarmtidsfyr]) {
       const p = sak.grupp.position
       p.y = terrainHeight(p.x, p.z, this.planet)
     }
@@ -316,6 +320,17 @@ export class Colony {
   setTavla(data) {
     this.tavlan.set(data)
     this.anslagstavla.set(data?.filip || [])
+  }
+
+  /**
+   * Roosts läsväg → skärmtidsfyren och maskinparkens kö.
+   *
+   * Pulsen säger vilka agenter som verkligen arbetar (mätt mot deras egen takt), kön om
+   * kommandoprocessorn har något att göra, och budgetarna hur mycket skärmtid barnen har kvar.
+   */
+  setPuls(data) {
+    this.skarmtidsfyr.set(data)
+    this.maskinpark.setPuls(data)
   }
 
   /** NUC:ens containrar → maskinparken. */
@@ -791,6 +806,7 @@ export class Colony {
     this.tavlan.update(dt, this.camera)
     this.maskinpark.update(dt, this.camera)
     this.agenttavla.update(dt, this.camera)
+    this.skarmtidsfyr.update(dt, this.camera)
 
     this._growBuildings(dt)
     this.astronauts.update(dt, elapsed)
@@ -947,6 +963,7 @@ export class Colony {
     this.tavlan.dispose()
     this.maskinpark.dispose()
     this.agenttavla.dispose()
+    this.skarmtidsfyr.dispose()
     this.astronauts.dispose()
     this.indicators.dispose()
     this.particles.dispose()

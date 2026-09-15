@@ -13,6 +13,7 @@ import {
 } from './scan.mjs'
 import { senasteRader } from './harnesses/roost-loggbok.mjs'
 import { laesMaskiner } from './maskiner.mjs'
+import { laesRoostie } from './roostie.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.BOT_CROSSING_DATA || path.join(here, '..', 'data')
@@ -387,6 +388,11 @@ export async function apiMiddleware(req, res, next) {
 
     if (url.pathname === '/api/maskiner' && req.method === 'GET') {
       return send(res, 200, await laesMaskiner())
+    }
+
+    // Roosts egen läsväg: agenternas puls, kommandokön och barnens skärmtid.
+    if (url.pathname === '/api/puls' && req.method === 'GET') {
+      return send(res, 200, await laesRoostie())
     }
 
     if (url.pathname === '/api/state' && req.method === 'GET') {

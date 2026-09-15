@@ -19,6 +19,9 @@ export const fetchThreads = () => req('/api/threads')
 /** Loggbokens senaste rader — det billboarden i kolonin visar. */
 export const fetchTavlan = () => req('/api/tavlan')
 
+/** Roosts lasvag: agenternas puls, kommandokon och barnens skarmtid. */
+export const fetchPuls = () => req('/api/puls')
+
 /** NUC:ens containrar, som maskinparken ritar. */
 export const fetchMaskiner = () => req('/api/maskiner')
 
