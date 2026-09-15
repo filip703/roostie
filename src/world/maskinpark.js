@@ -457,7 +457,7 @@ export class Maskinpark {
       return k
     }
     return new THREE.MeshStandardMaterial({
-      color: new THREE.Color(farg).offsetHSL(0, -0.4, 0).multiplyScalar(styrka),
+      color: new THREE.Color(farg).offsetHSL(0, -0.24, -0.04).multiplyScalar(styrka),
       map: klona(this._plat.map),
       normalMap: klona(this._plat.normalMap),
       roughnessMap: klona(this._plat.roughnessMap),
@@ -836,18 +836,7 @@ export class Maskinpark {
       p.broTill = new THREE.Vector3(riktning.x * slut, dackY + 0.3, riktning.z * slut)
 
       // Masten står mitt på gården: alla kablar går inåt, som ekrar i ett hjul.
-      if (!p.mast) {
-        try {
-          const mast = createBuilding({ seed: fro, accent: p.farg, kind: 'antenna' })
-          mast.scale.setScalar(0.55)
-          mast.castShadow = true
-          mast.userData.uniforms.uTime = p.masttid
-          this.grupp.add(mast)
-          p.mast = mast
-        } catch {
-          // Kitet är inte inne än. Nästa poll bygger masten; fältet fungerar utan den.
-        }
-      }
+      this._mast(p, fro)
       if (p.mast) {
         p.mast.position.set(mx, dackY + 0.14, mz)
         p.mast.visible = true
@@ -865,6 +854,31 @@ export class Maskinpark {
       }
       p.dronare.visible = true
     }
+  }
+
+  /**
+   * Masten, byggd när modellkitet finns.
+   *
+   * Kitet läses in efter att kolonin skapats, så det första försöket misslyckas nästan
+   * alltid. Förut gjordes försöket bara när maskinlistan ändrades — och den ändras sällan,
+   * så masterna kom aldrig upp och kablarna gick in i tomma luften. Nu försöker `update`
+   * igen tills kitet är inne, och slutar fråga så fort masten står.
+   */
+  _mast(p, fro) {
+    if (p.mast) return p.mast
+    try {
+      const mast = createBuilding({ seed: fro, accent: p.farg, kind: 'antenna' })
+      mast.scale.setScalar(0.55)
+      mast.castShadow = true
+      mast.userData.uniforms.uTime = p.masttid
+      mast.position.copy(p.mitt)
+      mast.position.y += 0.14
+      this.grupp.add(mast)
+      p.mast = mast
+    } catch {
+      // Kitet är inte inne än.
+    }
+    return p.mast
   }
 
   /** Bygger rovern när kitet är inne och kommandoprocessorn har fått sin plats. */
@@ -1033,6 +1047,7 @@ export class Maskinpark {
       if (falt.dronare?.visible && falt.radie) this._flygDronare(falt, dt, sekunder)
 
       // Masten snurrar så länge fältet lever, och lyser upp när ett paket kommer fram.
+      if (!falt.mast) this._mast(falt, falt.fro || 7)
       falt.masttid.value += dt
       falt.blink = Math.max(0, falt.blink - dt * 2.2)
       if (falt.mast) {
