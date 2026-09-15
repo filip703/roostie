@@ -160,7 +160,7 @@ export class Colony {
     this.skarmtidsfyr = new Skarmtidsfyr(scene, { x: 0, y: 0, z: 0 })
     // Trådarnas arbete står bredvid barnens tid: kolonins två sorters arbete, båda mitt i
     // bilden. Den mäter rader på tavlan, inte Claude-kvot — den läsvägen finns inte.
-    this.tradmatare = new Tradmatare(scene, { x: 0, y: 0, z: 7.5 })
+    this.tradmatare = new Tradmatare(scene, { x: 0, y: 0, z: 9.5 })
     this.astronauts = new Astronauts(scene, settings)
     this.astronauts.world = this._world()
     // Sized for the largest preset rather than the current one: unlike the astronaut meshes these

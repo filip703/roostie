@@ -25,8 +25,13 @@ import { createLabel } from './plots.js'
 
 const MIN_HOJD = 0.35
 const MAX_HOJD = 5.6
-/** Avstånd mellan stavarna. */
-const LUFT = 1.5
+/**
+ * Avstånd mellan stavarna.
+ *
+ * Satt av etiketterna, inte av stavarna: sju namn på rad krockar långt innan sju pinnar gör
+ * det, och en rad text som ligger ovanpå nästa är oläsbar hur fin mätaren än är.
+ */
+const LUFT = 2.5
 const SLAG_MS = 2000
 
 /**
@@ -76,7 +81,7 @@ export class Tradmatare {
     this.grupp.add(this.platta)
 
     // Skylten som säger vad man tittar på. Utan den är det sju lysande pinnar.
-    this.rubrik = createLabel('TRÅDARNAS ARBETE · SENASTE DYGNET', TAL.dampad)
+    this.rubrik = createLabel('TRÅDARNAS ARBETE · RADER SENASTE DYGNET', TAL.dampad)
     this.rubrik.position.set(0, MAX_HOJD + 1.1, 0)
     this.rubrik.visible = false
     this.rubrik.material.opacity = 0
@@ -119,7 +124,8 @@ export class Tradmatare {
       post.malHojd = stavHojd(t.tecken, mest)
       post.tyst = t.rader === 0
 
-      const text = t.rader === 1 ? `${t.namn} 1 rad` : `${t.namn} ${t.rader} rader`
+      // Kort text: namnet och siffran. "rader" står på rubriken ovanför, en gång.
+      const text = `${t.namn} · ${t.rader}`
       if (text !== post.text) {
         post.text = text
         this._etikett(post)
@@ -181,6 +187,7 @@ export class Tradmatare {
       hojd: MIN_HOJD,
       malHojd: MIN_HOJD,
       tyst: true,
+      rad: 0,
       raderForut: null,
       slag: 0,
     }
@@ -201,7 +208,9 @@ export class Tradmatare {
     const n = this.ordning.length
     this.ordning.forEach((trad, i) => {
       const post = this.stavar.get(trad)
-      if (post) post.grupp.position.x = (i - (n - 1) / 2) * LUFT
+      if (!post) return
+      post.grupp.position.x = (i - (n - 1) / 2) * LUFT
+      post.rad = i
     })
     this.platta.scale.set(Math.max(1, (n * LUFT + 0.8) / 2), 1, 1)
   }
@@ -242,16 +251,18 @@ export class Tradmatare {
       post.ringMat.opacity = post.slag * 0.7
       post.ring.scale.setScalar(1 + (1 - post.slag) * 5)
 
-      post.etikett.position.set(0, 0.42 + hojd + 0.5, 0)
+      // Varannan etikett en bit högre: staplarna står tätt, och två namn i exakt samma höjd
+      // lägger sig över varandra så fort man tittar snett på raden.
+      post.etikett.position.set(0, 0.42 + hojd + 0.55 + (post.rad % 2 ? 0.95 : 0), 0)
       post.etikett.getWorldPosition(p)
-      const mal = p.distanceTo(camera.position) < 34 ? 1 : 0
+      const mal = p.distanceTo(camera.position) < 26 ? 1 : 0
       const m = post.etikett.material
       m.opacity += (mal - m.opacity) * Math.min(1, dt * 5)
       post.etikett.visible = m.opacity > 0.02
     }
 
     this.rubrik.getWorldPosition(p)
-    const mal = p.distanceTo(camera.position) < 55 ? 1 : 0
+    const mal = p.distanceTo(camera.position) < 60 ? 1 : 0
     const rm = this.rubrik.material
     rm.opacity += (mal - rm.opacity) * Math.min(1, dt * 4)
     this.rubrik.visible = rm.opacity > 0.02
