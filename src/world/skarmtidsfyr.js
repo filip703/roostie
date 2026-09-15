@@ -157,11 +157,32 @@ export class Skarmtidsfyr {
     const grupp = new THREE.Group()
     this.grupp.add(grupp)
 
-    // Strålen: enhetshög, skalas i y. Smalare upptill så den tunnas ut mot rymden i stället
-    // för att sluta tvärt. Additiv — ljus LÄGGS TILL bilden; ett vanligt material i samma
-    // färg blir en målad pelare.
+    /**
+     * Spöket: hela budgeten, svagt. Det är SKALAN.
+     *
+     * En ensam stråle som är fyra enheter hög säger ingenting — fyra av vad? Med en svag
+     * pelare i full höjd bakom blir den lysande delen en nivå i ett kärl, och då ser man att
+     * Bill är på botten utan att veta något om kolonin. Tre streck markerar fjärdedelarna.
+     */
+    const spokMat = additiv(TAL.stomme, 0.12)
+    const spok = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, MAX_HOJD, 16, 1, true), spokMat)
+    spok.position.y = 0.45 + MAX_HOJD / 2
+    grupp.add(spok)
+
+    for (const del of [0.25, 0.5, 0.75]) {
+      const streck = new THREE.Mesh(
+        new THREE.RingGeometry(0.4, 0.52, 20),
+        additiv(TAL.stomme, 0.22)
+      )
+      streck.rotation.x = -Math.PI / 2
+      streck.position.y = 0.45 + MAX_HOJD * del
+      grupp.add(streck)
+    }
+
+    // Strålen: enhetshög, skalas i y, och fyller spöket underifrån. Additiv — ljus LÄGGS TILL
+    // bilden; ett vanligt material i samma färg blir en målad pelare.
     const pelarMat = additiv(TAL.sage, 0.3)
-    const pelare = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.4, 1, 16, 1, true), pelarMat)
+    const pelare = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 1, 16, 1, true), pelarMat)
     grupp.add(pelare)
 
     const glodMat = additiv(TAL.sage, 0.35)
@@ -172,7 +193,7 @@ export class Skarmtidsfyr {
 
     // Kronan sitter i strålens topp och följer med ner när tiden går.
     const kronaMat = additiv(TAL.sage, 0.9)
-    const krona = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 10), kronaMat)
+    const krona = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.09, 20), kronaMat)
     grupp.add(krona)
 
     // Urtavlan: en båge i marken som visar andelen kvar. Höjd är tvetydig på avstånd; en båge
@@ -242,6 +263,7 @@ export class Skarmtidsfyr {
       grupp,
       pelare,
       pelarMat,
+      spokMat,
       glod,
       glodMat,
       krona,
@@ -341,20 +363,24 @@ export class Skarmtidsfyr {
       post.pelare.scale.set(1 + blossa * 0.45, hojd, 1 + blossa * 0.45)
       post.pelare.position.y = 0.45 + hojd / 2
       post.krona.position.y = 0.45 + hojd
-      post.krona.scale.setScalar(1 + blossa * 2)
+      post.krona.scale.set(1 + blossa * 0.8, 1, 1 + blossa * 0.8)
 
       // En budget som är slut andas fortare: det är den enda gången fyren får vara enträgen.
       const takt = post.slut ? 3.2 : 1.1
       const andning = this.fardig ? 0.45 + Math.sin(t * takt) * (post.slut ? 0.3 : 0.08) : 0.18
 
+      // Skalan tar barnets färg, svagt: ett grått spöke bakom en röd nivå läser som två saker.
+      post.spokMat.color.set(post.farg)
+      post.spokMat.opacity = this.fardig ? 0.13 : 0.06
+
       post.pelarMat.color.set(post.farg)
-      post.pelarMat.opacity = Math.min(0.95, andning * 0.6 + blossa * 0.8)
+      post.pelarMat.opacity = Math.min(0.98, andning * 0.95 + blossa * 0.8)
       post.glodMat.color.set(post.farg)
-      post.glodMat.opacity = Math.min(0.85, andning * 0.7 + blossa * 0.5)
+      post.glodMat.opacity = Math.min(0.9, andning * 0.85 + blossa * 0.5)
       post.kronaMat.color.set(post.farg)
       post.kronaMat.opacity = Math.min(1, 0.5 + blossa * 0.5)
       post.bageMat.color.set(post.farg)
-      post.bageMat.opacity = this.fardig ? 0.75 + blossa * 0.25 : 0.3
+      post.bageMat.opacity = this.fardig ? 0.85 + blossa * 0.15 : 0.3
 
       post.ringMat.color.set(post.farg)
       post.ringMat.opacity = post.slag * 0.85
