@@ -358,7 +358,7 @@ export class Colony {
 
   utsiktspunkter() {
     // I trädvärlden är utsikterna trädets egna: roten, kronan, stamhålet.
-    if (this.varld === 'trad') return this.tradet.utsikter()
+    if (this.varld === 'trad') return this.tradet.utsikter(this.camera)
     const ut = [{ namn: 'kolonin', punkt: new THREE.Vector3(0, 0, 0), avstand: 64 }]
     const kandidater = [
       ['loggboken', this.tavlan, 30],
@@ -528,13 +528,13 @@ export class Colony {
    */
   tradpunkter() {
     if (this.varld !== 'trad') return { utsikter: [], bon: [] }
-    return { utsikter: this.tradet.utsikter(), bon: this.faglar.oversikt() }
+    return { utsikter: this.tradet.utsikter(this.camera), bon: this.faglar.oversikt() }
   }
 
   /** Flyger till en namngiven utsikt eller till en tråds bo. Null när den inte finns. */
   flygTill(namn) {
     if (this.varld !== 'trad') return null
-    const u = this.tradet.utsikter().find((x) => x.namn === namn)
+    const u = this.tradet.utsikter(this.camera).find((x) => x.namn === namn)
     if (u) return u
     const f = [...this.faglar.faglar.values()].find((x) => x.trad.id === namn || x.trad.namn === namn)
     if (!f) return null
@@ -542,7 +542,16 @@ export class Colony {
     // Utanför boet och en aning under, med kameran vänd inåt mot barken — då står fågeln
     // mot stammen i stället för mot tom himmel, och man ser vilken gren hon sitter på.
     const p = f.hem.clone()
-    return { namn: f.trad.namn, punkt: p, avstand: 26, lutning: 1.5, azimut: Math.atan2(p.x, p.z) * 0.55 }
+    // Samma omräkning som utsikterna: en närbild ska vara lika nära på alla synfält.
+    const fov = ((this.camera?.fov || 50) * Math.PI) / 180
+    const skala = Math.tan((50 * Math.PI) / 360) / Math.tan(fov / 2)
+    return {
+      namn: f.trad.namn,
+      punkt: p,
+      avstand: Math.round(26 * skala),
+      lutning: 1.5,
+      azimut: Math.atan2(p.x, p.z) * 0.55,
+    }
   }
 
   /** Var en agent står, för panelens klick. Null när maskinen inte finns i parken. */

@@ -38,6 +38,8 @@ export const STAM_R = 55
 const STAM_H = 380
 /** Kronans mått, för kamerans spärrar. */
 export const TRADHOJD = 62
+/** Synfältet kompositionen är avstämd mot. Allt annat räknas om mot det här talet. */
+const BASFOV = (50 * Math.PI) / 180
 
 /**
  * Var de sju bona hänger — scenens komposition, i klartext.
@@ -634,16 +636,35 @@ export class Tradet {
    * `överblick` är scenens hemläge och det enda som måste stämma: därifrån ska alla sju bon
    * synas samtidigt, och det är den bilden bygget kontrolleras mot.
    */
-  utsikter() {
+  utsikter(kamera) {
+    /**
+     * SYNFÄLTET, och varför utsikterna räknas om i stället för att stå fast.
+     *
+     * Kompositionen är avstämd mot standardens femtio graders synfält. Filips egen skärm
+     * står på trettioåtta — och med trettioåtta hamnade kameran mitt inne i barken: hela
+     * scenen var byggd för en vidare bild än den han faktiskt har. Det syntes först när
+     * bilden togs på köksskärmens riktiga URL, inte i utvecklingsmiljön.
+     *
+     * Så avstånden skalas med det synfält kameran verkligen har, och med bildens bredd om
+     * den är smalare än sexton-mot-nio. Då står överblicken rätt på vilken skärm som helst,
+     * och den som ändrar synfältet i inställningarna tappar inte bort trädet.
+     */
+    const fov = ((kamera?.fov || 50) * Math.PI) / 180
+    const bredd = kamera?.aspect || 16 / 9
+    const skala =
+      (Math.tan(BASFOV / 2) / Math.tan(fov / 2)) * Math.max(1, (16 / 9) / Math.max(0.8, bredd))
+    const v = (namn, punkt, avstand, lutning, azimut) => ({
+      namn,
+      punkt,
+      avstand: Math.round(avstand * skala * 10) / 10,
+      lutning,
+      azimut,
+    })
     return [
-      // Målet står en bit till höger om mitten med flit: sidopanelen täcker den högra
-      // fjärdedelen av skärmen, så en fläkt som centreras i VÄRLDEN hamnar snett i BILDEN
-      // och de två yttersta bona försvinner bakom panelen. Kiosken har ingen panel och
-      // tappar inget på förskjutningen.
-      { namn: 'överblick', punkt: new THREE.Vector3(7, 14, 84), avstand: 88, lutning: 1.42, azimut: 0 },
-      { namn: 'barken', punkt: new THREE.Vector3(0, 20, 62), avstand: 40, lutning: 1.5, azimut: 0.2 },
-      { namn: 'underifrån', punkt: new THREE.Vector3(6, 4, 82), avstand: 58, lutning: 1.86, azimut: -0.06 },
-      { namn: 'kronan', punkt: new THREE.Vector3(6, 28, 88), avstand: 58, lutning: 1.2, azimut: 0.05 },
+      v('överblick', new THREE.Vector3(7, 14, 84), 88, 1.42, 0),
+      v('barken', new THREE.Vector3(0, 20, 62), 40, 1.5, 0.2),
+      v('underifrån', new THREE.Vector3(6, 4, 82), 58, 1.86, -0.06),
+      v('kronan', new THREE.Vector3(6, 28, 88), 58, 1.2, 0.05),
     ]
   }
 

@@ -850,7 +850,9 @@ async function boot() {
       polarMin: 1.12,
       polarMax: 1.96,
       avstandMin: 14,
-      avstandMax: 96,
+      // Taket är satt av det smalaste synfältet som ska fungera: trettioåtta grader kräver
+      // drygt hundratjugo enheters avstånd för samma bild som femtio ger på åttioåtta.
+      avstandMax: 190,
     })
     hudTrad()
     // Första bilden är ÖVERBLICKEN: sju bon i en ram. Det var det Filip inte fick.

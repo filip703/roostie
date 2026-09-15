@@ -187,7 +187,7 @@ export class CameraRig {
       const d = this._pinchDistance()
       const [cx, cy] = this._pinchCentre()
       if (this._pinch > 0 && d > 0) {
-        this.desiredDistance = THREE.MathUtils.clamp(this.desiredDistance * (this._pinch / d), MIN_DIST, MAX_DIST)
+        this.desiredDistance = THREE.MathUtils.clamp(this.desiredDistance * (this._pinch / d), this._avstandGolv(), this._avstandTak())
         this.distance = this.desiredDistance
         this._sync()
       }
@@ -272,7 +272,7 @@ export class CameraRig {
     const raw = (e.deltaY * unit) / 100
     const step = Math.sign(raw) * Math.min(Math.abs(raw), 2.5) * (e.ctrlKey ? 1.6 : 1)
 
-    this.desiredDistance = THREE.MathUtils.clamp(this.desiredDistance * (1 + step * 0.16), MIN_DIST, MAX_DIST)
+    this.desiredDistance = THREE.MathUtils.clamp(this.desiredDistance * (1 + step * 0.16), this._avstandGolv(), this._avstandTak())
     // Hold the point under the pointer still for as long as the dolly takes to settle.
     if (this.groundPoint(e.clientX, e.clientY, this._hit2)) {
       this._zoom = { world: this._hit2.clone(), sx: e.clientX, sy: e.clientY }
@@ -312,6 +312,21 @@ export class CameraRig {
     this.maxHojd = maxHojd
   }
 
+  /**
+   * Zoomens gränser. I en scen är det scenen som bestämmer, inte kolonins.
+   *
+   * Överblicken i trädet kan behöva stå längre bort än kolonins tak på hundrafemtio: hur
+   * långt bort beror på kamerans synfält, och Filips egen är trettioåtta grader mot
+   * standardens femtio. Ett hårdkodat tak skar av just den bilden.
+   */
+  _avstandTak() {
+    return this.scen ? this.scen.avstandMax : MAX_DIST
+  }
+
+  _avstandGolv() {
+    return this.scen ? Math.min(this.scen.avstandMin, MIN_DIST) : MIN_DIST
+  }
+
   /** Sätter eller släpper scenen. Null = kolonins fria kamera tillbaka. */
   setScen(scen) {
     this.scen = scen || null
@@ -344,7 +359,7 @@ export class CameraRig {
     this.desiredTarget.copy(point)
     if (!this.tradlage) this.desiredTarget.y = 0
     this._clampTarget()
-    if (distance) this.desiredDistance = THREE.MathUtils.clamp(distance, MIN_DIST, MAX_DIST)
+    if (distance) this.desiredDistance = THREE.MathUtils.clamp(distance, this._avstandGolv(), this._avstandTak())
     // En utsikt mot ett träd behöver få bestämma sin egen lutning: att titta UPP i en krona
     // är en annan kamera än att titta ner på en plätt.
     if (polar !== undefined) this.desiredPolar = THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR)
