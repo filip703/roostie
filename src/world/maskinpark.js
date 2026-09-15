@@ -74,6 +74,8 @@ const FARG = {
 const SLACKT = 0x2b332e
 /** Hur länge efter en loggrad en maskin räknas som arbetande. */
 const AKTIV_MS = 5 * 60 * 1000
+/** Så nära måste man vara för att en maskin ska säga sitt namn utan att ha gjort något. */
+const NARA = 17
 
 /** Maskintyper, valda ur namnet så en agent alltid får samma maskin. */
 const SORTER = ['antenna', 'solar', 'greenhouse', 'tower', 'reactor']
@@ -959,7 +961,9 @@ export class Maskinpark {
       // den som bara står och kör går på tomgång, och den som är nere står stilla.
       if (post.status === 'ok') post.tid.value += dt * (arbetar ? 1 : 0.18)
 
-      post.blixt = Math.max(0, post.blixt - dt * 1.6)
+      // Blixten styr både ljuset och namnet, så den måste räcka längre än ett ögonblick:
+      // ett namn som blinkar förbi på en halv sekund är samma sak som inget namn.
+      post.blixt = Math.max(0, post.blixt - dt * 0.28)
 
       const accent = post.mesh.userData.uniforms.uAccent.value
       if (post.status === 'fel') {
@@ -969,7 +973,7 @@ export class Maskinpark {
         const grund = post.farg.set(FARG.ok)
         // Arbetar: ett lugnt pulserande ljus, plus en blixt när en ny loggrad kom.
         const puls = arbetar ? 0.78 + Math.sin(sekunder * 2.4) * 0.22 : 0.3
-        accent.copy(grund).multiplyScalar(Math.min(1.6, puls + post.blixt * 0.9))
+        accent.copy(grund).multiplyScalar(Math.min(1.6, puls + post.blixt * 0.45))
       } else {
         accent.set(SLACKT)
       }
@@ -1069,14 +1073,31 @@ export class Maskinpark {
       this.rover.visible = true
     }
 
-    // Etiketterna är läsbara på nära håll och försvinner när man drar sig undan — annars
-    // är fältet en vägg av text.
+    /**
+     * Namnen.
+     *
+     * Fyrtioen etiketter på en gång är ingen information — det är en vägg av text, och Filip
+     * läste den inte, han såg den. Parken visar därför namn på TRE sorters maskiner och inga
+     * andra:
+     *
+     *   · den som just gjorde något (blixten lyser), i några sekunder — namnet blir en
+     *     berättelse om vad som händer i stället för en skylt som alltid står där
+     *   · gårdens senast aktiva, den drönaren dyker mot — en läsbar rad per gård
+     *   · den man gått ända fram till (under NARA enheter)
+     *
+     * Allt annat säger sitt med lykta, ring, kabel och paket. Vill man veta vem en maskin är
+     * går man fram till den.
+     */
     const p = new THREE.Vector3()
     for (const post of this.maskiner.values()) {
       post.etikett.getWorldPosition(p)
-      const mal = p.distanceTo(camera.position) < 52 ? 1 : 0
+      const nara = p.distanceTo(camera.position) < NARA
+      const gard = this.plattor[post.plats.grupp]
+      const berattar = post.blixt > 0.05 || gard?.senast === post
+      const mal = berattar || nara ? 1 : 0
       const m = post.etikett.material
-      m.opacity += (mal - m.opacity) * Math.min(1, dt * 6)
+      // Fram snabbt, bort långsamt: ett namn som just dykt upp ska hinna läsas.
+      m.opacity += (mal - m.opacity) * Math.min(1, dt * (mal ? 7 : 1.4))
       post.etikett.visible = m.opacity > 0.02
     }
 

@@ -36,6 +36,30 @@ const konfig = () => ({
   fil: process.env.ROOST_ROOSTIE_FIL || '',
 })
 
+/**
+ * Barnens egna färger.
+ *
+ * Bill är blå och Tod är grön i Roost, och kolonin ska inte hitta på egna. Färgen hör hemma i
+ * Roosts data — kommer den med i budgeten (`farg`) vinner den. Tills läsvägen bär den läses
+ * `ROOSTIE_BARNFARGER` ur miljön: en JSON-karta namn→#rrggbb. Saknas båda får fyren använda
+ * statusfärgen som förut, och då ljuger den inte — den säger bara mindre.
+ */
+const HEX = /^#[0-9a-f]{6}$/i
+let barnfargerCache = null
+function barnfarger() {
+  if (barnfargerCache) return barnfargerCache
+  barnfargerCache = new Map()
+  try {
+    const rad = JSON.parse(process.env.ROOSTIE_BARNFARGER || '{}')
+    for (const [namn, hex] of Object.entries(rad)) {
+      if (typeof hex === 'string' && HEX.test(hex.trim())) barnfargerCache.set(namn, hex.trim().toLowerCase())
+    }
+  } catch {
+    // En trasig karta är ingen färg, och ingen färg är ett giltigt svar.
+  }
+  return barnfargerCache
+}
+
 const tal = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0)
 
 async function hamta() {
@@ -114,6 +138,11 @@ function tolka(rad) {
       kvar,
       // Andelen mot ram, aldrig mot tak. Se filhuvudet.
       andel: ram > 0 ? Math.max(0, Math.min(1, kvar / ram)) : 0,
+      // Barnets egen färg när någon vet den: läsvägen först, miljön sedan, annars ingen.
+      farg:
+        typeof b?.farg === 'string' && HEX.test(b.farg.trim())
+          ? b.farg.trim().toLowerCase()
+          : barnfarger().get(String(b?.namn || '')) || null,
     }
   })
 

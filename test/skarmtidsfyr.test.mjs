@@ -61,3 +61,21 @@ test('utan färska siffror lyser fyren varken grönt eller rött', () => {
   assert.equal(stapelFarg(0.9, false), TAL.sage)
   assert.equal(stapelFarg(0.01, false), TAL.sage)
 })
+
+/**
+ * Identitet och läge är två olika saker. Bill är blå och Tod är grön i Roost — en pelare som
+ * byter färg när tiden tar slut byter barn mitt framför en, och det är fel sorts information.
+ */
+import { identitetsFarg } from '../src/world/skarmtidsfyr.js'
+
+test('barnets egen färg vinner över statusfärgen, hur lite som än är kvar', () => {
+  assert.equal(identitetsFarg('#4e7f8a', 0.02), 0x4e7f8a)
+  assert.equal(identitetsFarg('#4E7F8A', 0.9), 0x4e7f8a)
+})
+
+test('utan känd färg får statusfärgen duga — kolonin hittar inte på en', () => {
+  assert.equal(identitetsFarg(null, 0.8), TAL.gron)
+  assert.equal(identitetsFarg('', 0.09), TAL.clay)
+  assert.equal(identitetsFarg('blå', 0.09), TAL.clay)
+  assert.equal(identitetsFarg('#xyzxyz', 0.3), TAL.honey)
+})

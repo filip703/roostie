@@ -11,8 +11,12 @@
  *
  * NU ÄR DEN EN MÄTARE. Varje barn har en egen stråle:
  *   HÖJDEN är hur mycket som är kvar — strålen sjunker under kvällen, av sig själv
- *   FÄRGEN är hur illa det är (grön över hälften, bärnsten under, lera på slutet)
- *   BÅGEN i marken är samma sak som en urtavla, läsbar också när höjden är tvetydig
+ *   FÄRGEN är BARNET, inte läget: Bill är blå och Tod är grön i Roost, och en pelare som
+ *     byter färg när tiden tar slut byter identitet mitt framför en. Färgen kommer ur
+ *     läsvägen (`farg` i budgeten) eller ur `ROOSTIE_BARNFARGER`; vet ingen, används
+ *     statusfärgen som förut
+ *   BÅGEN i marken bär LÄGET — grön, bärnsten, lera — och ett rött fält i pelarens botten
+ *     visar sista femtedelen, så en låg nivå läser som fara utan att byta vems den är
  *   SLAGET är kvar, men det tillhör nu ETT barn: man ser vems minut som gick
  *
  * Andelen räknas mot `tak + intjanat` — ett barn som tjänat minuter på uppdrag har mer än
@@ -58,6 +62,17 @@ export function raknaSlag(anvantForut, anvant, fardig, ko = 0) {
 export function stapelHojd(andel) {
   const a = Number.isFinite(andel) ? Math.min(1, Math.max(0, andel)) : 0
   return MIN_HOJD + a * (MAX_HOJD - MIN_HOJD)
+}
+
+/**
+ * Barnets egen färg, med statusfärgen som sista utväg.
+ *
+ * Identitet och läge är två skilda saker. Pelaren bär vems den är; bågen bär hur illa det är.
+ * Utbruten och testad av samma skäl som de andra reglerna.
+ */
+export function identitetsFarg(hex, andel, fardig = true) {
+  if (typeof hex === 'string' && /^#[0-9a-f]{6}$/i.test(hex)) return parseInt(hex.slice(1), 16)
+  return stapelFarg(andel, fardig)
 }
 
 /** Färgen ur andelen kvar. Samma trösklar överallt i kolonin. */
@@ -129,7 +144,8 @@ export class Skarmtidsfyr {
 
       post.andel = Number.isFinite(b.andel) ? b.andel : 0
       post.malHojd = this.fardig ? stapelHojd(post.andel) : MIN_HOJD
-      post.farg = stapelFarg(post.andel, this.fardig)
+      post.lagesFarg = stapelFarg(post.andel, this.fardig)
+      post.farg = this.fardig ? identitetsFarg(b.farg, post.andel, true) : TAL.sage
       post.slut = this.fardig && b.kvar <= 0
 
       const text = this.fardig ? (b.kvar > 0 ? `${b.namn} ${b.kvar} min` : `${b.namn} slut`) : `${b.namn} okänd`
@@ -168,6 +184,16 @@ export class Skarmtidsfyr {
     const spok = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, MAX_HOJD, 16, 1, true), spokMat)
     spok.position.y = 0.45 + MAX_HOJD / 2
     grupp.add(spok)
+
+    // Farofältet: pelarens understa femtedel. En låg nivå ska läsa som fara utan att
+    // pelaren byter färg och därmed byter barn.
+    const faroMat = additiv(TAL.crit, 0.14)
+    const faro = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.41, 0.41, MAX_HOJD * 0.2, 16, 1, true),
+      faroMat
+    )
+    faro.position.y = 0.45 + MAX_HOJD * 0.1
+    grupp.add(faro)
 
     for (const del of [0.25, 0.5, 0.75]) {
       const streck = new THREE.Mesh(
@@ -264,6 +290,7 @@ export class Skarmtidsfyr {
       pelare,
       pelarMat,
       spokMat,
+      faroMat,
       glod,
       glodMat,
       krona,
@@ -282,6 +309,7 @@ export class Skarmtidsfyr {
       bageSteg: -1,
       andel: 0,
       farg: TAL.sage,
+      lagesFarg: TAL.sage,
       slut: false,
       // Höjden går mjukt ner till målet: ett hopp ser ut som ett fel, en sjunkande stråle
       // ser ut som tid som går.
@@ -379,15 +407,20 @@ export class Skarmtidsfyr {
       post.glodMat.opacity = Math.min(0.9, andning * 0.85 + blossa * 0.5)
       post.kronaMat.color.set(post.farg)
       post.kronaMat.opacity = Math.min(1, 0.5 + blossa * 0.5)
-      post.bageMat.color.set(post.farg)
+      // Bågen är urtavlan och bär LÄGET, inte identiteten.
+      post.bageMat.color.set(post.lagesFarg)
       post.bageMat.opacity = this.fardig ? 0.85 + blossa * 0.15 : 0.3
 
-      post.ringMat.color.set(post.farg)
+      // Farofältet lyser upp först när nivån faktiskt är nere i det.
+      const ifara = this.fardig && post.andel <= 0.2
+      post.faroMat.opacity = ifara ? 0.26 + Math.sin(t * 2.6) * 0.1 : 0.1
+
+      post.ringMat.color.set(post.lagesFarg)
       post.ringMat.opacity = post.slag * 0.85
       post.ring.scale.setScalar(1 + (1 - post.slag) * 9)
 
       const efter = Math.max(0, post.slag - 0.25) / 0.75
-      post.ringMat2.color.set(post.farg)
+      post.ringMat2.color.set(post.lagesFarg)
       post.ringMat2.opacity = efter * 0.5
       post.ring2.scale.setScalar(1 + (1 - efter) * 6)
 
