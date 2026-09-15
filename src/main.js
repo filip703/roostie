@@ -60,6 +60,18 @@ const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer
  */
 if (new URLSearchParams(location.search).get('debug') === '1') {
   window.__roostie = { colony, engine, settings }
+  /**
+   * Felfällan. Ett kast som fångas av ett tomt `.catch(() => {})` någonstans i pollen tar
+   * kolonin ur drift utan att lämna ett spår någon utifrån kan läsa. Med `?debug=1` skrivs
+   * det sista felet på <html> bredvid diagnosen, så det går att FRÅGA sidan vad som brast.
+   */
+  const felen = []
+  const notera = (vad) => {
+    felen.push(String(vad).slice(0, 300))
+    document.documentElement.dataset.roostieFel = JSON.stringify(felen.slice(-5))
+  }
+  window.addEventListener('error', (e) => notera(e.error?.stack || e.message))
+  window.addEventListener('unhandledrejection', (e) => notera(e.reason?.stack || e.reason))
   // Också som ett attribut på <html>: ett verktyg som granskar sidan utifrån delar DOM med
   // den, men inte `window` — och redovisningen är värdelös om den bara går att läsa inifrån.
   setInterval(() => {
@@ -685,13 +697,15 @@ async function poll() {
     // astronauterna är det viktiga, de två andra är utsikt.
     fetchTavlan()
       .then((t) => colony.setTavla(t))
-      .catch(() => {})
+      // Tavlan får inte fälla astronauterna, men ett tomt catch är hur något kan vara trasigt
+      // i timmar utan att någon vet. Felet loggas, och syns i felfällan med ?debug=1.
+      .catch((e) => console.error('[roostie] tavlan:', e))
     fetchMaskiner()
       .then((m) => colony.setMaskiner(m.maskiner || []))
-      .catch(() => {})
+      .catch((e) => console.error('[roostie] maskiner:', e))
     fetchPuls()
       .then((p) => colony.setPuls(p))
-      .catch(() => {})
+      .catch((e) => console.error('[roostie] puls:', e))
   } catch (err) {
     hud.toast(err.message || 'Could not reach the thread scanner', 'err')
     hud.removeBoot()
