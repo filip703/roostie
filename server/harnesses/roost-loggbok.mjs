@@ -86,6 +86,33 @@ function mottagare(rubrik) {
   return ''
 }
 
+const ARTILLFILIP = (rubrik) => /TILL FILIP/i.test(String(rubrik || ''))
+
+/**
+ * När en fråga till Filip räknas som besvarad.
+ *
+ * Tavlan har ingen kvitteringskolumn, så regeln är Lednings (rad 132): en TILL FILIP-rad står
+ * öppen tills Ledning skriver en klart- eller notisrad efter den. Det är trubbigt med flit —
+ * Filip svarar i chatten, inte på tavlan, och Ledning är den tråd som skriver när ett beslut
+ * har landat. Följden är att en TILL FILIP-rad kan stängas av ett beslut som handlade om något
+ * helt annat, och det är den kända kostnaden för att slippa en skylt som lyser i evighet.
+ *
+ * @param {{trad:string,fas:string,nar:number}[]} rader
+ * @returns {number} tidpunkt då allt äldre räknas som stängt
+ */
+function stangtFore(rader) {
+  let senast = 0
+  for (const r of rader) {
+    if (r.trad !== 'ledning') continue
+    if (r.fas !== 'klart' && r.fas !== 'notis') continue
+    // En fråga till Filip stänger inte sig själv. Ledning skriver ofta sina TILL FILIP-rader
+    // som notis, och utan det här undantaget släcktes skylten i samma ögonblick den tändes.
+    if (r.fas === 'notis' && ARTILLFILIP(r.rubrik)) continue
+    if (r.nar > senast) senast = r.nar
+  }
+  return senast
+}
+
 /**
  * Trådens eget samtal i claude.ai, ur ROOSTIE_CHATTAR. Bara https till claude.ai släpps
  * igenom — adressen kommer ur miljön, men den hamnar i en länk som öppnas med ett klick,
@@ -187,6 +214,17 @@ async function scanThreads() {
   }
 
   const nu = Date.now()
+  // Samma stängningsregel som Filips skylt: en fråga till Filip slutar vinka när Ledning
+  // skrivit efter den. Astronautens ? och skylten vid skeppet ska aldrig säga olika saker.
+  // Räknas på de råa raderna, inte på hinkarna — gränsen är hela tavlans, inte en tråds.
+  const stangt = stangtFore(
+    rader.map((r) => ({
+      trad: String(r?.trad || '').trim().toLowerCase(),
+      fas: String(r?.fas || ''),
+      rubrik: String(r?.rubrik || ''),
+      nar: tid(r?.created_at),
+    }))
+  )
   const tradar = []
   for (const [trad, allt] of hinkar) {
     const r = allt.filter((x) => x.nar > 0).sort((a, b) => a.nar - b.nar)
@@ -201,7 +239,7 @@ async function scanThreads() {
     // "TILL FILIP" i en notisrubrik är tavlans sätt att vinka. Kolonin håller upp ett ? tills
     // du klickat Viewed; skriver tråden något nytt vinkar den igen. Den nyaste rubriken följer
     // med som `notis` — det är den som hamnar på anslagstavlan vid landningsplattan.
-    const tillFilip = r.filter((x) => x.fas === 'notis' && /TILL FILIP/i.test(x.rubrik))
+    const tillFilip = r.filter((x) => x.fas === 'notis' && ARTILLFILIP(x.rubrik) && x.nar > stangt)
     const vinkar = tillFilip.length > 0
     const sista = tillFilip[tillFilip.length - 1]
 
@@ -325,7 +363,21 @@ export async function senasteRader(antal = 40) {
     vantar.push({ fran: r.trad, till, rubrik: r.rubrik, text: r.text, nar: r.nar, svarat })
   }
 
-  return { rader: alla.slice(0, Math.max(1, Math.min(60, antal))), vantar: vantar.slice(0, 12), fel: fardig ? '' : cache.fel }
+  /**
+   * Det som väntar på Filip, och bara det — skylten vid landningsplattan lyser på den här
+   * listan och släcks när den är tom.
+   */
+  const stangt = stangtFore(alla)
+  const filip = alla
+    .filter((r) => r.fas === 'notis' && ARTILLFILIP(r.rubrik) && r.nar > stangt)
+    .map((r) => ({ trad: r.trad, rubrik: r.rubrik, text: r.text, nar: r.nar }))
+
+  return {
+    rader: alla.slice(0, Math.max(1, Math.min(60, antal))),
+    vantar: vantar.slice(0, 12),
+    filip,
+    fel: fardig ? '' : cache.fel,
+  }
 }
 
 /** Bara för testerna: tvinga en ny läsning vid nästa skanning, men behåll senast kända läge. */

@@ -144,7 +144,7 @@ export class Colony {
     // Anslagstavlan står bredvid skeppet: det Filip måste svara på ska synas där blicken
     // landar, inte bara ovanför den astronaut som råkar hålla upp handen.
     const tavlaPlats = shipPosition()
-    this.anslagstavla = new Anslagstavla(scene, { x: tavlaPlats.x + 8.2, y: 0, z: tavlaPlats.z + 5.2 })
+    this.anslagstavla = new Anslagstavla(scene, { x: tavlaPlats.x + 10, y: 0, z: tavlaPlats.z + 6.5 })
     // Billboarden står utanför plätterna, bakom skeppet sett från kolonin, så den syns över
     // taken utan att stå i vägen för en enda tomt.
     this.tavlan = new Tavlan(scene, { x: tavlaPlats.x - 15, y: 0, z: tavlaPlats.z - 6 })
@@ -239,7 +239,7 @@ export class Colony {
     // duken, eller en maskinpark full av buskar, ser ut som ett fel snarare än som natur.
     for (const [sak, r] of [
       [this.tavlan, 11],
-      [this.anslagstavla, 4],
+      [this.anslagstavla, 6],
       [this.maskinpark, this.maskinpark.radie()],
       [this.agenttavla, 10],
     ]) {
@@ -289,9 +289,10 @@ export class Colony {
     if (changed.has('timeOfDay')) this.sky.setTime(this.settings.get('timeOfDay'))
   }
 
-  /** Loggbokens rader och väntelista → billboarden. */
+  /** Loggbokens rader och väntelista → billboarden, och Filips egen skylt vid skeppet. */
   setTavla(data) {
     this.tavlan.set(data)
+    this.anslagstavla.set(data?.filip || [])
   }
 
   /** NUC:ens containrar → maskinparken. */
@@ -314,15 +315,6 @@ export class Colony {
   setThreads(threads, archivedIds = new Set(), hiddenProjects = new Set(), knownIds = new Set()) {
     const now = Date.now()
     const live = liveThreadsForColony(threads, archivedIds, hiddenProjects)
-
-    // Skylten vid skeppet läser samma `unread` som astronauternas `?`, alltså efter att
-    // Viewed räknats av — det som står där är det som faktiskt väntar på svar.
-    this.anslagstavla.set(
-      live
-        .filter((t) => t.unread && t.notis)
-        .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
-        .map((t) => ({ trad: t.title, rubrik: t.notis }))
-    )
 
     // Group by repo, biggest project first so the busiest work lands nearest the middle.
     const byProject = new Map()
@@ -772,7 +764,7 @@ export class Colony {
     // One write turns every rotor in the colony.
     buildingUniforms.uTime.value = elapsed
     this.ship.update(dt, elapsed, night)
-    this.anslagstavla.update(this.camera)
+    this.anslagstavla.update(dt, this.camera)
     this.tavlan.update(dt, this.camera)
     this.maskinpark.update(dt, this.camera)
     this.agenttavla.update(dt, this.camera)

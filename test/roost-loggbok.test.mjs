@@ -76,6 +76,21 @@ test('anslagstavlan får den nyaste raden, inte den första', async () => {
   assert.equal(av('ledning').notis, 'TILL FILIP: ny fråga')
 })
 
+test('en fråga till Filip stängs av att Ledning skriver efter den', async () => {
+  const { av } = await medTavla([
+    rad('ledning', 'notis', 120, { rubrik: 'TILL FILIP: godkänn fågelnamnen' }),
+    rad('ledning', 'klart', 30, { rubrik: 'BESLUT: något annat' }),
+    rad('produkt', 'notis', 20, { rubrik: 'TILL FILIP: VR-headsetet' }),
+  ])
+  assert.equal(av('ledning').unread, false, 'Lednings klart-rad efteråt stänger frågan')
+  assert.equal(av('produkt').unread, true, 'en nyare fråga står kvar öppen')
+})
+
+test('en fråga till Filip stänger inte sig själv', async () => {
+  const { av } = await medTavla([rad('ledning', 'notis', 10, { rubrik: 'TILL FILIP: ny fråga' })])
+  assert.equal(av('ledning').unread, true, 'Lednings egen TILL FILIP-rad får inte släcka skylten')
+})
+
 test('varje tråd får en zon och ett stabilt id', async () => {
   const { av } = await medTavla([
     rad('ledning', 'klart', 10),
