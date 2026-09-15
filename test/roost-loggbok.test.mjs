@@ -210,3 +210,55 @@ test('en tavla som inte svarar tömmer inte kolonin, men ingen hamrar på gammal
   assert.match(await mod.default.diagnostic(), /Loggboken kunde inte läsas/)
   delete process.env.ROOST_LOGGBOK_FIL
 })
+
+/**
+ * Arbetsmängden. Kolonin kan inte se hur mycket Claude-kvot en tråd bränt — den läsvägen
+ * finns inte — så den mäter det som faktiskt lämnat spår: rader och tecken på tavlan.
+ */
+import { arbetsmangd } from '../server/harnesses/roost-loggbok.mjs'
+
+const NU = Date.parse('2026-09-15T12:00:00Z')
+const nar = (timmarSedan) => new Date(NU - timmarSedan * 3600000).toISOString()
+
+test('räknar rader och tecken per tråd i det rullande dygnet', () => {
+  const ut = arbetsmangd(
+    [
+      { trad: 'kolonin', rubrik: 'abc', text: 'defg', created_at: nar(1) },
+      { trad: 'kolonin', rubrik: 'hi', text: '', created_at: nar(3) },
+      { trad: 'ledning', rubrik: 'x', text: 'y', created_at: nar(2) },
+    ],
+    NU
+  )
+  const kolonin = ut.find((t) => t.trad === 'kolonin')
+  assert.equal(kolonin.rader, 2)
+  assert.equal(kolonin.tecken, 3 + 4 + 2)
+  assert.equal(kolonin.senast, Date.parse(nar(1)))
+})
+
+test('äldre än ett dygn räknas inte — mätaren visar nu, inte hela historien', () => {
+  const ut = arbetsmangd([{ trad: 'kolonin', rubrik: 'gammalt', text: '', created_at: nar(30) }], NU)
+  assert.equal(ut.find((t) => t.trad === 'kolonin').rader, 0)
+})
+
+test('en tråd som inte skrivit något finns ändå med, som noll', () => {
+  const ut = arbetsmangd([], NU)
+  assert.ok(ut.length >= 7)
+  assert.ok(ut.every((t) => t.rader === 0 && t.tecken === 0))
+  assert.ok(ut.some((t) => t.trad === 'design' && t.namn === 'Design'))
+})
+
+test('den flitigaste ligger först', () => {
+  const ut = arbetsmangd(
+    [
+      { trad: 'ledning', rubrik: 'kort', text: '', created_at: nar(1) },
+      { trad: 'kolonin', rubrik: 'mycket', text: 'x'.repeat(500), created_at: nar(1) },
+    ],
+    NU
+  )
+  assert.equal(ut[0].trad, 'kolonin')
+})
+
+test('skräp i trad-fältet blir ingen stapel', () => {
+  const ut = arbetsmangd([{ trad: '../../etc', rubrik: 'a', text: 'b', created_at: nar(1) }], NU)
+  assert.ok(!ut.some((t) => t.trad.includes('..')))
+})

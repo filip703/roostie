@@ -19,6 +19,7 @@ import { Tavlan } from '../world/tavlan.js'
 import { Agenttavla } from '../world/agenttavla.js'
 import { Maskinpark, FALTLISTA } from '../world/maskinpark.js'
 import { Skarmtidsfyr } from '../world/skarmtidsfyr.js'
+import { Tradmatare } from '../world/tradmatare.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
 import { MAX_AGENT_CAP } from '../core/settings.js'
@@ -157,6 +158,9 @@ export class Colony {
     // Skärmtidsfyren står mitt i kolonin, där plätterna möts — Roost handlar om en enda sak,
     // och den ska stå i mitten, inte i utkanten bland maskinerna.
     this.skarmtidsfyr = new Skarmtidsfyr(scene, { x: 0, y: 0, z: 0 })
+    // Trådarnas arbete står bredvid barnens tid: kolonins två sorters arbete, båda mitt i
+    // bilden. Den mäter rader på tavlan, inte Claude-kvot — den läsvägen finns inte.
+    this.tradmatare = new Tradmatare(scene, { x: 0, y: 0, z: 7.5 })
     this.astronauts = new Astronauts(scene, settings)
     this.astronauts.world = this._world()
     // Sized for the largest preset rather than the current one: unlike the astronaut meshes these
@@ -208,7 +212,14 @@ export class Colony {
     const ship = shipPosition()
     this.ship.group.position.y = terrainHeight(ship.x, ship.z, this.planet)
     // Samma sak för skylten: stolparna ska stå i marken, inte i luften ovanför den.
-    for (const sak of [this.anslagstavla, this.tavlan, this.maskinpark, this.agenttavla, this.skarmtidsfyr]) {
+    for (const sak of [
+      this.anslagstavla,
+      this.tavlan,
+      this.maskinpark,
+      this.agenttavla,
+      this.skarmtidsfyr,
+      this.tradmatare,
+    ]) {
       const p = sak.grupp.position
       p.y = terrainHeight(p.x, p.z, this.planet)
     }
@@ -246,6 +257,7 @@ export class Colony {
       [this.anslagstavla, 6],
       [this.maskinpark, this.maskinpark.radie()],
       [this.agenttavla, 10],
+      [this.tradmatare, 7],
     ]) {
       const p = sak.grupp.position
       clear.push({ x: p.x, z: p.z, r })
@@ -317,6 +329,7 @@ export class Colony {
       anslagstavla: this.anslagstavla.grupp.visible,
       agenttavla: this.agenttavla.grupp.visible,
       skarmtidsfyr: this.skarmtidsfyr.grupp.visible,
+      tradmatare: this.tradmatare.diagnos(),
       maskinpark: this.maskinpark.diagnos(),
     }
   }
@@ -339,6 +352,15 @@ export class Colony {
   setTavla(data) {
     this.tavlan.set(data)
     this.anslagstavla.set(data?.filip || [])
+    // Staven får plättens färg, så en tråds stav och dess astronaut hör ihop.
+    this.tradmatare.set(data?.arbete || [], this._tradFarger())
+  }
+
+  /** Trådnamn i gemener → plättens accentfärg, som mätaren målar sina stavar med. */
+  _tradFarger() {
+    const ut = new Map()
+    for (const plot of this.plotOrder || []) ut.set(String(plot.name || '').toLowerCase(), plot.accent)
+    return ut
   }
 
   /**
@@ -826,6 +848,7 @@ export class Colony {
     this.maskinpark.update(dt, this.camera)
     this.agenttavla.update(dt, this.camera)
     this.skarmtidsfyr.update(dt, this.camera)
+    this.tradmatare.update(dt, this.camera)
 
     this._growBuildings(dt)
     this.astronauts.update(dt, elapsed)
@@ -983,6 +1006,7 @@ export class Colony {
     this.maskinpark.dispose()
     this.agenttavla.dispose()
     this.skarmtidsfyr.dispose()
+    this.tradmatare.dispose()
     this.astronauts.dispose()
     this.indicators.dispose()
     this.particles.dispose()

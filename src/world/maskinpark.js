@@ -110,7 +110,7 @@ const RAND_GEO = new THREE.CylinderGeometry(1, 1, 1, 6)
  * och inget annat — sanningen om vad en agent gör står i agentens egen kod och i
  * containervakten. Saknas ett namn står bara namnet, aldrig en gissning.
  */
-const JOBB = {
+export const JOBB = {
   'nexus-screentime': 'räknar skärmtid',
   'nexus-blockdevices': 'spärrar enheter',
   'nexus-commands': 'kör kommandon',

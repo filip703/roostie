@@ -331,6 +331,41 @@ async function diagnostic() {
  *
  * Samma cache som skanningen, så billboarden kostar inget extra anrop mot Loggboken.
  */
+/**
+ * Hur mycket varje tråd faktiskt jobbat, mätt i det enda som finns: vad den skrivit på tavlan.
+ *
+ * Roosts trådar kör i molnet och det finns INGEN läsväg till hur mycket Claude-kvot de bränt
+ * — Anthropics Usage & Cost API täcker uttryckligen inte prenumerationen, och Claude Code har
+ * bara `/status` i terminalen. Så kolonin mäter det den kan mäta: rader och tecken skrivna i
+ * Loggboken det senaste dygnet. Det är arbete som lämnat spår, inte förbrukning — och det är
+ * skillnaden som gör att mätaren går att lita på.
+ *
+ * Ett rullande dygn, inte "idag": en mätare som nollas vid midnatt ser trasig ut klockan ett.
+ * Utbruten och ren, så regeln går att prova utan nät.
+ */
+export function arbetsmangd(rader, nu = Date.now(), fonster = 24 * 60 * 60 * 1000) {
+  const per = new Map()
+  for (const r of Array.isArray(rader) ? rader : []) {
+    const trad = String(r?.trad || '')
+      .trim()
+      .toLowerCase()
+    if (!TRAD_OK.test(trad)) continue
+    const nar = tid(r?.created_at)
+    if (!nar || nu - nar > fonster || nar > nu + 60000) continue
+    const post = per.get(trad) || { trad, namn: TRADAR[trad]?.namn || trad, rader: 0, tecken: 0, senast: 0 }
+    post.rader += 1
+    post.tecken += String(r?.rubrik || '').length + String(r?.text || '').length
+    if (nar > post.senast) post.senast = nar
+    per.set(trad, post)
+  }
+  // Trådar som INTE skrivit något ska ändå finnas: en tom stapel är information, en saknad
+  // stapel ser ut som att tråden inte existerar.
+  for (const [trad, info] of Object.entries(TRADAR)) {
+    if (!per.has(trad)) per.set(trad, { trad, namn: info.namn, rader: 0, tecken: 0, senast: 0 })
+  }
+  return [...per.values()].sort((a, b) => b.tecken - a.tecken || a.namn.localeCompare(b.namn))
+}
+
 export async function senasteRader(antal = 40) {
   const { rader, fardig } = await tavlan()
   if (!rader) return { rader: [], vantar: [], fel: cache.fel }
@@ -376,6 +411,9 @@ export async function senasteRader(antal = 40) {
     rader: alla.slice(0, Math.max(1, Math.min(60, antal))),
     vantar: vantar.slice(0, 12),
     filip,
+    // Arbetsmängden räknas på RÅRADERNA, inte på de kapade — en klart-rad som är fyra tusen
+    // tecken lång ska väga fyra tusen, inte tvåhundrafyrtio.
+    arbete: arbetsmangd(rader),
     fel: fardig ? '' : cache.fel,
   }
 }

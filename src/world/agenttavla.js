@@ -11,9 +11,10 @@
  */
 import * as THREE from 'three'
 import { CSS, TAL, rgba } from './palett.js'
-import { SANS, byggDuk, byggPlank, bakgrund, huvud, regel, spartext, vridMot } from './skyltverk.js'
+import { MONO, SANS, byggDuk, byggPlank, bakgrund, huvud, regel, spartext, vridMot } from './skyltverk.js'
+import { JOBB } from './maskinpark.js'
 
-const BREDD = 15
+const BREDD = 18.5
 const HOJD = 8
 const BENHOJD = 3.8
 const PIXLAR = 128
@@ -25,6 +26,13 @@ const FARG = {
   okand: CSS.sage,
 }
 const AKTIV_MS = 5 * 60 * 1000
+
+const klocka = (ms) => {
+  const d = new Date(ms)
+  return Number.isNaN(d.getTime())
+    ? '--:--'
+    : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
 const sedan = (ms) => {
   if (!ms) return ''
@@ -115,8 +123,15 @@ export class Agenttavla {
     })
     regel(c, pad, y0 + 82, W - pad * 2, 0.1)
 
-    // En spalt per gård.
-    const spalter = this.falt.length
+    /**
+     * En spalt per gård, plus en för vad som HÄNT.
+     *
+     * Maskinparken slutade skriva ut fyrtioen namn i luften — de var en vägg man ser i stället
+     * för läser. Texten hör hemma här: en tavla är gjord för att läsas, en gård för att tittas
+     * på. Den sista spalten är parkens flöde, senast först, så man kan stå framför tavlan och
+     * följa vad agenterna gör utan att leta upp dem en och en.
+     */
+    const spalter = this.falt.length + 1
     const spaltBredd = (W - pad * 2) / spalter
     const topp = y0 + 108
     this.falt.forEach((f, i) => {
@@ -156,11 +171,57 @@ export class Agenttavla {
       }
     })
 
+    this._flode(c, pad + this.falt.length * spaltBredd, topp, spaltBredd, maskiner, H, pad)
+
     c.font = `500 20px ${SANS}`
     c.fillStyle = rgba('cream', 0.3)
     spartext(c, 'NUC · DOCKER', pad, H - pad + 8, 4)
 
     this.textur.needsUpdate = true
+  }
+
+  /** Parkens flöde: vad agenterna gjort, senast först. Det är här namnen hör hemma. */
+  _flode(c, x, topp, bredd, maskiner, H, pad) {
+    c.fillStyle = CSS.cream
+    c.fillRect(x, topp, 46, 4)
+    c.font = `600 20px ${SANS}`
+    c.fillStyle = rgba('cream', 0.6)
+    spartext(c, 'SENAST I PARKEN', x, topp + 18, 3)
+
+    const senaste = maskiner
+      .filter((m) => m.sistaLogg > 0)
+      .sort((a, b) => b.sistaLogg - a.sistaLogg)
+      .slice(0, 11)
+
+    if (!senaste.length) {
+      c.font = `400 22px ${SANS}`
+      c.fillStyle = rgba('cream', 0.35)
+      c.fillText('Ingen har loggat något.', x, topp + 58)
+      return
+    }
+
+    let y = topp + 58
+    for (const m of senaste) {
+      if (y > H - pad - 24) break
+      const kort = m.namn.replace(/^nexus-/, '')
+      c.font = `500 20px ${MONO}`
+      c.fillStyle = rgba('cream', 0.4)
+      c.fillText(klocka(m.sistaLogg), x, y + 2)
+
+      c.font = `500 22px ${SANS}`
+      c.fillStyle = m.status === 'ok' ? CSS.cream : rgba('cream', 0.4)
+      c.fillText(kort, x + 86, y)
+
+      const jobb = JOBB[m.namn]
+      if (jobb) {
+        c.font = `400 19px ${SANS}`
+        c.fillStyle = rgba('cream', 0.34)
+        c.fillText(jobb, x + 86, y + 25)
+        y += 50
+      } else {
+        y += 34
+      }
+    }
   }
 
   update(dt, camera) {

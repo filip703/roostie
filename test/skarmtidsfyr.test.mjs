@@ -79,3 +79,23 @@ test('utan känd färg får statusfärgen duga — kolonin hittar inte på en', 
   assert.equal(identitetsFarg('blå', 0.09), TAL.clay)
   assert.equal(identitetsFarg('#xyzxyz', 0.3), TAL.honey)
 })
+
+/**
+ * Trådmätarens skala. Den flitigaste tråden är full höjd och alla andra mäts mot den — en
+ * absolut skala hade krävt ett tak som ingen bestämt, och ett påhittat tak är en lögn med
+ * decimaler.
+ */
+import { stavHojd } from '../src/world/tradmatare.js'
+
+test('den flitigaste tråden fyller staven, och alla mäts mot den', () => {
+  assert.equal(stavHojd(1000, 1000), 5.6)
+  assert.ok(stavHojd(500, 1000) < stavHojd(1000, 1000))
+  assert.ok(stavHojd(500, 1000) > stavHojd(100, 1000))
+})
+
+test('en tråd som inte skrivit något får stubben, aldrig noll', () => {
+  // En saknad stapel ser ut som att tråden inte finns — det är en annan sak än att vara tyst.
+  assert.equal(stavHojd(0, 1000), 0.35)
+  assert.equal(stavHojd(0, 0), 0.35)
+  assert.equal(stavHojd(NaN, 1000), 0.35)
+})
