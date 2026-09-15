@@ -459,7 +459,7 @@ export class Maskinpark {
       return k
     }
     return new THREE.MeshStandardMaterial({
-      color: new THREE.Color(farg).offsetHSL(0, -0.14, -0.06).multiplyScalar(styrka),
+      color: new THREE.Color(TAL.charcoal).lerp(new THREE.Color(farg), styrka * 0.55),
       map: klona(this._plat.map),
       normalMap: klona(this._plat.normalMap),
       roughnessMap: klona(this._plat.roughnessMap),
