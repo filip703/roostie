@@ -19,6 +19,7 @@ import * as THREE from 'three'
 import { createBuilding } from './buildings.js'
 import { atlasTexture, part } from './kit.js'
 import { createLabel, hashString } from './plots.js'
+import { TAL } from './palett.js'
 
 const RAD = 4 // maskiner per rad i ett fält
 const RUTA = 2.9 // avstånd mellan platser
@@ -33,10 +34,10 @@ const SKALA = 0.34
  * ritad så att den gränsen syns: fyra gårdar med var sin mast, var sin skylt och var sitt lag.
  */
 const FALT = {
-  roost: { namn: 'ROOST · PRODUKTAGENTER', farg: 0x2e5c6e, ruta: [-1, -1] },
-  nat: { namn: 'HEMMET · NÄT OCH WIFI', farg: 0x6b6b3a, ruta: [1, -1] },
-  hem: { namn: 'HEMMET · HUSET', farg: 0xb5562b, ruta: [-1, 1] },
-  data: { namn: 'HEMMET · MÄTNING OCH MINNE', farg: 0xc4a678, ruta: [1, 1] },
+  roost: { namn: 'ROOST · PRODUKTAGENTER', farg: TAL.clay, ruta: [-1, -1] },
+  nat: { namn: 'HEMMET · NÄT OCH WIFI', farg: TAL.petrol, ruta: [1, -1] },
+  hem: { namn: 'HEMMET · HUSET', farg: TAL.honey, ruta: [-1, 1] },
+  data: { namn: 'HEMMET · MÄTNING OCH MINNE', farg: TAL.camel, ruta: [1, 1] },
 }
 const FALTBREDD = RAD * RUTA + 1.8
 
@@ -44,12 +45,12 @@ const FALTBREDD = RAD * RUTA + 1.8
 export const FALTLISTA = Object.entries(FALT).map(([nyckel, f]) => ({ nyckel, namn: f.namn, farg: f.farg }))
 
 const FARG = {
-  ok: 0x7fb069,
-  nere: 0x6f6257,
-  fel: 0xc9564f,
-  okand: 0x5c5349,
+  ok: TAL.gron,
+  nere: TAL.dampad,
+  fel: TAL.crit,
+  okand: TAL.sage,
 }
-const SLACKT = 0x3a342d
+const SLACKT = 0x2b332e
 /** Hur länge efter en loggrad en maskin räknas som arbetande. */
 const AKTIV_MS = 5 * 60 * 1000
 
@@ -149,19 +150,29 @@ export class Maskinpark {
     for (const [grupp, { namn, farg }] of Object.entries(FALT)) {
       const platta = new THREE.Mesh(
         new THREE.BoxGeometry(1, 0.3, 1),
-        new THREE.MeshStandardMaterial({ color: 0x241f1a, roughness: 0.92, metalness: 0.05 })
+        new THREE.MeshStandardMaterial({ color: TAL.natt, roughness: 0.92, metalness: 0.05 })
       )
       platta.receiveShadow = true
       platta.visible = false
+
+      // Kant i lagets färg, som zonerna har. Utan den är gårdarna fyra svarta fläckar och
+      // färgen finns bara på skylten; med den ser man på håll vems mark man tittar på.
+      const kant = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 0.22, 1),
+        new THREE.MeshStandardMaterial({ color: farg, roughness: 0.75, metalness: 0.1 })
+      )
+      kant.receiveShadow = true
+      kant.visible = false
       const etikett = createLabel(namn, farg)
       etikett.visible = false
       etikett.material.opacity = 0
 
       // Masten byggs först när fältet får sin första maskin: modellkitet är inte inläst när
       // kolonin skapas, och createBuilding kan inte bygga något ur ett kit som inte finns.
-      this.grupp.add(platta, etikett)
+      this.grupp.add(kant, platta, etikett)
       this.plattor[grupp] = {
         platta,
+        kant,
         etikett,
         farg,
         mast: null,
@@ -277,7 +288,7 @@ export class Maskinpark {
 
     const kabel = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
-      new THREE.LineBasicMaterial({ color: 0x4a4138, transparent: true, opacity: 0.45 })
+      new THREE.LineBasicMaterial({ color: TAL.stomme, transparent: true, opacity: 0.45 })
     )
     const paket = new THREE.Mesh(
       PAKET_GEO,
@@ -340,6 +351,7 @@ export class Maskinpark {
       const antal = this.antal[grupp]
       fro += 4
       p.platta.visible = antal > 0
+      p.kant.visible = antal > 0
       if (!antal) {
         p.etikett.visible = false
         if (p.mast) p.mast.visible = false
@@ -354,6 +366,8 @@ export class Maskinpark {
 
       p.platta.scale.set(FALTBREDD, 1, djup)
       p.platta.position.set(mx, my - 0.12, mz)
+      p.kant.scale.set(FALTBREDD + 0.7, 1, djup + 0.7)
+      p.kant.position.set(mx, my - 0.2, mz)
       // Skylten står på gårdens yttersida, bort från gatan.
       p.etikett.position.set(mx, my + 1.1, mz + sz * (djup / 2 + 1))
 
@@ -542,6 +556,8 @@ export class Maskinpark {
     for (const falt of Object.values(this.plattor)) {
       falt.platta.geometry.dispose()
       falt.platta.material.dispose()
+      falt.kant.geometry.dispose()
+      falt.kant.material.dispose()
       falt.mast?.geometry.dispose()
       falt.mast?.material.dispose()
       falt.etikett.userData.dispose?.()

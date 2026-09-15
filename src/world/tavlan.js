@@ -15,6 +15,7 @@
  */
 import * as THREE from 'three'
 import { bryt } from './anslagstavla.js'
+import { CSS, FAS, TAL, rgba } from './palett.js'
 
 const BREDD = 18
 const HOJD = 10
@@ -23,12 +24,7 @@ const PIXLAR = 128 // texlar per världsenhet → 2304 x 1280
 const PER_SIDA = 6
 const SIDTID = 9 // sekunder per sida
 
-const FASFARG = {
-  borjar: '#e08a4a',
-  klart: '#7fb069',
-  stoppat: '#c9564f',
-  notis: '#5b9dc9',
-}
+const FASFARG = FAS
 const FASNAMN = {
   borjar: 'BÖRJAR',
   klart: 'KLART',
@@ -55,7 +51,7 @@ export class Tavlan {
     this.rader = []
     this.vantar = []
 
-    const stalMat = new THREE.MeshStandardMaterial({ color: 0x3b332b, roughness: 0.72, metalness: 0.35 })
+    const stalMat = new THREE.MeshStandardMaterial({ color: TAL.stomme, roughness: 0.72, metalness: 0.35 })
 
     for (const dx of [-BREDD / 2 + 1.8, BREDD / 2 - 1.8]) {
       const ben = new THREE.Mesh(new THREE.BoxGeometry(0.55, BENHOJD + 1.2, 0.55), stalMat)
@@ -96,8 +92,8 @@ export class Tavlan {
 
     // Två strålkastare på överkanten, ren rekvisita — de lyser inte, de ser ut att göra det.
     const lampMat = new THREE.MeshStandardMaterial({
-      color: 0xf4ecdf,
-      emissive: 0xe08a4a,
+      color: TAL.cream,
+      emissive: TAL.honey,
       emissiveIntensity: 0.5,
       roughness: 0.5,
     })
@@ -142,8 +138,8 @@ export class Tavlan {
 
     c.clearRect(0, 0, W, H)
     const bak = c.createLinearGradient(0, 0, 0, H)
-    bak.addColorStop(0, '#171411')
-    bak.addColorStop(1, '#221d18')
+    bak.addColorStop(0, CSS.natt)
+    bak.addColorStop(1, CSS.panel)
     c.fillStyle = bak
     c.fillRect(0, 0, W, H)
     c.textBaseline = 'top'
@@ -151,26 +147,26 @@ export class Tavlan {
 
     // ── rubrikrad ──────────────────────────────────────────────────────────────────
     c.font = '700 58px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = '#f4ecdf'
+    c.fillStyle = CSS.cream
     c.fillText('LOGGBOKEN', pad, pad - 4)
     c.font = '500 28px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = '#8d8073'
+    c.fillStyle = CSS.dampad
     c.fillText('tavlan trådarna delar', pad + 330, pad + 20)
 
-    c.fillStyle = '#7fb069'
+    c.fillStyle = CSS.gron
     c.beginPath()
     c.arc(W - pad - 10, pad + 20, 10, 0, Math.PI * 2)
     c.fill()
     c.textAlign = 'right'
     c.font = '500 26px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = '#8d8073'
+    c.fillStyle = CSS.dampad
     c.fillText('LIVE', W - pad - 32, pad + 6)
     c.textAlign = 'left'
 
-    c.fillStyle = 'rgba(244,236,223,0.16)'
+    c.fillStyle = rgba('cream', 0.16)
     c.fillRect(pad, pad + 76, W - pad * 2, 3)
     // Spaltlinjen mellan flödet och väntelistan.
-    c.fillStyle = 'rgba(244,236,223,0.1)'
+    c.fillStyle = rgba('cream', 0.1)
     c.fillRect(spalt - 30, pad + 96, 2, H - pad * 2 - 96)
 
     this._flode(c, pad, pad + 100, spalt - 70)
@@ -185,7 +181,7 @@ export class Tavlan {
     const sida = this.rader.slice(start, start + PER_SIDA)
 
     c.font = '600 26px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = '#8d8073'
+    c.fillStyle = CSS.dampad
     c.fillText('SENASTE', x, y0)
     if (this.rader.length > PER_SIDA) {
       c.textAlign = 'right'
@@ -196,10 +192,10 @@ export class Tavlan {
     let y = y0 + 48
     const radhojd = 128
     for (const r of sida) {
-      const farg = FASFARG[r.fas] || '#8d8073'
+      const farg = FASFARG[r.fas] || CSS.dampad
 
       c.font = '500 32px ui-monospace, SFMono-Regular, Menlo, monospace'
-      c.fillStyle = '#8d8073'
+      c.fillStyle = CSS.dampad
       c.fillText(klocka(r.nar), x, y + 4)
 
       c.fillStyle = farg
@@ -210,28 +206,28 @@ export class Tavlan {
       c.fillText(String(r.trad || '').toUpperCase(), x + 156, y)
 
       c.font = '500 22px ui-sans-serif, system-ui, sans-serif'
-      c.fillStyle = '#8d8073'
+      c.fillStyle = CSS.dampad
       c.fillText(FASNAMN[r.fas] || r.fas || '', x + 156, y + 40)
 
       const x0 = x + 156 + 260
       c.font = '400 32px ui-sans-serif, system-ui, sans-serif'
-      c.fillStyle = '#f4ecdf'
+      c.fillStyle = CSS.cream
       bryt(c, r.rubrik, bredd - (x0 - x), 2).forEach((rad, i) => c.fillText(rad, x0, y + i * 40))
 
       y += radhojd
-      c.fillStyle = 'rgba(244,236,223,0.07)'
+      c.fillStyle = rgba('cream', 0.07)
       c.fillRect(x, y - 22, bredd, 2)
     }
   }
 
   _vantar(c, x, y0, bredd) {
     c.font = '600 26px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = '#e08a4a'
+    c.fillStyle = CSS.clay
     c.fillText('VÄNTAR PÅ NÅGON', x, y0)
 
     if (!this.vantar.length) {
       c.font = '400 30px ui-sans-serif, system-ui, sans-serif'
-      c.fillStyle = '#6f6257'
+      c.fillStyle = CSS.dampad
       c.fillText('Ingenting ligger och väntar.', x, y0 + 54)
       return
     }
@@ -240,24 +236,24 @@ export class Tavlan {
     for (const v of this.vantar) {
       if (y > this.duk.height - 120) break
       // Grön prick = mottagaren har skrivit något efteråt. Bärnsten = orörd.
-      c.fillStyle = v.svarat ? '#7fb069' : '#e08a4a'
+      c.fillStyle = v.svarat ? CSS.gron : CSS.clay
       c.beginPath()
       c.arc(x + 9, y + 16, 9, 0, Math.PI * 2)
       c.fill()
 
       c.font = '700 26px ui-sans-serif, system-ui, sans-serif'
-      c.fillStyle = v.svarat ? '#7c8f6e' : '#e08a4a'
+      c.fillStyle = v.svarat ? CSS.sage : CSS.clay
       const huvud = `${String(v.fran || '').toUpperCase()} → ${v.till}`
       c.fillText(huvud, x + 32, y)
 
       c.font = '400 28px ui-sans-serif, system-ui, sans-serif'
-      c.fillStyle = v.svarat ? '#8d8073' : '#f4ecdf'
+      c.fillStyle = v.svarat ? CSS.dampad : CSS.cream
       const utan = String(v.rubrik || '').replace(/^\s*TILL\s+[^:–—-]{1,28}\s*[:–—-]\s*/i, '')
       const rader = bryt(c, utan, bredd - 32, 2)
       rader.forEach((rad, i) => c.fillText(rad, x + 32, y + 36 + i * 34))
 
       y += 36 + rader.length * 34 + 26
-      c.fillStyle = 'rgba(244,236,223,0.06)'
+      c.fillStyle = rgba('cream', 0.06)
       c.fillRect(x, y - 14, bredd, 2)
     }
   }

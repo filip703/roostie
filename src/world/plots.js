@@ -17,9 +17,17 @@ import { mulberry } from './planet.js'
  * repo lands where you are already looking and quiet ones ring the edge.
  */
 
+/**
+ * Zonernas färger — Roosts egna, inte bot-crossings.
+ *
+ * Originalpaletten var orange, lila och rosa. Roost har sin egen vokabulär (clay, forest,
+ * petrol, honey, olive, camel, rose) och kolonin står på en köksskärm i Roosts hem, så den
+ * bär Roosts färger. Ordningen är vald så att två zoner som hamnar bredvid varandra inte
+ * får samma familj.
+ */
 export const PLOT_PALETTE = [
-  0xc96442, 0x4f9a63, 0x4f7ec9, 0xb8942a, 0x8b5cc9, 0xc94f8b,
-  0x3fa8a0, 0xc97f4f, 0x6f8f4f, 0x5c7fc9, 0xc95c5c, 0x7f6fc9,
+  0xc9785e, 0x6e8f72, 0x4e7f8a, 0xd7a85f, 0x7e8a5a, 0xc99a9a,
+  0x3f7068, 0xc4a678, 0x8a6b52, 0x5f8f86, 0xb65c57, 0x92a68e,
 ]
 
 /** Hex size, centre to corner. Cells tile exactly at this radius. */

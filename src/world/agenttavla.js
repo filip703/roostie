@@ -9,6 +9,7 @@
  * Fyra spalter, en per gård, i gårdarnas egna färger.
  */
 import * as THREE from 'three'
+import { CSS, TAL, rgba } from './palett.js'
 
 const BREDD = 15
 const HOJD = 8
@@ -16,10 +17,10 @@ const BENHOJD = 3.8
 const PIXLAR = 128
 
 const FARG = {
-  ok: '#7fb069',
-  nere: '#8d8073',
-  fel: '#c9564f',
-  okand: '#6f6257',
+  ok: CSS.gron,
+  nere: CSS.dampad,
+  fel: CSS.crit,
+  okand: CSS.sage,
 }
 const AKTIV_MS = 5 * 60 * 1000
 
@@ -45,7 +46,7 @@ export class Agenttavla {
     this.riktning = 0
     this.nyckel = ''
 
-    const stal = new THREE.MeshStandardMaterial({ color: 0x3b332b, roughness: 0.75, metalness: 0.3 })
+    const stal = new THREE.MeshStandardMaterial({ color: TAL.stomme, roughness: 0.75, metalness: 0.3 })
     for (const dx of [-BREDD / 2 + 1.4, BREDD / 2 - 1.4]) {
       const ben = new THREE.Mesh(new THREE.BoxGeometry(0.45, BENHOJD + 1, 0.45), stal)
       ben.position.set(dx, (BENHOJD + 1) / 2, 0)
@@ -92,8 +93,8 @@ export class Agenttavla {
 
     c.clearRect(0, 0, W, H)
     const bak = c.createLinearGradient(0, 0, 0, H)
-    bak.addColorStop(0, '#141210')
-    bak.addColorStop(1, '#201b17')
+    bak.addColorStop(0, CSS.natt)
+    bak.addColorStop(1, CSS.panel)
     c.fillStyle = bak
     c.fillRect(0, 0, W, H)
     c.textBaseline = 'top'
@@ -105,10 +106,10 @@ export class Agenttavla {
     const nere = maskiner.filter((m) => m.status === 'nere').length
 
     c.font = '700 52px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = '#f4ecdf'
+    c.fillStyle = CSS.cream
     c.fillText('AGENTERNA', pad, pad - 4)
     c.font = '500 26px ui-sans-serif, system-ui, sans-serif'
-    c.fillStyle = '#8d8073'
+    c.fillStyle = CSS.dampad
     const rad = [
       `${maskiner.length} maskiner`,
       `${arbetar} arbetar`,
@@ -119,7 +120,7 @@ export class Agenttavla {
       .filter(Boolean)
       .join('   ·   ')
     c.fillText(rad, pad, pad + 62)
-    c.fillStyle = 'rgba(244,236,223,0.16)'
+    c.fillStyle = rgba('cream', 0.16)
     c.fillRect(pad, pad + 104, W - pad * 2, 3)
 
     // En spalt per gård.
@@ -144,12 +145,12 @@ export class Agenttavla {
         c.fill()
 
         c.font = '600 25px ui-sans-serif, system-ui, sans-serif'
-        c.fillStyle = m.status === 'ok' ? '#f4ecdf' : '#8d8073'
+        c.fillStyle = m.status === 'ok' ? CSS.cream : CSS.dampad
         const namn = m.namn.replace(/^nexus-/, '')
         c.fillText(namn, x + 24, y)
 
         c.font = '400 22px ui-sans-serif, system-ui, sans-serif'
-        c.fillStyle = '#8d8073'
+        c.fillStyle = CSS.dampad
         const tid = m.status === 'ok' ? sedan(m.sistaLogg) : m.status === 'nere' ? 'nere' : 'fel'
         c.textAlign = 'right'
         c.fillText(tid, x + spaltBredd - 24, y + 3)

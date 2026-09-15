@@ -13,6 +13,7 @@
  * som står i ett kök ska dra blicken till sig, inte hamra på den.
  */
 import * as THREE from 'three'
+import { CSS, TAL, rgba } from './palett.js'
 
 const BREDD = 7.6
 const HOJD = 4.2
@@ -20,10 +21,10 @@ const BENHOJD = 3.2
 const PIXLAR = 180
 const BYTESTID = 6 // sekunder per rubrik
 
-const NEON = 0xff7a2f
-const NEON_CSS = '#ff9d5c'
-const TEXT = '#f4ecdf'
-const DAMPAD = '#b9ab97'
+const NEON = TAL.clay
+const NEON_CSS = CSS.clay
+const TEXT = CSS.cream
+const DAMPAD = CSS.dampad
 
 /** Bryter en rad så den ryms i bredden, och klipper med … om den ändå inte gör det. */
 export function bryt(ctx, text, maxBredd, maxRader) {
@@ -76,7 +77,7 @@ export class Anslagstavla {
     // köksskärm i veckor, och en mediaquery som ändras mitt i är inte värd en lyssnare.
     this.lugnt = Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)
 
-    const stolpMat = new THREE.MeshStandardMaterial({ color: 0x3b332b, roughness: 0.8, metalness: 0.25 })
+    const stolpMat = new THREE.MeshStandardMaterial({ color: TAL.stomme, roughness: 0.8, metalness: 0.25 })
     for (const dx of [-BREDD / 2 + 0.5, BREDD / 2 - 0.5]) {
       const stolpe = new THREE.Mesh(new THREE.BoxGeometry(0.22, BENHOJD + 0.8, 0.22), stolpMat)
       stolpe.position.set(dx, (BENHOJD + 0.8) / 2, 0)
@@ -87,7 +88,7 @@ export class Anslagstavla {
     const mittY = BENHOJD + HOJD / 2
     const bak = new THREE.Mesh(
       new THREE.BoxGeometry(BREDD + 0.3, HOJD + 0.3, 0.22),
-      new THREE.MeshStandardMaterial({ color: 0x241f1a, roughness: 0.9 })
+      new THREE.MeshStandardMaterial({ color: TAL.natt, roughness: 0.9 })
     )
     bak.position.set(0, mittY, 0)
     bak.castShadow = true
@@ -99,7 +100,7 @@ export class Anslagstavla {
      * ligger runt skylten syns från andra sidan kolonin medan texten bara syns på nära håll.
      */
     this.neonMat = new THREE.MeshStandardMaterial({
-      color: 0x2a2520,
+      color: TAL.panel,
       emissive: NEON,
       emissiveIntensity: 1.2,
       roughness: 0.4,
@@ -158,7 +159,7 @@ export class Anslagstavla {
     const post = this.poster[this.sida % n]
 
     c.clearRect(0, 0, W, H)
-    c.fillStyle = '#181410'
+    c.fillStyle = CSS.natt
     c.fillRect(0, 0, W, H)
     c.textBaseline = 'top'
     c.textAlign = 'left'
@@ -166,12 +167,12 @@ export class Anslagstavla {
     // Antalet, i klartext. Det är det Filip ska kunna läsa från andra sidan köket.
     c.font = '700 78px ui-sans-serif, system-ui, sans-serif'
     c.fillStyle = NEON_CSS
-    c.shadowColor = 'rgba(255,122,47,0.55)'
+    c.shadowColor = rgba('clay', 0.55)
     c.shadowBlur = 26
     c.fillText(n === 1 ? '1 SAK VÄNTAR PÅ DIG' : `${n} SAKER VÄNTAR PÅ DIG`, pad, pad)
     c.shadowBlur = 0
 
-    c.fillStyle = 'rgba(255,157,92,0.35)'
+    c.fillStyle = rgba('clay', 0.35)
     c.fillRect(pad, pad + 100, W - pad * 2, 3)
 
     // Rubriken, en i taget.
@@ -188,7 +189,7 @@ export class Anslagstavla {
     if (n > 1) {
       const y = H - pad - 10
       for (let i = 0; i < Math.min(n, 8); i++) {
-        c.fillStyle = i === this.sida % n ? NEON_CSS : 'rgba(244,236,223,0.28)'
+        c.fillStyle = i === this.sida % n ? NEON_CSS : rgba('cream', 0.28)
         c.beginPath()
         c.arc(pad + 12 + i * 34, y, i === this.sida % n ? 10 : 7, 0, Math.PI * 2)
         c.fill()
