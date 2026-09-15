@@ -802,6 +802,20 @@ async function boot() {
    * den. Den räknas som sedd, så en människa som öppnar samma URL slipper den också.
    */
   /**
+   * `?varld=trad` — Roostie 2.0, trädet.
+   *
+   * Lednings rad 224: 1.0 ska stå kvar körande tills 2.0 är godkänd. En flagga är det enda
+   * ärliga sättet att hålla båda vid liv i samma container — samma trådar, samma adapter,
+   * samma HUD, andra värld. Utan flaggan är kolonin exakt som den var.
+   */
+  if (new URLSearchParams(location.search).get('varld') === 'trad') {
+    colony.setVarld('trad')
+    // Nere vid roten och blicken uppåt: trädet ska kännas kolossalt i första bilden, inte
+    // ligga som en modell på ett bord.
+    rig.focus(new THREE.Vector3(0, 16, 0), { distance: 62 })
+  }
+
+  /**
    * `?vy=maskinparken` — kameran går direkt till en utsiktspunkt.
    *
    * Kolonin är stor nog att något kan vara byggt och ändå osynligt: rundturen hinner dit

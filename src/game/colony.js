@@ -20,6 +20,8 @@ import { Agenttavla } from '../world/agenttavla.js'
 import { Maskinpark, FALTLISTA } from '../world/maskinpark.js'
 import { Skarmtidsfyr } from '../world/skarmtidsfyr.js'
 import { Tradmatare } from '../world/tradmatare.js'
+import { Tradet, arstidNu } from '../world/tradet.js'
+import { Faglar } from '../world/faglar.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
 import { MAX_AGENT_CAP } from '../core/settings.js'
@@ -164,6 +166,18 @@ export class Colony {
     // bilden. Den mäter rader på tavlan, inte Claude-kvot — den läsvägen finns inte.
     // Mätaren håller inga egna koordinater: varje stav ställs på sin tråds plätt.
     this.tradmatare = new Tradmatare(scene, { x: 0, y: 0, z: 0 })
+
+    /**
+     * Roostie 2.0 — Trädet.
+     *
+     * Den nya världen bor bredvid den gamla i stället för att ersätta den: `?varld=trad`
+     * släcker plättarna, skeppet, maskinparken och astronauterna och tänder trädet med samma
+     * trådar. Lednings rad 224 säger uttryckligen att 1.0 ska stå kvar körande tills 2.0 är
+     * godkänd, och en flagga är det enda ärliga sättet att hålla båda vid liv i en container.
+     */
+    this.tradet = new Tradet(scene)
+    this.faglar = new Faglar(scene)
+    this.varld = 'koloni'
     this.astronauts = new Astronauts(scene, settings)
     this.astronauts.world = this._world()
     // Sized for the largest preset rather than the current one: unlike the astronaut meshes these
@@ -331,11 +345,15 @@ export class Colony {
       agenttavla: this.agenttavla.grupp.visible,
       skarmtidsfyr: this.skarmtidsfyr.grupp.visible,
       tradmatare: this.tradmatare.diagnos(),
+      varld: this.varld,
+      faglar: this.faglar.faglar.size,
       maskinpark: this.maskinpark.diagnos(),
     }
   }
 
   utsiktspunkter() {
+    // I trädvärlden är utsikterna trädets egna: roten, kronan, stamhålet.
+    if (this.varld === 'trad') return this.tradet.utsikter()
     const ut = [{ namn: 'kolonin', punkt: new THREE.Vector3(0, 0, 0), avstand: 64 }]
     const kandidater = [
       ['loggboken', this.tavlan, 30],
@@ -347,6 +365,82 @@ export class Colony {
       if (sak?.grupp?.visible) ut.push({ namn, punkt: sak.grupp.position.clone(), avstand })
     }
     return ut
+  }
+
+  /**
+   * Byter värld: 'koloni' (1.0) eller 'trad' (2.0).
+   *
+   * Det som göms göms — det får inte ligga kvar och ritas bakom trädet och äta bilder per
+   * sekund för en värld ingen tittar på.
+   */
+  setVarld(namn) {
+    const trad = namn === 'trad'
+    this.varld = trad ? 'trad' : 'koloni'
+
+    const gamla = [
+      this.plotGroup,
+      this.labelGroup,
+      this.ship.group,
+      this.astronauts.group,
+      this.indicators?.group,
+      this.scaffolds?.group,
+      this.maskinpark.grupp,
+      this.agenttavla.grupp,
+      this.tradmatare.grupp,
+      this.tavlan.grupp,
+      this.anslagstavla.grupp,
+      this.skarmtidsfyr.grupp,
+    ].filter(Boolean)
+
+    if (trad) {
+      // Kom ihåg vad som var tänt, så ett byte tillbaka inte släcker en tavla som hade
+      // något att säga. Objekten styr sin egen synlighet ur data; vi lånar den bara.
+      this._synligt = gamla.map((g) => g.visible)
+      gamla.forEach((g) => (g.visible = false))
+    } else if (this._synligt) {
+      gamla.forEach((g, i) => (g.visible = this._synligt[i] ?? true))
+      this._synligt = null
+    }
+
+    this.tradet.setVisible(trad)
+    this.faglar.setVisible(trad)
+    if (trad) {
+      this.tradet.satArstid(arstidNu())
+      this._satFaglar()
+    }
+  }
+
+  /**
+   * Trådarna in i trädet.
+   *
+   * Samma lista som astronauterna får — bara översatt till det fåglarna behöver. Färgen är
+   * plättens, så en tråd har samma färg i båda världarna och man känner igen sig när man
+   * byter.
+   */
+  _satFaglar() {
+    if (this.varld !== 'trad') return
+    const lista = []
+    for (const [id, t] of this.threads) {
+      if (!t) continue
+      const projekt = String(t.project || '')
+      const arbete = (this.arbete || []).find((a) => String(a.namn || '').toLowerCase() === projekt.toLowerCase())
+      lista.push({
+        id,
+        namn: projekt || t.title || id,
+        // Samma färg som plätten hade: en tråd ska gå att känna igen när man byter värld.
+        farg: this.plots.get(projekt)?.accent ?? 0xc4a678,
+        rader: arbete ? arbete.rader : 0,
+        running: Boolean(t.running),
+        unread: Boolean(t.unread),
+        notis: Boolean(t.notis),
+        hasError: Boolean(t.hasError),
+        archived: Boolean(t.archived),
+        openUrl: t.openUrl || '',
+        thread: t,
+      })
+    }
+    lista.sort((a, b) => a.namn.localeCompare(b.namn))
+    this.faglar.set(lista, this.tradet.boplatser(Math.max(1, lista.length - 1)), this.tradet.stamhal())
   }
 
   /** Var en agent står, för panelens klick. Null när maskinen inte finns i parken. */
@@ -362,6 +456,7 @@ export class Colony {
     // hör ihop, och kolonin läses genom att titta sig omkring i stället för på ett diagram.
     this.arbete = Array.isArray(data?.arbete) ? data.arbete : this.arbete
     this.tradmatare.set(this.arbete || [], this._tradPlatser())
+    this._satFaglar()
   }
 
   /** Trådnamn i gemener → var stapeln står på plätten, och i vilken färg. */
@@ -387,6 +482,8 @@ export class Colony {
    */
   setPuls(data) {
     this.skarmtidsfyr.set(data)
+    // Samma slag i barken. Fyren och trädet får aldrig säga olika saker om samma minut.
+    if (this.skarmtidsfyr.slagKo > 0 || [...this.skarmtidsfyr.barn.values()].some((b) => b.slagKo > 0)) this.tradet.slag()
     this.maskinpark.setPuls(data)
   }
 
@@ -569,6 +666,9 @@ export class Colony {
     // Plättarna flyttar sig när trådar tillkommer eller försvinner, och stavarna står PÅ dem
     // — så de måste ställas om här, inte bara när Loggboken hämtas.
     this.tradmatare?.set(this.arbete || [], this._tradPlatser())
+    // Samma trådar, andra världen. Färgen hämtas ur plättarna, så den här raden måste komma
+    // EFTER att plättarna finns.
+    this._satFaglar()
     // Zones that just moved, appeared or grew are zones the scatter does not know about.
     if (this.scatterGroup && this._plotFootprint() !== this._scatterFootprint) this._buildScatter()
     // Which hex cells are decked. Ground height is asked for once per moving agent per
@@ -868,6 +968,13 @@ export class Colony {
     this.agenttavla.update(dt, this.camera)
     this.skarmtidsfyr.update(dt, this.camera)
     this.tradmatare.update(dt, this.camera)
+    if (this.varld === 'trad') {
+      // Trädet lyser efter samma natt som resten av kolonin, och blossar på samma slag som
+      // skärmtidsfyren: en minut som lämnat någons konto syns i barken.
+      this.tradet.setNatt(night)
+      this.tradet.update(dt)
+      this.faglar.update(dt, this.camera, night)
+    }
 
     this._growBuildings(dt)
     this.astronauts.update(dt, elapsed)
@@ -1000,6 +1107,12 @@ export class Colony {
   // ── interaction ─────────────────────────────────────────────────────────────────────
 
   pick(ndcX, ndcY, aspect) {
+    if (this.varld === 'trad') {
+      if (!this._strale) this._strale = new THREE.Raycaster()
+      this._strale.setFromCamera({ x: ndcX, y: ndcY }, this.camera)
+      const trad = this.faglar.traffa(this._strale)
+      return trad ? trad.id : null
+    }
     return this.astronauts.pick(this.camera, ndcX, ndcY, aspect)
   }
 
@@ -1026,6 +1139,8 @@ export class Colony {
     this.agenttavla.dispose()
     this.skarmtidsfyr.dispose()
     this.tradmatare.dispose()
+    this.tradet.dispose()
+    this.faglar.dispose()
     this.astronauts.dispose()
     this.indicators.dispose()
     this.particles.dispose()
