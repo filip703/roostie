@@ -291,7 +291,11 @@ export class Colony {
 
   /** NUC:ens containrar → maskinparken. */
   setMaskiner(maskiner) {
+    const fore = this.maskinpark.radie()
     this.maskinpark.set(maskiner)
+    // Marken under parken ströddes med stenar innan vi visste hur stor den skulle bli. Växer
+    // eller krymper den, läggs strösslet om — annars står ett klippblock mitt i ett fält.
+    if (Math.abs(this.maskinpark.radie() - fore) > 0.5) this._buildScatter()
   }
 
   // ── roster ──────────────────────────────────────────────────────────────────────────

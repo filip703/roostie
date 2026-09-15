@@ -37,6 +37,9 @@ const AKTIV_MS = 5 * 60 * 1000
 /** Maskintyper, valda ur namnet så en agent alltid får samma maskin. */
 const SORTER = ['antenna', 'solar', 'greenhouse', 'tower', 'reactor']
 
+/** En liten lykta ovanför varje maskin — status som går att läsa tvärs över kolonin. */
+const FYR_GEO = new THREE.SphereGeometry(0.22, 10, 8)
+
 /**
  * Vad maskinen gör, på svenska.
  *
@@ -172,9 +175,10 @@ export class Maskinpark {
 
     for (const namn of kvar) {
       const post = this.maskiner.get(namn)
-      this.grupp.remove(post.mesh, post.etikett)
+      this.grupp.remove(post.mesh, post.etikett, post.fyr)
       post.mesh.geometry.dispose()
       post.mesh.material.dispose()
+      post.fyr.material.dispose()
       post.etikett.userData.dispose?.()
       this.maskiner.delete(namn)
     }
@@ -201,10 +205,17 @@ export class Maskinpark {
     etikett.visible = false
     etikett.material.opacity = 0
 
-    this.grupp.add(mesh, etikett)
+    const fyr = new THREE.Mesh(
+      FYR_GEO,
+      new THREE.MeshBasicMaterial({ color: FARG.okand, transparent: true, opacity: 0.9, toneMapped: false })
+    )
+    fyr.userData.hojd = (mesh.userData.height || 2) * SKALA + 0.55
+
+    this.grupp.add(mesh, etikett, fyr)
     return {
       mesh,
       etikett,
+      fyr,
       tid,
       status: 'okand',
       farg: new THREE.Color(FARG.okand),
@@ -227,6 +238,7 @@ export class Maskinpark {
     const y = this.hojd(this.grupp.position.x + x, this.grupp.position.z + z) - this.grupp.position.y
     post.mesh.position.set(x, y, z)
     post.etikett.position.set(x, y + 1.9, z)
+    post.fyr.position.set(x, y + post.fyr.userData.hojd, z)
   }
 
   /** Plattorna växer med fälten, så en ny agent inte hamnar utanför gården. */
@@ -273,6 +285,22 @@ export class Maskinpark {
       } else {
         accent.set(SLACKT)
       }
+
+      // Lyktan: den enda statusen som går att se på håll.
+      const m = post.fyr.material
+      if (post.status === 'fel') {
+        m.color.set(FARG.fel)
+        m.opacity = Math.sin(sekunder * 4) > 0 ? 1 : 0.15
+        post.fyr.scale.setScalar(1.15)
+      } else if (post.status === 'ok') {
+        m.color.set(FARG.ok)
+        m.opacity = arbetar ? 0.75 + Math.sin(sekunder * 2.4) * 0.25 : 0.34
+        post.fyr.scale.setScalar(arbetar ? 1 + Math.sin(sekunder * 2.4) * 0.14 + post.blixt * 0.5 : 0.8)
+      } else {
+        m.color.set(post.status === 'nere' ? FARG.nere : FARG.okand)
+        m.opacity = 0.22
+        post.fyr.scale.setScalar(0.7)
+      }
     }
 
     // Etiketterna är läsbara på nära håll och försvinner när man drar sig undan — annars
@@ -299,6 +327,7 @@ export class Maskinpark {
     for (const post of this.maskiner.values()) {
       post.mesh.geometry.dispose()
       post.mesh.material.dispose()
+      post.fyr.material.dispose()
       post.etikett.userData.dispose?.()
     }
     for (const falt of Object.values(this.plattor)) {
