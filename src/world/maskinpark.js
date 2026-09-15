@@ -32,6 +32,8 @@ import { TAL } from './palett.js'
 const SPRIDNING = 2.35 // hur glest spiralen växer
 const GYLLENE = Math.PI * (3 - Math.sqrt(5))
 const GATA = 6 // luft mellan gårdarna
+/** Hur högt gårdens yta ligger över markens högsta punkt inom gården. */
+const PLATAHOJD = 1.1
 const SKALA = 0.34
 
 /**
@@ -243,6 +245,31 @@ export class Maskinpark {
     return SPRIDNING * Math.sqrt(flest - 0.4) + 2.6
   }
 
+  /**
+   * Markens högsta och lägsta punkt inom en gård.
+   *
+   * Terrängen böljar, och en platt skiva lagd rakt på den blir uppäten av marken — kullar
+   * skär igenom den och gården ser trasig ut. Så gårdarna ligger på platåer: en tjock platta
+   * vars ÖVERSIDA är ovanför markens högsta punkt inom gården och vars undersida går ner
+   * under den lägsta, så den står stadigt oavsett hur kuperat det är där den råkar hamna.
+   */
+  _markTopp(mx, mz, r) {
+    let hogst = -Infinity
+    let lagst = Infinity
+    const prov = [[0, 0]]
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2
+      prov.push([Math.cos(a) * r * 0.6, Math.sin(a) * r * 0.6])
+      prov.push([Math.cos(a) * r, Math.sin(a) * r])
+    }
+    for (const [dx, dz] of prov) {
+      const h = this.hojd(this.grupp.position.x + mx + dx, this.grupp.position.z + mz + dz) - this.grupp.position.y
+      if (h > hogst) hogst = h
+      if (h < lagst) lagst = h
+    }
+    return { topp: hogst + PLATAHOJD, lagst }
+  }
+
   /** Plats nummer i i spiralen, i gårdens eget koordinatsystem. */
   _spiral(i, fro) {
     const r = SPRIDNING * Math.sqrt(i + 0.55)
@@ -378,7 +405,9 @@ export class Maskinpark {
     const plats = this._spiral(i, falt.fro)
     const x = falt.mitt.x + plats.x
     const z = falt.mitt.z + plats.z
-    const y = this.hojd(this.grupp.position.x + x, this.grupp.position.z + z) - this.grupp.position.y
+    // Gårdens yta är plan: maskinerna står på platån, inte i backen. Det är också det som
+    // gör att fyrtio boxar ligger i våg i stället för att luta åt varsitt håll.
+    const y = falt.mitt.y
 
     // Maskinen vrider sig utåt från masten, med en skvätt slump ur sitt eget namn. Fyrtio
     // maskiner i exakt samma riktning är lika livlöst som fyrtio på rad.
@@ -427,16 +456,20 @@ export class Maskinpark {
       const [sx, sz] = FALT[grupp].ruta
       const mx = sx * (r + GATA / 2)
       const mz = sz * (r + GATA / 2)
-      const my = this.hojd(this.grupp.position.x + mx, this.grupp.position.z + mz) - this.grupp.position.y
-      p.mitt.set(mx, my, mz)
+      const { topp, lagst } = this._markTopp(mx, mz, r + 0.6)
+      // Platån går från strax under markens lägsta punkt upp till sin egen yta.
+      const tjocklek = topp - lagst + 1.4
+      p.mitt.set(mx, topp, mz)
       p.radie = r
 
-      p.platta.scale.set(r, 1, r)
-      p.platta.position.set(mx, my - 0.12, mz)
-      p.kant.scale.set(r + 0.5, 1, r + 0.5)
-      p.kant.position.set(mx, my - 0.2, mz)
+      p.platta.scale.set(r, tjocklek / 0.3, r)
+      p.platta.position.set(mx, topp - tjocklek / 2, mz)
+      // Kanten är en bredare platå strax under ytan — den blir en färgad rand runt gården
+      // och en synlig sockel i sidan, i stället för en rand som marken äter upp.
+      p.kant.scale.set(r + 0.6, (tjocklek - 0.3) / 0.22, r + 0.6)
+      p.kant.position.set(mx, topp - 0.22 - (tjocklek - 0.3) / 2, mz)
       // Skylten står på gårdens yttersida, bort från gatan där de fyra möts.
-      p.etikett.position.set(mx + sx * r * 0.55, my + 1.2, mz + sz * (r + 1.2))
+      p.etikett.position.set(mx + sx * r * 0.55, topp + 1.2, mz + sz * (r + 1.2))
 
       // Masten står mitt på gården: alla kablar går inåt, som ekrar i ett hjul.
       if (!p.mast) {
@@ -452,10 +485,10 @@ export class Maskinpark {
         }
       }
       if (p.mast) {
-        p.mast.position.set(mx, my, mz)
+        p.mast.position.set(mx, topp, mz)
         p.mast.visible = true
       }
-      p.nav.set(mx, my + 2.2, mz)
+      p.nav.set(mx, topp + 2.2, mz)
 
       /**
        * Drönaren. Varje gård har en som kretsar runt masten och sjunker ner mot den maskin
