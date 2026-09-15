@@ -97,7 +97,9 @@ if (new URLSearchParams(location.search).get('debug') === '1') {
           fov: engine.camera.fov,
           bredd: rund(engine.camera.aspect),
           scen: Boolean(rig.scen),
+          onskat: [rund(rig.desiredTarget.x), rund(rig.desiredTarget.y), rund(rig.desiredTarget.z), rund(rig.desiredDistance)],
         },
+        stall: { ...stallLogg },
         ...colony.diagnos(),
       })
     } catch {
@@ -106,6 +108,13 @@ if (new URLSearchParams(location.search).get('debug') === '1') {
   }, 1000)
 }
 
+/**
+ * Vad inställningen av överblicken gjorde, senast.
+ *
+ * Står i diagnosen på <html> eftersom trädet bara går att granska utifrån: kameran stod
+ * fel på köksskärmen och rätt i utvecklingsmiljön, och en bild kan inte säga varför.
+ */
+const stallLogg = { varv: 0, sist: 'har inte körts' }
 let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {}, hiddenProjects: [], viewedAt: {} }
 let threads = []
 /** Last legend built for the bottom bar, kept so the open zone's chip can light up between polls. */
@@ -888,15 +897,25 @@ async function boot() {
      * startbild, inte ta ifrån någon kontrollen.
      */
     const stallIn = () => {
-      if (rig.interacting) return true
-      const v = colony.flygTill('överblick')
+      stallLogg.varv += 1
+      if (rig.interacting) {
+        stallLogg.sist = 'användaren höll i kameran'
+        return true
+      }
+      let v = null
+      try {
+        v = colony.flygTill('överblick')
+      } catch (e) {
+        stallLogg.sist = 'flygTill kastade: ' + String(e && e.message).slice(0, 120)
+        return true
+      }
       if (!v) {
-        // En utsikt som inte finns är ett fel som annars försvinner tyst.
-        document.documentElement.dataset.roostieFel = '["utsikten överblick saknas"]'
+        stallLogg.sist = 'utsikten överblick saknas'
         return true
       }
       const nara = rig.desiredTarget.distanceTo(v.punkt) < 10 && Math.abs(rig.distance - v.avstand) < 8
       rig.focus(v.punkt, { distance: v.avstand, polar: v.lutning, azimuth: v.azimut })
+      stallLogg.sist = `satte ${Math.round(v.avstand)} @ ${v.punkt.x},${v.punkt.y},${v.punkt.z} → önskat ${Math.round(rig.desiredDistance)}`
       return nara
     }
     stallIn()
