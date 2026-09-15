@@ -18,9 +18,22 @@ import { CSS, TAL, rgba } from './palett.js'
 import { createLabel } from './plots.js'
 
 /** Hur länge en puls syns. */
-const SLAG_MS = 1400
+const SLAG_MS = 2200
 /** Max antal slag som spelas upp i rad, så en lucka i pollen inte blir ett stroboskop. */
 const MAX_KO = 3
+
+/**
+ * Hur många slag en ny hämtning ska ge.
+ *
+ * Bruten ut ur klassen för att den går att prova utan en webbläsare: det är den här räkningen
+ * som avgör om fyren säger sanning. Första hämtningen ger noll — vi vet inte vad som hänt före
+ * den och ska inte låtsas. En hämtning som inte är färsk ger noll. Fler än MAX_KO i rad
+ * kortas, så en lucka i pollen inte blir ett stroboskop.
+ */
+export function raknaSlag(anvantForut, anvant, fardig, ko = 0) {
+  if (!fardig || anvantForut === null || anvant <= anvantForut) return ko
+  return Math.min(MAX_KO, ko + (anvant - anvantForut))
+}
 
 export class Skarmtidsfyr {
   constructor(scene, plats) {
@@ -100,10 +113,32 @@ export class Skarmtidsfyr {
       toneMapped: false,
       depthWrite: false,
     })
-    this.ring = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.75, 40), this.ringMat)
+    this.ring = new THREE.Mesh(new THREE.RingGeometry(1.3, 2.05, 48), this.ringMat)
     this.ring.rotation.x = -Math.PI / 2
     this.ring.position.y = 0.35
     this.grupp.add(this.ring)
+
+    // Andra ringen går en halv takt efter den första, så ett slag läser som en våg och inte
+    // som ett blink. Det är den som gör att man ser det i ögonvrån tvärs över köket.
+    this.ringMat2 = this.ringMat.clone()
+    this.ring2 = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.7, 48), this.ringMat2)
+    this.ring2.rotation.x = -Math.PI / 2
+    this.ring2.position.y = 0.32
+    this.grupp.add(this.ring2)
+
+    // Blixten: en kort, bred ljuskägla rakt upp vid varje slag.
+    this.blixtMat = new THREE.MeshBasicMaterial({
+      color: TAL.cream,
+      transparent: true,
+      opacity: 0,
+      toneMapped: false,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    })
+    this.blixt = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.5, 11, 20, 1, true), this.blixtMat)
+    this.blixt.position.y = 5.6
+    this.grupp.add(this.blixt)
 
     this.etikett = createLabel('skärmtid', TAL.gron)
     this.etikett.position.set(0, 2.4, 0)
@@ -124,9 +159,7 @@ export class Skarmtidsfyr {
     // Ett slag per minut som faktiskt lämnat en budget sedan förra hämtningen. Första
     // hämtningen ger inga slag — vi vet inte vad som hänt före den, och ska inte låtsas.
     const anvant = budgetar.reduce((n, b) => n + b.anvant, 0)
-    if (this.anvantForut !== null && this.fardig && anvant > this.anvantForut) {
-      this.slagKo = Math.min(MAX_KO, this.slagKo + (anvant - this.anvantForut))
-    }
+    this.slagKo = raknaSlag(this.anvantForut, anvant, this.fardig, this.slagKo)
     if (this.fardig) this.anvantForut = anvant
 
     const nyckel = budgetar.map((b) => `${b.namn}${b.kvar}${b.andel.toFixed(2)}`).join('|') + this.fardig
@@ -176,17 +209,26 @@ export class Skarmtidsfyr {
     const andning = this.fardig ? 0.45 + Math.sin(t * 1.1) * 0.08 : 0.2
 
     this.pelarMat.color.set(farg)
-    this.pelarMat.opacity = Math.min(0.75, andning * 0.5 + blossa * 0.45)
+    this.pelarMat.opacity = Math.min(0.95, andning * 0.5 + blossa * 0.85)
+    this.pelare.scale.set(1 + blossa * 0.5, 1, 1 + blossa * 0.5)
     this.glodMat.color.set(farg)
     this.glodMat.opacity = Math.min(0.8, andning * 0.6 + blossa * 0.5)
     this.kronaMat.color.set(farg)
-    this.kronaMat.opacity = Math.min(1, 0.55 + blossa * 0.45)
-    this.krona.scale.setScalar(1 + blossa * 0.7)
+    this.kronaMat.opacity = Math.min(1, 0.5 + blossa * 0.5)
+    this.krona.scale.setScalar(1 + blossa * 2.2)
 
+    // Ringarna far ut över hela kolonin — en minut som lämnat någons konto ska synas.
     this.ringMat.color.set(farg)
-    this.ringMat.opacity = this.slag * 0.55
-    const r = 1 + (1 - this.slag) * 5
-    this.ring.scale.setScalar(r)
+    this.ringMat.opacity = this.slag * 0.85
+    this.ring.scale.setScalar(1 + (1 - this.slag) * 11)
+
+    const efter = Math.max(0, this.slag - 0.25) / 0.75
+    this.ringMat2.color.set(farg)
+    this.ringMat2.opacity = efter * 0.5
+    this.ring2.scale.setScalar(1 + (1 - efter) * 7)
+
+    this.blixtMat.opacity = Math.min(0.85, blossa * 0.9)
+    this.blixt.scale.set(1 + blossa * 0.6, 1, 1 + blossa * 0.6)
 
     const p = new THREE.Vector3()
     this.etikett.getWorldPosition(p)

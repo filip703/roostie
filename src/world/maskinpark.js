@@ -21,9 +21,17 @@ import { atlasTexture, part } from './kit.js'
 import { createLabel, hashString } from './plots.js'
 import { TAL } from './palett.js'
 
-const RAD = 4 // maskiner per rad i ett fält
-const RUTA = 2.9 // avstånd mellan platser
-const GATA = 5 // gatan mellan fälten
+/**
+ * Gårdarna är inte rutnät.
+ *
+ * Fyrtio maskiner på rad läser som ett kalkylark, inte som en plats — och en agent som står
+ * i kolumn tre rad två blir aldrig "den där borta vid masten". Platserna läggs därför i en
+ * gyllene-vinkel-spiral ut från gårdens mast: tät i mitten, glesare utåt, aldrig två i linje,
+ * och ändå helt bestämd av ordningen så att samma agent alltid hamnar på samma ställe.
+ */
+const SPRIDNING = 2.35 // hur glest spiralen växer
+const GYLLENE = Math.PI * (3 - Math.sqrt(5))
+const GATA = 6 // luft mellan gårdarna
 const SKALA = 0.34
 
 /**
@@ -39,8 +47,6 @@ const FALT = {
   hem: { namn: 'HEMMET · HUSET', farg: TAL.honey, ruta: [-1, 1] },
   data: { namn: 'HEMMET · MÄTNING OCH MINNE', farg: TAL.camel, ruta: [1, 1] },
 }
-const FALTBREDD = RAD * RUTA + 1.8
-
 /** Gårdarna som agenttavlan behöver känna till: nyckel, namn och färg. */
 export const FALTLISTA = Object.entries(FALT).map(([nyckel, f]) => ({ nyckel, namn: f.namn, farg: f.farg }))
 
@@ -63,6 +69,11 @@ const FYR_GEO = new THREE.SphereGeometry(0.22, 10, 8)
 const PAKET_GEO = new THREE.SphereGeometry(0.13, 8, 6)
 /** Varje maskin står på sin egen box. */
 const BOX_GEO = new THREE.BoxGeometry(2.3, 0.22, 2.3)
+/** Gårdens drönare — liten, lysande, alltid i rörelse. */
+const DRONAR_GEO = new THREE.OctahedronGeometry(0.34)
+/** Runda gårdar: en platta och en kant, skalade per fält. */
+const PLATT_GEO = new THREE.CylinderGeometry(1, 1, 0.3, 40)
+const KANT_GEO = new THREE.CylinderGeometry(1, 1, 0.22, 40)
 
 /**
  * Vad maskinen gör, på svenska.
@@ -161,7 +172,7 @@ export class Maskinpark {
     this.plattor = {}
     for (const [grupp, { namn, farg }] of Object.entries(FALT)) {
       const platta = new THREE.Mesh(
-        new THREE.BoxGeometry(1, 0.3, 1),
+        PLATT_GEO,
         new THREE.MeshStandardMaterial({ color: TAL.natt, roughness: 0.92, metalness: 0.05 })
       )
       platta.receiveShadow = true
@@ -170,7 +181,7 @@ export class Maskinpark {
       // Kant i lagets färg, som zonerna har. Utan den är gårdarna fyra svarta fläckar och
       // färgen finns bara på skylten; med den ser man på håll vems mark man tittar på.
       const kant = new THREE.Mesh(
-        new THREE.BoxGeometry(1, 0.22, 1),
+        KANT_GEO,
         new THREE.MeshStandardMaterial({ color: farg, roughness: 0.75, metalness: 0.1 })
       )
       kant.receiveShadow = true
@@ -222,9 +233,21 @@ export class Maskinpark {
    */
   radie() {
     if (!this.maskiner.size) return 0
-    const rader = Math.max(...Object.values(this.antal).map((n) => Math.ceil(n / RAD)), 1)
-    const djup = rader * RUTA + 1.8
-    return Math.hypot(FALTBREDD + GATA / 2, djup + GATA / 2) + 2
+    const r = this._faltradie()
+    return r * 2 + GATA + 4
+  }
+
+  /** Gårdens egen radie: så långt ut spiralen når för det största laget, plus lite kant. */
+  _faltradie() {
+    const flest = Math.max(...Object.values(this.antal), 1)
+    return SPRIDNING * Math.sqrt(flest - 0.4) + 2.6
+  }
+
+  /** Plats nummer i i spiralen, i gårdens eget koordinatsystem. */
+  _spiral(i, fro) {
+    const r = SPRIDNING * Math.sqrt(i + 0.55)
+    const a = i * GYLLENE + fro
+    return { x: Math.cos(a) * r, z: Math.sin(a) * r, vinkel: a }
   }
 
   /** Kolonin lämnar en markhöjdsfunktion hit, så maskinerna står på marken och inte i den. */
@@ -337,6 +360,9 @@ export class Maskinpark {
       paket,
       // Fasen är slumpad från start, annars åker fyrtio paket i takt som ett tåg.
       fas: Math.random(),
+      // Egen vridning ur namnet: bestämd, men ingen står exakt som grannen.
+      vridning: ((fro % 1000) / 1000 - 0.5) * 1.1,
+      hemY: 0,
       tid,
       status: 'okand',
       farg: new THREE.Color(FARG.okand),
@@ -349,12 +375,17 @@ export class Maskinpark {
   _placera(post) {
     const { grupp, i } = post.plats
     const falt = this.plattor[grupp] || this.plattor.hem
-    const kol = i % RAD
-    const rad = Math.floor(i / RAD)
-    const x = falt.mitt.x + (kol - (RAD - 1) / 2) * RUTA
-    // Raderna centreras i gårdens djup, som är lika för alla fält.
-    const z = falt.mitt.z + (rad - (this.maxRader - 1) / 2) * RUTA
+    const plats = this._spiral(i, falt.fro)
+    const x = falt.mitt.x + plats.x
+    const z = falt.mitt.z + plats.z
     const y = this.hojd(this.grupp.position.x + x, this.grupp.position.z + z) - this.grupp.position.y
+
+    // Maskinen vrider sig utåt från masten, med en skvätt slump ur sitt eget namn. Fyrtio
+    // maskiner i exakt samma riktning är lika livlöst som fyrtio på rad.
+    post.mesh.rotation.y = -plats.vinkel + post.vridning
+    post.box.rotation.y = post.mesh.rotation.y
+
+    post.hemY = y
     post.mesh.position.set(x, y + 0.11, z)
     post.etikett.position.set(x, y + 1.9, z)
     post.fyr.position.set(x, y + post.fyr.userData.hojd, z)
@@ -375,35 +406,39 @@ export class Maskinpark {
    * poängen med att ge dem fast plats.
    */
   _plattor() {
-    this.maxRader = Math.max(...Object.values(this.antal).map((n) => Math.ceil(n / RAD)), 1)
-    const djup = this.maxRader * RUTA + 1.8
+    const r = this._faltradie()
     let fro = 3
 
     for (const [grupp, p] of Object.entries(this.plattor)) {
       const antal = this.antal[grupp]
       fro += 4
+      p.fro = fro
       p.platta.visible = antal > 0
       p.kant.visible = antal > 0
       if (!antal) {
         p.etikett.visible = false
         if (p.mast) p.mast.visible = false
+        if (p.dronare) p.dronare.visible = false
         continue
       }
 
+      // Fyra runda gårdar kring parkens mitt, alla lika stora som det största laget — annars
+      // vandrar de när en agent tillkommer, och en gård man känner igen är halva poängen.
       const [sx, sz] = FALT[grupp].ruta
-      const mx = sx * (FALTBREDD / 2 + GATA / 2)
-      const mz = sz * (djup / 2 + GATA / 2)
+      const mx = sx * (r + GATA / 2)
+      const mz = sz * (r + GATA / 2)
       const my = this.hojd(this.grupp.position.x + mx, this.grupp.position.z + mz) - this.grupp.position.y
       p.mitt.set(mx, my, mz)
+      p.radie = r
 
-      p.platta.scale.set(FALTBREDD, 1, djup)
+      p.platta.scale.set(r, 1, r)
       p.platta.position.set(mx, my - 0.12, mz)
-      p.kant.scale.set(FALTBREDD + 0.7, 1, djup + 0.7)
+      p.kant.scale.set(r + 0.5, 1, r + 0.5)
       p.kant.position.set(mx, my - 0.2, mz)
-      // Skylten står på gårdens yttersida, bort från gatan.
-      p.etikett.position.set(mx, my + 1.1, mz + sz * (djup / 2 + 1))
+      // Skylten står på gårdens yttersida, bort från gatan där de fyra möts.
+      p.etikett.position.set(mx + sx * r * 0.55, my + 1.2, mz + sz * (r + 1.2))
 
-      // Masten står på gårdens innerhörn, mot gatan där alla fyra möts.
+      // Masten står mitt på gården: alla kablar går inåt, som ekrar i ett hjul.
       if (!p.mast) {
         try {
           const mast = createBuilding({ seed: fro, accent: p.farg, kind: 'antenna' })
@@ -416,14 +451,25 @@ export class Maskinpark {
           // Kitet är inte inne än. Nästa poll bygger masten; fältet fungerar utan den.
         }
       }
-      const mastX = mx - sx * (FALTBREDD / 2 + 1.1)
-      const mastZ = mz - sz * (djup / 2 + 1.1)
-      const mastY = this.hojd(this.grupp.position.x + mastX, this.grupp.position.z + mastZ) - this.grupp.position.y
       if (p.mast) {
-        p.mast.position.set(mastX, mastY, mastZ)
+        p.mast.position.set(mx, my, mz)
         p.mast.visible = true
       }
-      p.nav.set(mastX, mastY + 1.8, mastZ)
+      p.nav.set(mx, my + 2.2, mz)
+
+      /**
+       * Drönaren. Varje gård har en som kretsar runt masten och sjunker ner mot den maskin
+       * som senast gjorde något — det är den som gör en gård till en plats där det händer
+       * saker i stället för en uppställning.
+       */
+      if (!p.dronare) {
+        p.dronare = new THREE.Mesh(
+          DRONAR_GEO,
+          new THREE.MeshBasicMaterial({ color: p.farg, transparent: true, opacity: 0.95, toneMapped: false })
+        )
+        this.grupp.add(p.dronare)
+      }
+      p.dronare.visible = true
     }
   }
 
@@ -454,8 +500,13 @@ export class Maskinpark {
     const nu = Date.now()
     const sekunder = performance.now() / 1000
 
+    // Vem som senast gjorde något på varje gård — drönaren far dit.
+    for (const falt of Object.values(this.plattor)) falt.senast = null
+
     for (const [namn, post] of this.maskiner) {
       const arbetar = this._arbetar(post, namn, nu)
+      const gard = this.plattor[post.plats.grupp]
+      if (gard && arbetar && (!gard.senast || post.sistaLogg > gard.senast.sistaLogg)) gard.senast = post
       // Bara det som går får sin klocka framflyttad. Den som arbetar snurrar i full fart,
       // den som bara står och kör går på tomgång, och den som är nere står stilla.
       if (post.status === 'ok') post.tid.value += dt * (arbetar ? 1 : 0.18)
@@ -499,6 +550,14 @@ export class Maskinpark {
       } else {
         post.paket.visible = false
         post.kabel.material.opacity = 0.16
+      }
+
+      // Maskiner som arbetar guppar svagt. Det är litet, men det är skillnaden mellan en
+      // uppställning och en gård där något pågår.
+      if (post.hemY !== undefined) {
+        const gupp = arbetar ? Math.sin(sekunder * 2.6 + post.fas * 6.28) * 0.09 : 0
+        post.mesh.position.y = post.hemY + 0.11 + gupp
+        post.fyr.position.y = post.hemY + post.fyr.userData.hojd + gupp
       }
 
       // Lyktan: den enda statusen som går att se på håll.
@@ -566,6 +625,28 @@ export class Maskinpark {
     for (const falt of Object.values(this.plattor)) {
       if (!falt.platta.visible) continue
 
+      /**
+       * Drönaren kretsar runt masten i en åtta och dyker ner mot den maskin som senast
+       * gjorde något. Har ingen gjort något på gården håller den sig uppe och patrullerar.
+       */
+      if (falt.dronare?.visible && falt.radie) {
+        const bana = sekunder * 0.42 + (falt.fro || 0)
+        const punkt = new THREE.Vector3(
+          falt.mitt.x + Math.cos(bana) * falt.radie * 0.55,
+          falt.mitt.y + 3.4 + Math.sin(bana * 2.1) * 0.45,
+          falt.mitt.z + Math.sin(bana * 1.3) * falt.radie * 0.55
+        )
+        if (falt.senast) {
+          const m = falt.senast.mesh.position
+          const dyk = 0.35 + Math.sin(bana * 0.7) * 0.28
+          punkt.lerp(new THREE.Vector3(m.x, m.y + 1.9, m.z), Math.max(0, dyk))
+        }
+        falt.dronare.position.copy(punkt)
+        falt.dronare.rotation.y += dt * 1.7
+        falt.dronare.rotation.x += dt * 0.9
+        falt.dronare.material.opacity = falt.senast ? 0.95 : 0.55
+      }
+
       // Masten snurrar så länge fältet lever, och lyser upp när ett paket kommer fram.
       falt.masttid.value += dt
       falt.blink = Math.max(0, falt.blink - dt * 2.2)
@@ -599,6 +680,7 @@ export class Maskinpark {
       falt.kant.material.dispose()
       falt.mast?.geometry.dispose()
       falt.mast?.material.dispose()
+      falt.dronare?.material.dispose()
       falt.etikett.userData.dispose?.()
     }
     if (this.rover) {
