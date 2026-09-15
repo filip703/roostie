@@ -349,6 +349,11 @@ export class Colony {
     return ut
   }
 
+  /** Var en agent står, för panelens klick. Null när maskinen inte finns i parken. */
+  maskinPlats(namn) {
+    return this.maskinpark.plats(namn)
+  }
+
   /** Loggbokens rader och väntelista → billboarden, och Filips egen skylt vid skeppet. */
   setTavla(data) {
     this.tavlan.set(data)

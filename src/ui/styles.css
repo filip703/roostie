@@ -1440,3 +1440,151 @@ kbd {
 .thread-pop .rad[hidden] {
   display: none;
 }
+
+/* ── Agenterna i sidopanelen ──────────────────────────────────────────────────────────
+   Maskinparken visar hur agenterna MÅR. Den här listan svarar på den andra frågan — vilken
+   av de fyrtioen heter vad, vad gör den, och var står den — och ett klick tar kameran dit.
+
+   Hopfälld som förval: fyrtioen rader ovanpå sju repon gör sidopanelen till en scroll i
+   stället för en översikt. Rubriken bär siffrorna som räcker på håll. */
+.side .agent-block {
+  flex: none;
+  border-top: 1px solid var(--line);
+}
+
+.side .agent-block[hidden] { display: none; }
+
+.side .agent-toggle {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 15px;
+  background: transparent;
+  border: 0;
+  color: var(--dim);
+  font: inherit;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.side .agent-toggle:hover { color: var(--text); }
+.side .agent-toggle .agent-sum {
+  text-transform: none;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+/* Fel tar rubriken, inte en rad långt ner i en hopfälld lista. */
+.side .agent-toggle.larm .agent-sum { color: var(--warn, #b65c57); }
+.side .agent-toggle[aria-expanded='true'] { color: var(--text); }
+
+.side .agents {
+  max-height: 44vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.side .agents[hidden] { display: none; }
+
+.side .agent-gard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 10px 5px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--dim);
+}
+
+.side .agent-gard .count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.side .agent {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease;
+  pointer-events: auto;
+}
+
+.side .agent:hover { background: rgba(255, 255, 255, 0.07); }
+
+.side .agent .text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.side .agent .n {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Vad agenten gör står under namnet, dämpat: ett containernamn säger ingenting för den som
+   går förbi, och jobbet är det enda av de två som betyder något. */
+.side .agent .jobb {
+  font-size: 11px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side .agent .count {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--dim);
+  flex: none;
+}
+
+/* Lampan är samma status som lyktan ute på gården — grön som kör, matt som står, röd som
+   är trasig. Den som arbetar just nu andas. */
+.side .agent .lampa {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: #9aa79c;
+  box-shadow: none;
+}
+
+.side .agent.ok .lampa { background: #7fa07f; }
+.side .agent.ok .lampa.pa { box-shadow: 0 0 8px #7fa07f; animation: agentpuls 2.4s ease-in-out infinite; }
+.side .agent.fel .lampa { background: #b65c57; box-shadow: 0 0 8px #b65c57; }
+.side .agent.nere .lampa { background: #5a625c; }
+.side .agent.nere .n,
+.side .agent.okand .n { color: var(--dim); }
+
+@keyframes agentpuls {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side .agent .lampa.pa { animation: none; }
+}

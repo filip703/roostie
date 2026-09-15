@@ -7,6 +7,7 @@ import { Colony, STATUS_LABEL, STATUS_ORDER, statusFor, transcriptProgress } fro
 import { Hud } from './ui/hud.js'
 import { PLANETS } from './world/planet.js'
 import { loadKit } from './world/kit.js'
+import { FALTLISTA, JOBB } from './world/maskinpark.js'
 import { crewRig, loadCrew } from './agents/crew.js'
 import { TIMES } from './world/sky.js'
 import {
@@ -201,6 +202,22 @@ const actions = {
     } catch (err) {
       hud.toast(err.message || 'Could not open that folder', 'err')
     }
+  },
+
+  /**
+   * Klick på en agent i panelen: kameran far ut till maskinen på dess gård.
+   *
+   * Parken ligger utanför plätterna och fyrtioen maskiner ser likadana ut på håll — att leta
+   * upp `nexus-screentime` för hand är inte rimligt. Finns inte maskinen i parken sägs det
+   * rakt ut i stället för att kameran far till origo.
+   */
+  pickMaskin: (namn) => {
+    const punkt = colony.maskinPlats(namn)
+    if (!punkt) {
+      hud.toast(`${namn} står inte i parken just nu`, 'err')
+      return
+    }
+    rig.focus(punkt, { distance: 13 })
   },
 
   /**
@@ -701,7 +718,16 @@ async function poll() {
       // i timmar utan att någon vet. Felet loggas, och syns i felfällan med ?debug=1.
       .catch((e) => console.error('[roostie] tavlan:', e))
     fetchMaskiner()
-      .then((m) => colony.setMaskiner(m.maskiner || []))
+      .then((m) => {
+        const lista = m.maskiner || []
+        colony.setMaskiner(lista)
+        // Samma lista i panelen, med jobbtexten påhängd: listan svarar på vem agenten är,
+        // gården på hur den mår.
+        hud.setMaskiner(
+          lista.map((x) => ({ ...x, jobb: JOBB[x.namn] || '' })),
+          FALTLISTA
+        )
+      })
       .catch((e) => console.error('[roostie] maskiner:', e))
     fetchPuls()
       .then((p) => colony.setPuls(p))

@@ -368,6 +368,7 @@ export class Hud {
     on('#btn-copy-path', 'click', () => this.actions.copyProjectPath?.())
     on('#btn-hide-project', 'click', () => this.actions.hideProject?.())
     on('#btn-hidden-toggle', 'click', () => this.toggleHiddenList())
+    on('#btn-agents-toggle', 'click', () => this.toggleAgentList())
     on('#btn-locate', 'click', () => this.actions.focusProject?.(this.project?.name))
     on('#btn-close-project', 'click', () => this.actions.closeProject?.())
     on('.help', 'click', (e) => {
@@ -475,6 +476,73 @@ export class Hud {
     const total = hidden.length + folded.length
     this.$('#btn-hidden-toggle .label').textContent = `${total} off the map`
     this._syncHiddenList()
+  }
+
+  /**
+   * Agenterna i panelen.
+   *
+   * Maskinparken visar hur de MÅR — lykta, ring, paket på kabeln. Men "vilken av de
+   * fyrtioen heter vad och vad gör den" är en fråga för en lista, inte för en gård, och
+   * fram till nu har svaret bara funnits på agenttavlan ute i kolonin. Här står de som
+   * repolistan står: en rad var, grupperade per gård, och ett klick tar kameran dit.
+   *
+   * Hopfälld som förval. Fyrtioen rader ovanpå sju repon hade gjort sidopanelen till en
+   * scroll i stället för en översikt — rubriken bär siffrorna som räcker på håll.
+   */
+  setMaskiner(lista, falt) {
+    const rader = Array.isArray(lista) ? lista : []
+    const signatur = rader.map((m) => `${m.namn}:${m.status}:${Math.round((m.sistaLogg || 0) / 60000)}`).join('|')
+    if (this._last.maskiner === signatur) return
+    this._last.maskiner = signatur
+
+    const block = this.$('.agent-block')
+    block.hidden = rader.length === 0
+    if (!rader.length) return
+
+    const nu = Date.now()
+    const arbetar = rader.filter((m) => m.status === 'ok' && m.sistaLogg && nu - m.sistaLogg < 5 * 60 * 1000).length
+    const trasiga = rader.filter((m) => m.status === 'fel').length
+    this.$('.agent-sum').textContent = trasiga
+      ? `${rader.length} · ${arbetar} arbetar · ${trasiga} fel`
+      : `${rader.length} · ${arbetar} arbetar`
+    this.$('#btn-agents-toggle').classList.toggle('larm', trasiga > 0)
+
+    const wrap = this.$('.agents')
+    wrap.innerHTML = ''
+    for (const f of falt || []) {
+      const mina = rader.filter((m) => m.grupp === f.nyckel)
+      if (!mina.length) continue
+      const rubrik = document.createElement('div')
+      rubrik.className = 'agent-gard'
+      rubrik.innerHTML =
+        `<i class="swatch" style="background:${hex(f.farg)};color:${hex(f.farg)}"></i>` +
+        `<span>${escapeHtml(f.namn)}</span><span class="count">${mina.length}</span>`
+      wrap.appendChild(rubrik)
+
+      for (const m of mina) {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.className = `agent ${m.status}`
+        const aktiv = m.status === 'ok' && m.sistaLogg && nu - m.sistaLogg < 5 * 60 * 1000
+        b.title = m.detalj || m.namn
+        b.innerHTML =
+          `<i class="lampa${aktiv ? ' pa' : ''}"></i>` +
+          `<span class="text">` +
+          `<span class="n">${escapeHtml(m.namn.replace(/^nexus-/, ''))}</span>` +
+          `<span class="jobb">${escapeHtml(m.jobb || statusOrd(m.status))}</span>` +
+          `</span>` +
+          `<span class="count">${m.status === 'ok' ? agentSedan(m.sistaLogg) : statusOrd(m.status)}</span>`
+        b.addEventListener('click', () => this.actions.pickMaskin?.(m.namn))
+        wrap.appendChild(b)
+      }
+    }
+  }
+
+  toggleAgentList() {
+    const knapp = this.$('#btn-agents-toggle')
+    const oppen = knapp.getAttribute('aria-expanded') === 'true'
+    knapp.setAttribute('aria-expanded', String(!oppen))
+    this.$('.agents').hidden = oppen
   }
 
   toggleHiddenList() {
@@ -900,6 +968,24 @@ function nearestTime(value) {
   return bestD < 0.03 ? best.id : null
 }
 
+/** Statusen på svenska — samma ord som resten av kolonin använder. */
+function statusOrd(status) {
+  if (status === 'fel') return 'fel'
+  if (status === 'nere') return 'nere'
+  if (status === 'okand') return 'okänd'
+  return 'kör'
+}
+
+/** Kort tid sedan, för agentraderna. */
+function agentSedan(ts) {
+  if (!ts) return '—'
+  const min = Math.round((Date.now() - ts) / 60000)
+  if (min < 1) return 'nu'
+  if (min < 60) return `${min} min`
+  const h = Math.round(min / 60)
+  return h < 48 ? `${h} h` : `${Math.round(h / 24)} d`
+}
+
 function ago(ts) {
   if (!ts) return 'never'
   const s = Math.max(0, (Date.now() - ts) / 1000)
@@ -925,6 +1011,13 @@ const TEMPLATE = `
     <div class="projects-pane">
       <div class="sec-head"><span>Repos</span></div>
       <div class="projects"></div>
+      <div class="agent-block" hidden>
+        <button type="button" class="agent-toggle" id="btn-agents-toggle" aria-expanded="false">
+          <span class="label">Agenterna</span>
+          <span class="agent-sum"></span>
+        </button>
+        <div class="agents" hidden></div>
+      </div>
       <div class="hidden-block" hidden>
         <button type="button" class="hidden-toggle" id="btn-hidden-toggle" aria-expanded="false">
           <span class="label">0 hidden</span>

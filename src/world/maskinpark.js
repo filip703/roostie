@@ -894,6 +894,20 @@ export class Maskinpark {
   }
 
   /**
+   * Var en maskin står i världen, så panelen kan flyga dit när man klickar på en agent.
+   * Null när maskinen inte finns — en kamera som far till origo är värre än ingen resa.
+   */
+  plats(namn) {
+    const post = this.maskiner.get(namn)
+    if (!post) return null
+    return new THREE.Vector3(
+      this.grupp.position.x + post.mesh.position.x,
+      this.grupp.position.y + post.hemY + DACKY,
+      this.grupp.position.z + post.mesh.position.z
+    )
+  }
+
+  /**
    * Vad parken faktiskt innehåller, i klartext.
    *
    * En skärmbild bevisar inte att en mast står där — den kan stå bakom en maskin, eller inte
