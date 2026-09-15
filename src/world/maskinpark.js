@@ -125,20 +125,10 @@ export class Maskinpark {
       etikett.visible = false
       etikett.material.opacity = 0
 
-      /**
-       * Masten i mitten av fältet. Varje maskin har en kabel dit, och det som åker längs
-       * kabeln är maskinens rapport — det är så man ser att de arbetar ihop och inte var
-       * för sig. Masten blinkar när ett paket kommer fram.
-       */
-      const mast = createBuilding({ seed: grupp === 'roost' ? 7 : 11, accent: farg, kind: 'antenna' })
-      mast.scale.setScalar(0.5)
-      mast.castShadow = true
-      mast.visible = false
-      const masttid = { value: 0 }
-      mast.userData.uniforms.uTime = masttid
-
-      this.grupp.add(platta, etikett, mast)
-      this.plattor[grupp] = { platta, etikett, farg, mast, masttid, blink: 0, navY: 0, navZ: 0 }
+      // Masten byggs först när fältet får sin första maskin: modellkitet är inte inläst när
+      // kolonin skapas, och createBuilding kan inte bygga något ur ett kit som inte finns.
+      this.grupp.add(platta, etikett)
+      this.plattor[grupp] = { platta, etikett, farg, mast: null, masttid: { value: 0 }, blink: 0, navY: 0, navZ: 0 }
     }
   }
 
@@ -315,10 +305,24 @@ export class Maskinpark {
       p.etikett.position.set(0, y + 0.9, z + (grupp === 'roost' ? -djup / 2 - 0.9 : djup / 2 + 0.9))
 
       // Masten står vid gatan mellan fälten, där alla kablar möts.
+      if (!p.mast) {
+        try {
+          const mast = createBuilding({ seed: grupp === 'roost' ? 7 : 11, accent: p.farg, kind: 'antenna' })
+          mast.scale.setScalar(0.5)
+          mast.castShadow = true
+          mast.userData.uniforms.uTime = p.masttid
+          this.grupp.add(mast)
+          p.mast = mast
+        } catch {
+          // Kitet är inte inne än. Nästa poll bygger masten; fältet fungerar utan den.
+        }
+      }
       const mastZ = grupp === 'roost' ? -FALTAVSTAND / 2 + 0.9 : FALTAVSTAND / 2 - 0.9
       const mastY = this.hojd(this.grupp.position.x, this.grupp.position.z + mastZ) - this.grupp.position.y
-      p.mast.position.set(0, mastY, mastZ)
-      p.mast.visible = true
+      if (p.mast) {
+        p.mast.position.set(0, mastY, mastZ)
+        p.mast.visible = true
+      }
       p.navZ = mastZ
       p.navY = mastY
     }
@@ -409,7 +413,9 @@ export class Maskinpark {
       // Masten snurrar så länge fältet lever, och lyser upp när ett paket kommer fram.
       falt.masttid.value += dt
       falt.blink = Math.max(0, falt.blink - dt * 2.2)
-      falt.mast.userData.uniforms.uAccent.value.set(falt.farg).multiplyScalar(0.7 + falt.blink * 1.1)
+      if (falt.mast) {
+        falt.mast.userData.uniforms.uAccent.value.set(falt.farg).multiplyScalar(0.7 + falt.blink * 1.1)
+      }
 
       falt.etikett.getWorldPosition(p)
       const mal = p.distanceTo(camera.position) < 90 ? 1 : 0
@@ -433,8 +439,8 @@ export class Maskinpark {
     for (const falt of Object.values(this.plattor)) {
       falt.platta.geometry.dispose()
       falt.platta.material.dispose()
-      falt.mast.geometry.dispose()
-      falt.mast.material.dispose()
+      falt.mast?.geometry.dispose()
+      falt.mast?.material.dispose()
       falt.etikett.userData.dispose?.()
     }
     this.maskiner.clear()
