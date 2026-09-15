@@ -9,8 +9,15 @@
 import claudeCode from './claude-code.mjs'
 import codex from './codex.mjs'
 import cursor from './cursor.mjs'
+import roostLoggbok from './roost-loggbok.mjs'
 
-export const HARNESSES = [claudeCode, codex, cursor]
+/**
+ * ROOSTIE_ONLY=1 stänger av de lokala harnessen och lämnar bara Roosts Loggbok kvar.
+ * Det är läget på köksskärmen: containern på NUC:en har inga agentsessioner att visa,
+ * och en tom harness som ändå skannar är bara brus.
+ */
+export const HARNESSES =
+  process.env.ROOSTIE_ONLY === '1' ? [roostLoggbok] : [claudeCode, codex, cursor, roostLoggbok]
 
 export const harnessById = (id) => HARNESSES.find((h) => h.id === id) || null
 
