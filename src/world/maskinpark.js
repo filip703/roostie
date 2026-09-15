@@ -459,7 +459,7 @@ export class Maskinpark {
       return k
     }
     return new THREE.MeshStandardMaterial({
-      color: new THREE.Color(farg).offsetHSL(0, -0.24, -0.04).multiplyScalar(styrka),
+      color: new THREE.Color(farg).offsetHSL(0, -0.14, -0.06).multiplyScalar(styrka),
       map: klona(this._plat.map),
       normalMap: klona(this._plat.normalMap),
       roughnessMap: klona(this._plat.roughnessMap),
@@ -858,6 +858,8 @@ export class Maskinpark {
        */
       if (!p.dronare) {
         p.dronare = byggDronare(p.farg)
+        // Gården är över tjugo enheter bred. En drönare byggd i maskinskala blir en prick.
+        p.dronare.scale.setScalar(1.8)
         this.grupp.add(p.dronare)
       }
       p.dronare.visible = true
@@ -876,7 +878,7 @@ export class Maskinpark {
     if (p.mast) return p.mast
     try {
       const mast = createBuilding({ seed: fro, accent: p.farg, kind: 'antenna' })
-      mast.scale.setScalar(0.55)
+      mast.scale.setScalar(0.95)
       mast.castShadow = true
       mast.userData.uniforms.uTime = p.masttid
       mast.position.copy(p.mitt)
