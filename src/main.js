@@ -82,7 +82,24 @@ if (new URLSearchParams(location.search).get('debug') === '1') {
       // Tidsstämplad: Chrome strypar timers i en bakgrundsflik, så en diagnos kan vara en
       // minut gammal utan att det syns. En avläsning som inte kan säga hur gammal den är
       // ljuger lika gärna som en som har fel siffror.
-      document.documentElement.dataset.roostie = JSON.stringify({ nar: Date.now(), ...colony.diagnos() })
+      const rund = (v) => Math.round(v * 10) / 10
+      document.documentElement.dataset.roostie = JSON.stringify({
+        nar: Date.now(),
+        // Kameran med i redovisningen. Trädet kan bara granskas utifrån genom det här
+        // attributet — ett tillägg som körs i webbläsaren delar DOM med sidan men inte
+        // `window`, och en bild som ser fel ut säger inte VARFÖR den gör det.
+        kamera: {
+          pos: [rund(engine.camera.position.x), rund(engine.camera.position.y), rund(engine.camera.position.z)],
+          mal: [rund(rig.target.x), rund(rig.target.y), rund(rig.target.z)],
+          avstand: rund(rig.distance),
+          azimut: rund(rig.azimuth),
+          polar: rund(rig.polar),
+          fov: engine.camera.fov,
+          bredd: rund(engine.camera.aspect),
+          scen: Boolean(rig.scen),
+        },
+        ...colony.diagnos(),
+      })
     } catch {
       // En diagnos som kraschar får inte ta sidan med sig.
     }
