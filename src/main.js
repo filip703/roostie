@@ -872,8 +872,35 @@ async function boot() {
       avstandMax: 190,
     })
     hudTrad()
-    // Första bilden är ÖVERBLICKEN: sju bon i en ram. Det var det Filip inte fick.
-    actions.flygTill?.('överblick')
+
+    /**
+     * Första bilden är ÖVERBLICKEN: sju bon i en ram. Det var det Filip inte fick.
+     *
+     * Och den SÄTTS OM tills den sitter. På köksskärmen stod kameran kvar på kolonins
+     * grundläge — mål (0,0,0), avstånd 62 — mitt inne i stammen, medan samma bygge stod
+     * rätt i utvecklingsmiljön. Ett enda anrop vid start är ett anrop som kan tappas av
+     * vad som helst som händer under de första sekunderna, och det går inte att se på
+     * bilden att det hänt.
+     *
+     * Så vi kontrollerar i stället för att hoppas: om kameran fortfarande står mer än tio
+     * enheter från utsikten flyttas den dit igen, fem gånger under de första sex
+     * sekunderna. Rör användaren kameran slutar vi genast — det här ska ställa in en
+     * startbild, inte ta ifrån någon kontrollen.
+     */
+    const stallIn = () => {
+      if (rig.interacting) return true
+      const v = colony.flygTill('överblick')
+      if (!v) {
+        // En utsikt som inte finns är ett fel som annars försvinner tyst.
+        document.documentElement.dataset.roostieFel = '["utsikten överblick saknas"]'
+        return true
+      }
+      const nara = rig.desiredTarget.distanceTo(v.punkt) < 10 && Math.abs(rig.distance - v.avstand) < 8
+      rig.focus(v.punkt, { distance: v.avstand, polar: v.lutning, azimuth: v.azimut })
+      return nara
+    }
+    stallIn()
+    for (const ms of [400, 1200, 2600, 6000]) setTimeout(() => stallIn(), ms)
   }
 
   /**
