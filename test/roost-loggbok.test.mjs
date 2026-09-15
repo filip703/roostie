@@ -83,10 +83,15 @@ test('varje tråd får en zon och ett stabilt id', async () => {
     rad('sajt-roostadmin', 'klart', 10),
     rad('kolonin', 'borjar', 10),
   ])
-  assert.equal(av('ledning').project, 'landningsplattan')
-  assert.equal(av('produkt').project, 'nexus')
-  assert.equal(av('sajt-roostadmin').project, 'roost-site')
-  assert.equal(av('kolonin').project, 'roostie')
+  // En tomt per tråd, inte per repo: fyra trådar i nexus-repot har fyra olika uppdrag.
+  assert.equal(av('ledning').project, 'Ledning')
+  assert.equal(av('produkt').project, 'Produkt')
+  assert.equal(av('sajt-roostadmin').project, 'Sajt & Roostadmin')
+  assert.equal(av('kolonin').project, 'Kolonin')
+  // Repot följer med som worktree, så kortet fortfarande säger var tråden arbetar.
+  assert.equal(av('produkt').worktree, 'nexus')
+  assert.equal(av('sajt-roostadmin').worktree, 'roost-site')
+  assert.equal(av('ledning').worktree, 'landningsplattan')
   assert.equal(av('produkt').id, 'roost-loggbok:produkt')
   assert.equal(av('produkt').title, 'Produkt')
 })

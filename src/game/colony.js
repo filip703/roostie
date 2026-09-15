@@ -16,7 +16,8 @@ import { createBuilding, buildingUniforms, Scaffolds } from '../world/buildings.
 import { Ship } from '../world/ship.js'
 import { Anslagstavla } from '../world/anslagstavla.js'
 import { Tavlan } from '../world/tavlan.js'
-import { Maskinpark } from '../world/maskinpark.js'
+import { Agenttavla } from '../world/agenttavla.js'
+import { Maskinpark, FALTLISTA } from '../world/maskinpark.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
 import { MAX_AGENT_CAP } from '../core/settings.js'
@@ -148,7 +149,10 @@ export class Colony {
     // taken utan att stå i vägen för en enda tomt.
     this.tavlan = new Tavlan(scene, { x: tavlaPlats.x - 15, y: 0, z: tavlaPlats.z - 6 })
     // Maskinparken: NUC:ens containrar, på egen mark bredvid kolonin.
-    this.maskinpark = new Maskinpark(scene, { x: tavlaPlats.x + 4, y: 0, z: tavlaPlats.z + 26 })
+    this.maskinpark = new Maskinpark(scene, { x: tavlaPlats.x + 2, y: 0, z: tavlaPlats.z + 50 })
+    // Agenterna får en egen tavla vid gården: de skriver inga rader i Loggboken, så det här
+    // är enda stället deras uppdrag och läge går att läsa på ett ställe.
+    this.agenttavla = new Agenttavla(scene, { x: tavlaPlats.x + 2, y: 0, z: tavlaPlats.z + 25 }, FALTLISTA)
     this.astronauts = new Astronauts(scene, settings)
     this.astronauts.world = this._world()
     // Sized for the largest preset rather than the current one: unlike the astronaut meshes these
@@ -200,7 +204,7 @@ export class Colony {
     const ship = shipPosition()
     this.ship.group.position.y = terrainHeight(ship.x, ship.z, this.planet)
     // Samma sak för skylten: stolparna ska stå i marken, inte i luften ovanför den.
-    for (const sak of [this.anslagstavla, this.tavlan, this.maskinpark]) {
+    for (const sak of [this.anslagstavla, this.tavlan, this.maskinpark, this.agenttavla]) {
       const p = sak.grupp.position
       p.y = terrainHeight(p.x, p.z, this.planet)
     }
@@ -237,6 +241,7 @@ export class Colony {
       [this.tavlan, 11],
       [this.anslagstavla, 4],
       [this.maskinpark, this.maskinpark.radie()],
+      [this.agenttavla, 10],
     ]) {
       const p = sak.grupp.position
       clear.push({ x: p.x, z: p.z, r })
@@ -293,6 +298,7 @@ export class Colony {
   setMaskiner(maskiner) {
     const fore = this.maskinpark.radie()
     this.maskinpark.set(maskiner)
+    this.agenttavla.set(maskiner)
     // Marken under parken ströddes med stenar innan vi visste hur stor den skulle bli. Växer
     // eller krymper den, läggs strösslet om — annars står ett klippblock mitt i ett fält.
     if (Math.abs(this.maskinpark.radie() - fore) > 0.5) this._buildScatter()
@@ -769,6 +775,7 @@ export class Colony {
     this.anslagstavla.update(this.camera)
     this.tavlan.update(dt, this.camera)
     this.maskinpark.update(dt, this.camera)
+    this.agenttavla.update(dt, this.camera)
 
     this._growBuildings(dt)
     this.astronauts.update(dt, elapsed)
@@ -924,6 +931,7 @@ export class Colony {
     this.anslagstavla.dispose()
     this.tavlan.dispose()
     this.maskinpark.dispose()
+    this.agenttavla.dispose()
     this.astronauts.dispose()
     this.indicators.dispose()
     this.particles.dispose()

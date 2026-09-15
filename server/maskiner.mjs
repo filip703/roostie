@@ -19,7 +19,7 @@ const FARSK_MS = 10 * 60 * 1000
 const MAX = 80
 const NAMN_OK = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/
 const STATUS = new Set(['ok', 'nere', 'fel', 'okand'])
-const GRUPPER = new Set(['roost', 'nexus'])
+const GRUPPER = new Set(['roost', 'nat', 'hem', 'data'])
 
 export async function laesMaskiner() {
   const fil = process.env.ROOSTIE_MASKINER_FIL || ''
@@ -43,7 +43,7 @@ export async function laesMaskiner() {
       namn,
       // Gammal fil = vi vet inte. Att visa gårdagens gröna lampor är värre än att visa mörker.
       status: gammal ? 'okand' : status,
-      grupp: GRUPPER.has(m?.grupp) ? m.grupp : 'nexus',
+      grupp: GRUPPER.has(m?.grupp) ? m.grupp : 'hem',
       detalj: String(m?.detalj || '').slice(0, 120),
       // Sista loggraden = enda aktivitetssignalen. Gammal fil betyder att vi inte vet något
       // om arbetet heller, inte att maskinen står stilla.

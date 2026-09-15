@@ -26,17 +26,67 @@ import path from 'node:path'
 const SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock'
 const UT = process.env.ROOSTIE_MASKINER_FIL || '/data/maskiner.json'
 
-/** Box & molns produktagenter. Allt annat är hemmets. */
-const PRODUKT = new Set([
-  'nexus-screentime',
-  'nexus-blockdevices',
-  'nexus-commands',
-  'nexus-netflow',
-  'nexus-dns',
-  'nexus-identity',
-  'nexus-fingerprint',
-  'nexus-wifiwatch',
-])
+/**
+ * Vilket lag en agent hör till.
+ *
+ * Fyrtio maskiner i en enda hög säger ingenting. Agenterna har olika uppdrag och olika ägare,
+ * och det är den gränsen kolonin ska visa: Roosts produktagenter (Box & molns), hemmets nät,
+ * hemmets hus, och det som mäter och minns. Okänt namn hamnar i "hemmet" — aldrig i Roost,
+ * för en främmande container ska inte se ut som en produktagent.
+ */
+const LAG = {
+  roost: [
+    'nexus-screentime',
+    'nexus-blockdevices',
+    'nexus-commands',
+    'nexus-netflow',
+    'nexus-dns',
+    'nexus-identity',
+    'nexus-fingerprint',
+    'nexus-wifiwatch',
+    'nexus-blocksync',
+    'nexus-roost-allow',
+    'nexus-skyddsvakt',
+  ],
+  nat: [
+    'nexus-switch',
+    'nexus-unleashed',
+    'nexus-probes',
+    'nexus-dhcp',
+    'nexus-cloudflare',
+    'nexus-tunnel',
+    'nexus-guestnet',
+    'gastnat-watcher',
+    'adguard',
+    'nexus-configbak',
+    'nexus-portal',
+    'nexus-fast',
+  ],
+  hem: [
+    'homeassistant',
+    'nexus-habridge',
+    'nexus-camera',
+    'eufy-security-ws',
+    'music-assistant',
+    'nexus-sirisync',
+    'nexus-familjestund',
+    'nexus-stunder',
+    'nexus-skola',
+  ],
+  data: [
+    'nexus-telemetry',
+    'nexus-brain',
+    'nexus-insights',
+    'nexus-rollup',
+    'nexus-habits',
+    'nexus-ai',
+    'nexus-ollama',
+    'nexus-doctor',
+    'uptime-kuma',
+  ],
+}
+const GRUPP = new Map()
+for (const [lag, namn] of Object.entries(LAG)) for (const n of namn) GRUPP.set(n, lag)
 
 /** Ritas inte: kolonins egen container och rena verktyg. */
 const HOPPA_OVER = new Set(['nexus-roostie', 'nexus-maskinlasare', 'nexus-containervakt', 'portainer'])
@@ -127,7 +177,7 @@ for (const rad of lista) {
   }
   const { status, detalj } = las(detaljer)
   const sistaLogg = status === 'ok' ? await sistaLoggrad(namn) : 0
-  maskiner.push({ namn, status, detalj, sistaLogg, grupp: PRODUKT.has(namn) ? 'roost' : 'nexus' })
+  maskiner.push({ namn, status, detalj, sistaLogg, grupp: GRUPP.get(namn) || 'hem' })
 }
 
 maskiner.sort((a, b) => a.namn.localeCompare(b.namn))

@@ -19,10 +19,28 @@ import * as THREE from 'three'
 import { createBuilding } from './buildings.js'
 import { createLabel, hashString } from './plots.js'
 
-const RAD = 6 // maskiner per rad
-const RUTA = 3.4 // avstånd mellan platser
-const FALTAVSTAND = 4.5 // gatan mellan Roost-fältet och hemmets fält
-const SKALA = 0.38
+const RAD = 4 // maskiner per rad i ett fält
+const RUTA = 2.9 // avstånd mellan platser
+const GATA = 5 // gatan mellan fälten
+const SKALA = 0.34
+
+/**
+ * Fälten, ett per uppdrag.
+ *
+ * Fyrtio maskiner i en klump säger ingenting om vem som gör vad. Agenterna har olika uppdrag
+ * och olika ägare — Roosts produktagenter är Box & molns, resten är hemmets — och gården är
+ * ritad så att den gränsen syns: fyra gårdar med var sin mast, var sin skylt och var sitt lag.
+ */
+const FALT = {
+  roost: { namn: 'ROOST · PRODUKTAGENTER', farg: 0x2e5c6e, ruta: [-1, -1] },
+  nat: { namn: 'HEMMET · NÄT OCH WIFI', farg: 0x6b6b3a, ruta: [1, -1] },
+  hem: { namn: 'HEMMET · HUSET', farg: 0xb5562b, ruta: [-1, 1] },
+  data: { namn: 'HEMMET · MÄTNING OCH MINNE', farg: 0xc4a678, ruta: [1, 1] },
+}
+const FALTBREDD = RAD * RUTA + 1.8
+
+/** Gårdarna som agenttavlan behöver känna till: nyckel, namn och färg. */
+export const FALTLISTA = Object.entries(FALT).map(([nyckel, f]) => ({ nyckel, namn: f.namn, farg: f.farg }))
 
 const FARG = {
   ok: 0x7fb069,
@@ -106,15 +124,13 @@ export class Maskinpark {
     this.maskiner = new Map()
     this.nyckel = ''
     this.hojd = () => 0
-    this.antal = { roost: 0, nexus: 0 }
+    this.antal = Object.fromEntries(Object.keys(FALT).map((k) => [k, 0]))
+    this.maxRader = 1
 
     // Två plattor, en per fält. Utan dem ser maskinerna ut som skrot någon tappat i
     // terrängen; med dem är det en gård.
     this.plattor = {}
-    for (const [grupp, namn, farg] of [
-      ['roost', 'ROOST-AGENTER', 0x2e5c6e],
-      ['nexus', 'HEMMETS AGENTER', 0x6b6b3a],
-    ]) {
+    for (const [grupp, { namn, farg }] of Object.entries(FALT)) {
       const platta = new THREE.Mesh(
         new THREE.BoxGeometry(1, 0.3, 1),
         new THREE.MeshStandardMaterial({ color: 0x241f1a, roughness: 0.92, metalness: 0.05 })
@@ -128,7 +144,16 @@ export class Maskinpark {
       // Masten byggs först när fältet får sin första maskin: modellkitet är inte inläst när
       // kolonin skapas, och createBuilding kan inte bygga något ur ett kit som inte finns.
       this.grupp.add(platta, etikett)
-      this.plattor[grupp] = { platta, etikett, farg, mast: null, masttid: { value: 0 }, blink: 0, navY: 0, navZ: 0 }
+      this.plattor[grupp] = {
+        platta,
+        etikett,
+        farg,
+        mast: null,
+        masttid: { value: 0 },
+        blink: 0,
+        mitt: new THREE.Vector3(),
+        nav: new THREE.Vector3(),
+      }
     }
   }
 
@@ -138,8 +163,9 @@ export class Maskinpark {
    */
   radie() {
     if (!this.maskiner.size) return 0
-    const rader = Math.max(Math.ceil(this.antal.roost / RAD), Math.ceil(this.antal.nexus / RAD))
-    return Math.max((RAD * RUTA) / 2, rader * RUTA + FALTAVSTAND) + 4
+    const rader = Math.max(...Object.values(this.antal).map((n) => Math.ceil(n / RAD)), 1)
+    const djup = rader * RUTA + 1.8
+    return Math.hypot(FALTBREDD + GATA / 2, djup + GATA / 2) + 2
   }
 
   /** Kolonin lämnar en markhöjdsfunktion hit, så maskinerna står på marken och inte i den. */
@@ -157,9 +183,9 @@ export class Maskinpark {
     this.grupp.visible = rader.length > 0
 
     const kvar = new Set(this.maskiner.keys())
-    const grupper = { roost: [], nexus: [] }
-    for (const m of rader) (grupper[m.grupp] || grupper.nexus).push(m)
-    this.antal = { roost: grupper.roost.length, nexus: grupper.nexus.length }
+    const grupper = Object.fromEntries(Object.keys(FALT).map((k) => [k, []]))
+    for (const m of rader) (grupper[m.grupp] || grupper.hem).push(m)
+    this.antal = Object.fromEntries(Object.entries(grupper).map(([k, v]) => [k, v.length]))
 
     // Fälten och masterna först: maskinerna drar sina kablar dit, så gården måste finnas
     // innan den möbleras.
@@ -255,7 +281,7 @@ export class Maskinpark {
       tid,
       status: 'okand',
       farg: new THREE.Color(FARG.okand),
-      plats: { grupp: 'nexus', i: 0 },
+      plats: { grupp: 'hem', i: 0 },
       sistaLogg: 0,
       blixt: 0,
     }
@@ -263,14 +289,12 @@ export class Maskinpark {
 
   _placera(post) {
     const { grupp, i } = post.plats
+    const falt = this.plattor[grupp] || this.plattor.hem
     const kol = i % RAD
     const rad = Math.floor(i / RAD)
-    const x = (kol - (RAD - 1) / 2) * RUTA
-    // Roosts fält ligger före noll, hemmets efter — två fält med en gata emellan.
-    const z =
-      grupp === 'roost'
-        ? -FALTAVSTAND / 2 - RUTA / 2 - rad * RUTA
-        : FALTAVSTAND / 2 + RUTA / 2 + rad * RUTA
+    const x = falt.mitt.x + (kol - (RAD - 1) / 2) * RUTA
+    // Raderna centreras i gårdens djup, som är lika för alla fält.
+    const z = falt.mitt.z + (rad - (this.maxRader - 1) / 2) * RUTA
     const y = this.hojd(this.grupp.position.x + x, this.grupp.position.z + z) - this.grupp.position.y
     post.mesh.position.set(x, y + 0.11, z)
     post.etikett.position.set(x, y + 1.9, z)
@@ -278,37 +302,50 @@ export class Maskinpark {
     post.box.position.set(x, y, z)
 
     // Kabeln dras från maskinens lykta in till fältets mast, och paketet åker den vägen.
-    const falt = this.plattor[grupp]
     const fran = new THREE.Vector3(x, y + post.fyr.userData.hojd * 0.8, z)
-    const till = new THREE.Vector3(0, (falt?.navY ?? 0) + 1.6, falt?.navZ ?? 0)
+    const till = falt.nav.clone()
     post.kabel.geometry.setFromPoints([fran, till])
     post.kabel.geometry.computeBoundingSphere()
     post.fran = fran
     post.till = till
   }
 
-  /** Plattorna växer med fälten, så en ny agent inte hamnar utanför gården. */
+  /**
+   * Gårdarna läggs ut i fyra rutor kring parkens mitt, alla lika djupa som det största laget
+   * — annars vandrar fälten när en agent tillkommer, och en gård man känner igen är halva
+   * poängen med att ge dem fast plats.
+   */
   _plattor() {
+    this.maxRader = Math.max(...Object.values(this.antal).map((n) => Math.ceil(n / RAD)), 1)
+    const djup = this.maxRader * RUTA + 1.8
+    let fro = 3
+
     for (const [grupp, p] of Object.entries(this.plattor)) {
       const antal = this.antal[grupp]
+      fro += 4
       p.platta.visible = antal > 0
-      p.etikett.visible = false
-      if (!antal) continue
-      const rader = Math.ceil(antal / RAD)
-      const bredd = RAD * RUTA + 1.6
-      const djup = rader * RUTA + 1.6
-      const mitt = FALTAVSTAND / 2 + djup / 2
-      const z = grupp === 'roost' ? -mitt : mitt
-      const y = this.hojd(this.grupp.position.x, this.grupp.position.z + z) - this.grupp.position.y
-      p.platta.scale.set(bredd, 1, djup)
-      p.platta.position.set(0, y - 0.12, z)
-      p.etikett.position.set(0, y + 0.9, z + (grupp === 'roost' ? -djup / 2 - 0.9 : djup / 2 + 0.9))
+      if (!antal) {
+        p.etikett.visible = false
+        if (p.mast) p.mast.visible = false
+        continue
+      }
 
-      // Masten står vid gatan mellan fälten, där alla kablar möts.
+      const [sx, sz] = FALT[grupp].ruta
+      const mx = sx * (FALTBREDD / 2 + GATA / 2)
+      const mz = sz * (djup / 2 + GATA / 2)
+      const my = this.hojd(this.grupp.position.x + mx, this.grupp.position.z + mz) - this.grupp.position.y
+      p.mitt.set(mx, my, mz)
+
+      p.platta.scale.set(FALTBREDD, 1, djup)
+      p.platta.position.set(mx, my - 0.12, mz)
+      // Skylten står på gårdens yttersida, bort från gatan.
+      p.etikett.position.set(mx, my + 1.1, mz + sz * (djup / 2 + 1))
+
+      // Masten står på gårdens innerhörn, mot gatan där alla fyra möts.
       if (!p.mast) {
         try {
-          const mast = createBuilding({ seed: grupp === 'roost' ? 7 : 11, accent: p.farg, kind: 'antenna' })
-          mast.scale.setScalar(0.5)
+          const mast = createBuilding({ seed: fro, accent: p.farg, kind: 'antenna' })
+          mast.scale.setScalar(0.42)
           mast.castShadow = true
           mast.userData.uniforms.uTime = p.masttid
           this.grupp.add(mast)
@@ -317,14 +354,14 @@ export class Maskinpark {
           // Kitet är inte inne än. Nästa poll bygger masten; fältet fungerar utan den.
         }
       }
-      const mastZ = grupp === 'roost' ? -FALTAVSTAND / 2 + 0.9 : FALTAVSTAND / 2 - 0.9
-      const mastY = this.hojd(this.grupp.position.x, this.grupp.position.z + mastZ) - this.grupp.position.y
+      const mastX = mx - sx * (FALTBREDD / 2 + 1.1)
+      const mastZ = mz - sz * (djup / 2 + 1.1)
+      const mastY = this.hojd(this.grupp.position.x + mastX, this.grupp.position.z + mastZ) - this.grupp.position.y
       if (p.mast) {
-        p.mast.position.set(0, mastY, mastZ)
+        p.mast.position.set(mastX, mastY, mastZ)
         p.mast.visible = true
       }
-      p.navZ = mastZ
-      p.navY = mastY
+      p.nav.set(mastX, mastY + 1.8, mastZ)
     }
   }
 

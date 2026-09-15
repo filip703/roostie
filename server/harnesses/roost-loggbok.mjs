@@ -219,9 +219,17 @@ async function scanThreads() {
       // Håller tråden upp handen är det frågan som ska stå på kortet, inte det senaste den
       // gjorde: ett `?` man måste öppna chatten för att förstå är bara en prick.
       preview: vinkar ? text(`${sista.rubrik} — ${sista.text}`, 240) : text(senaste.rubrik, 240),
-      project: info.zon,
+      /**
+       * En tomt per TRÅD, inte per repo.
+       *
+       * Bot Crossing ger normalt en zon åt varje repo, men Roosts trådar delar repo utan att
+       * dela uppdrag: Produkt, Box & moln, Nexus och Design bor alla i nexus-repot och rör
+       * olika saker med flit. Fyra astronauter på samma plätt döljer just den gränsen. Repot
+       * följer med som worktree, så kortet fortfarande säger var tråden arbetar.
+       */
+      project: info.namn,
       projectPath,
-      worktree: '',
+      worktree: info.repo || info.zon,
       cwd: projectPath,
       gitBranch: projectPath ? 'main' : '',
       model: senaste.commit ? senaste.commit.slice(0, 7) : '',
