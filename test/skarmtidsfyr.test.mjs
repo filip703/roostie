@@ -29,3 +29,35 @@ test('en lucka i pollen blir inte ett stroboskop', () => {
 test('kön byggs på, men bara till taket', () => {
   assert.equal(raknaSlag(100, 102, true, 2), 3)
 })
+
+/**
+ * Mätaren. Det Filip ska kunna se tvärs över köket utan att vänta in ett slag är HÖJDEN och
+ * FÄRGEN — så de två reglerna är utbrutna och provas här, precis som slagräkningen.
+ */
+import { stapelHojd, stapelFarg } from '../src/world/skarmtidsfyr.js'
+import { TAL } from '../src/world/palett.js'
+
+test('full budget ger full stråle, slut budget ger stubben — aldrig noll', () => {
+  assert.equal(stapelHojd(1), 9.5)
+  assert.equal(stapelHojd(0), 1.3)
+  // En osynlig stråle betyder "ingen data", och det är något annat än "slut".
+  assert.ok(stapelHojd(0) > 0)
+})
+
+test('stapeln växer med andelen kvar, och ingenting utanför noll till ett', () => {
+  assert.ok(stapelHojd(0.5) > stapelHojd(0.2))
+  assert.equal(stapelHojd(2), stapelHojd(1))
+  assert.equal(stapelHojd(-3), stapelHojd(0))
+  assert.equal(stapelHojd(NaN), stapelHojd(0))
+})
+
+test('färgen följer samma trösklar som resten av kolonin', () => {
+  assert.equal(stapelFarg(0.8), TAL.gron)
+  assert.equal(stapelFarg(0.3), TAL.honey)
+  assert.equal(stapelFarg(0.09), TAL.clay)
+})
+
+test('utan färska siffror lyser fyren varken grönt eller rött', () => {
+  assert.equal(stapelFarg(0.9, false), TAL.sage)
+  assert.equal(stapelFarg(0.01, false), TAL.sage)
+})
