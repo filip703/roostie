@@ -78,7 +78,10 @@ if (new URLSearchParams(location.search).get('debug') === '1') {
   // den, men inte `window` — och redovisningen är värdelös om den bara går att läsa inifrån.
   setInterval(() => {
     try {
-      document.documentElement.dataset.roostie = JSON.stringify(colony.diagnos())
+      // Tidsstämplad: Chrome strypar timers i en bakgrundsflik, så en diagnos kan vara en
+      // minut gammal utan att det syns. En avläsning som inte kan säga hur gammal den är
+      // ljuger lika gärna som en som har fel siffror.
+      document.documentElement.dataset.roostie = JSON.stringify({ nar: Date.now(), ...colony.diagnos() })
     } catch {
       // En diagnos som kraschar får inte ta sidan med sig.
     }
