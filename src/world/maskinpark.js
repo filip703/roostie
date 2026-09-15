@@ -17,6 +17,7 @@
  */
 import * as THREE from 'three'
 import { createBuilding } from './buildings.js'
+import { atlasTexture, part } from './kit.js'
 import { createLabel, hashString } from './plots.js'
 
 const RAD = 4 // maskiner per rad i ett fält
@@ -126,6 +127,21 @@ export class Maskinpark {
     this.hojd = () => 0
     this.antal = Object.fromEntries(Object.keys(FALT).map((k) => [k, 0]))
     this.maxRader = 1
+
+    /**
+     * Rovern är kommandoprocessorn.
+     *
+     * `nexus-commands` är den agent som faktiskt åker ut och gör något i hemmet när appen
+     * ber om det — den enda i parken vars jobb är en resa. Så länge den skriver i loggen
+     * kör rovern ut på gatan och hem igen; tystnar den står den parkerad vid sin box.
+     *
+     * Att den kör betyder "agenten arbetar", inte "det ligger kommandon i kön" — kön syns
+     * inte härifrån. Skillnaden är liten i praktiken (agenten loggar när den kör ett
+     * kommando) men den ska inte påstås vara något annat än den är.
+     */
+    this.rover = null
+    this.roverT = 0
+    this.roverRiktning = 1
 
     // Två plattor, en per fält. Utan dem ser maskinerna ut som skrot någon tappat i
     // terrängen; med dem är det en gård.
@@ -365,6 +381,28 @@ export class Maskinpark {
     }
   }
 
+  /** Bygger rovern när kitet är inne och kommandoprocessorn har fått sin plats. */
+  _rover() {
+    const post = this.maskiner.get('nexus-commands')
+    if (!post || !post.fran) return null
+    if (!this.rover) {
+      try {
+        const geo = part('spacetruck')
+        const mesh = new THREE.Mesh(
+          geo,
+          new THREE.MeshStandardMaterial({ map: atlasTexture(), roughness: 0.6, metalness: 0.05 })
+        )
+        mesh.scale.setScalar(0.5)
+        mesh.castShadow = true
+        this.grupp.add(mesh)
+        this.rover = mesh
+      } catch {
+        return null // kitet är inte inne än
+      }
+    }
+    return post
+  }
+
   update(dt, camera) {
     if (!this.grupp.visible) return
     const nu = Date.now()
@@ -434,6 +472,34 @@ export class Maskinpark {
       }
     }
 
+    // Rovern kör ut på gatan och hem igen så länge kommandoprocessorn arbetar.
+    const kommando = this._rover()
+    if (this.rover && kommando) {
+      const hem = new THREE.Vector3(kommando.mesh.position.x + 1.6, kommando.mesh.position.y, kommando.mesh.position.z)
+      const ute = new THREE.Vector3(0, hem.y, 0) // gatan där de fyra gårdarna möts
+      const kor = kommando.status === 'ok' && kommando.sistaLogg > 0 && nu - kommando.sistaLogg < AKTIV_MS
+
+      if (kor) {
+        this.roverT += dt * 0.16 * this.roverRiktning
+        if (this.roverT >= 1) {
+          this.roverT = 1
+          this.roverRiktning = -1
+        } else if (this.roverT <= 0) {
+          this.roverT = 0
+          this.roverRiktning = 1
+        }
+      } else {
+        // Tystnar agenten kör rovern hem och stannar där — den ska inte frysa mitt på gatan.
+        this.roverT = Math.max(0, this.roverT - dt * 0.3)
+        this.roverRiktning = 1
+      }
+
+      this.rover.position.lerpVectors(hem, ute, this.roverT)
+      const mot = ute.clone().sub(hem).multiplyScalar(this.roverRiktning)
+      if (mot.lengthSq() > 0.0001) this.rover.rotation.y = Math.atan2(mot.x, mot.z)
+      this.rover.visible = true
+    }
+
     // Etiketterna är läsbara på nära håll och försvinner när man drar sig undan — annars
     // är fältet en vägg av text.
     const p = new THREE.Vector3()
@@ -479,6 +545,11 @@ export class Maskinpark {
       falt.mast?.geometry.dispose()
       falt.mast?.material.dispose()
       falt.etikett.userData.dispose?.()
+    }
+    if (this.rover) {
+      this.rover.geometry.dispose()
+      this.rover.material.dispose()
+      this.rover = null
     }
     this.maskiner.clear()
     this.scene.remove(this.grupp)

@@ -726,6 +726,23 @@ async function boot() {
     if (!document.hidden) poll()
   })
 
+  /**
+   * Köksläge: `?kiosk=1`.
+   *
+   * Skärmen i köket har ingen som klickar. Den ska visa kolonin, inte en meny — så HUD:en
+   * går ner och kameran går i bana av sig själv. Allt annat fungerar som vanligt: trycker
+   * någon H eller O tar de över, och en omladdning ger köksläget tillbaka.
+   *
+   * Ingen hjälpruta heller: den lägger sig över hela bilden och ingen är där för att stänga
+   * den. Den räknas som sedd, så en människa som öppnar samma URL slipper den också.
+   */
+  if (new URLSearchParams(location.search).get('kiosk') === '1') {
+    localStorage.setItem('botcrossing.seen-help', '1')
+    hud.toggleUi(false)
+    hud.setOrbit(actions.toggleOrbit())
+    return
+  }
+
   if (!localStorage.getItem('botcrossing.seen-help')) {
     hud.toggleHelp(true)
     localStorage.setItem('botcrossing.seen-help', '1')
