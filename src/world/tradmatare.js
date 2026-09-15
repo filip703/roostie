@@ -2,8 +2,12 @@
  * Trådmätaren — hur mycket trådarna jobbar, bredvid barnens skärmtid.
  *
  * Skärmtidsfyren säger hur mycket tid barnen har kvar. Den här säger hur mycket trådarna har
- * gjort. De står bredvid varandra med flit: det är kolonins två sorters arbete, och båda hör
- * hemma mitt i bilden.
+ * gjort.
+ *
+ * VARJE STAV STÅR PÅ SIN EGEN TOMT. Först stod de i rad mitt i kolonin, och då var de sju
+ * pinnar man fick läsa en namnlista för att förstå. På plätten behöver de ingen namnlista:
+ * staven har plättens färg, står bredvid trådens eget hus och sin egen astronaut, och man
+ * läser hela kolonin genom att titta sig omkring i stället för på ett diagram.
  *
  * VAD DEN MÄTER, och varför just det: kolonin kan INTE se hur mycket Claude-kvot en tråd
  * bränt. Den läsvägen finns inte — Anthropics Usage & Cost API täcker uttryckligen inte
@@ -25,13 +29,6 @@ import { createLabel } from './plots.js'
 
 const MIN_HOJD = 0.35
 const MAX_HOJD = 5.6
-/**
- * Avstånd mellan stavarna.
- *
- * Satt av etiketterna, inte av stavarna: sju namn på rad krockar långt innan sju pinnar gör
- * det, och en rad text som ligger ovanpå nästa är oläsbar hur fin mätaren än är.
- */
-const LUFT = 2.5
 const SLAG_MS = 2000
 
 /**
@@ -68,49 +65,35 @@ export class Tradmatare {
     scene.add(this.grupp)
 
     this.stavar = new Map()
-    this.ordning = []
     this.nyckel = ''
-
-    this.platta = new THREE.Mesh(
-      new THREE.BoxGeometry(2, 0.3, 1.5),
-      new THREE.MeshStandardMaterial({ color: TAL.panel, roughness: 0.86, metalness: 0.12 })
-    )
-    this.platta.position.y = 0.15
-    this.platta.receiveShadow = true
-    this.platta.castShadow = true
-    this.grupp.add(this.platta)
-
-    // Skylten som säger vad man tittar på. Utan den är det sju lysande pinnar.
-    this.rubrik = createLabel('TRÅDARNAS ARBETE · RADER SENASTE DYGNET', TAL.dampad)
-    this.rubrik.position.set(0, MAX_HOJD + 1.1, 0)
-    this.rubrik.visible = false
-    this.rubrik.material.opacity = 0
-    this.grupp.add(this.rubrik)
   }
 
   /**
    * @param {{trad:string, namn:string, rader:number, tecken:number, senast:number}[]} arbete
-   * @param {Map<string, number>} farger  trådnamn i gemener → plättens accentfärg
+   * @param {Map<string, {x:number,y:number,z:number,farg:number}>} platser  trådnamn i gemener → plättens stapelankare
    */
-  set(arbete, farger) {
-    const lista = Array.isArray(arbete) ? arbete.slice(0, 10) : []
-    this.grupp.visible = lista.length > 0
-    if (!lista.length) return
-
+  set(arbete, platser) {
+    const lista = Array.isArray(arbete) ? arbete.slice(0, 12) : []
     const mest = Math.max(...lista.map((t) => t.tecken), 0)
     const kvar = new Set(this.stavar.keys())
-    this.ordning = lista.map((t) => t.trad)
+    let nagon = false
 
     lista.forEach((t) => {
+      // En tråd utan plätt har ingen tomt att stå på — då ritas ingen stav. Att lägga den
+      // vid origo hade sett ut som en åttonde tråd mitt i kolonin.
+      const plats = platser?.get(String(t.namn || '').toLowerCase())
+      if (!plats) return
+      nagon = true
       kvar.delete(t.trad)
       let post = this.stavar.get(t.trad)
       if (!post) {
         post = this._bygg(t)
         this.stavar.set(t.trad, post)
       }
-      // Tråden får plättens egen färg, så staven och astronauten hör ihop. Utan en känd plätt
-      // blir den dämpad — ingen påhittad färg.
-      const farg = farger?.get(String(t.namn || '').toLowerCase()) ?? TAL.dampad
+      post.grupp.position.set(plats.x, plats.y, plats.z)
+
+      // Tråden får plättens egen färg, så staven och astronauten hör ihop.
+      const farg = plats.farg ?? TAL.dampad
       if (farg !== post.farg) {
         post.farg = farg
         post.stavMat.color.set(farg)
@@ -124,8 +107,9 @@ export class Tradmatare {
       post.malHojd = stavHojd(t.tecken, mest)
       post.tyst = t.rader === 0
 
-      // Kort text: namnet och siffran. "rader" står på rubriken ovanför, en gång.
-      const text = `${t.namn} · ${t.rader}`
+      // Staven står på trådens egen tomt bredvid plättens namnskylt, så namnet behöver inte
+      // upprepas — siffran räcker, och den ska gå att förstå utan sammanhang.
+      const text = t.rader === 1 ? '1 rad i dygnet' : `${t.rader} rader i dygnet`
       if (text !== post.text) {
         post.text = text
         this._etikett(post)
@@ -137,9 +121,8 @@ export class Tradmatare {
       this.stavar.delete(trad)
     }
 
-    this._placera()
-    const nyckel = lista.map((t) => `${t.trad}${t.rader}${t.tecken}`).join('|')
-    this.nyckel = nyckel
+    this.grupp.visible = nagon
+    this.nyckel = lista.map((t) => `${t.trad}${t.rader}${t.tecken}`).join('|')
   }
 
   _bygg(t) {
@@ -187,7 +170,6 @@ export class Tradmatare {
       hojd: MIN_HOJD,
       malHojd: MIN_HOJD,
       tyst: true,
-      rad: 0,
       raderForut: null,
       slag: 0,
     }
@@ -201,18 +183,6 @@ export class Tradmatare {
     post.etikett.material.opacity = synlig
     post.etikett.visible = synlig > 0.02
     post.grupp.add(post.etikett)
-  }
-
-  /** Stavarna står på rad, flitigast först. Ordningen är information i sig. */
-  _placera() {
-    const n = this.ordning.length
-    this.ordning.forEach((trad, i) => {
-      const post = this.stavar.get(trad)
-      if (!post) return
-      post.grupp.position.x = (i - (n - 1) / 2) * LUFT
-      post.rad = i
-    })
-    this.platta.scale.set(Math.max(1, (n * LUFT + 0.8) / 2), 1, 1)
   }
 
   _riv(post) {
@@ -251,21 +221,17 @@ export class Tradmatare {
       post.ringMat.opacity = post.slag * 0.7
       post.ring.scale.setScalar(1 + (1 - post.slag) * 5)
 
-      // Varannan etikett en bit högre: staplarna står tätt, och två namn i exakt samma höjd
-      // lägger sig över varandra så fort man tittar snett på raden.
-      post.etikett.position.set(0, 0.42 + hojd + 0.55 + (post.rad % 2 ? 0.95 : 0), 0)
+      // Etiketten sitter i stavens topp. Stavarna står på var sin tomt nu, så de krockar
+      // inte längre med varandra — men plättens eget namn hänger på 3.2, så staven lägger
+      // sin text ovanför den.
+      post.etikett.position.set(0, 0.42 + hojd + 0.7, 0)
       post.etikett.getWorldPosition(p)
-      const mal = p.distanceTo(camera.position) < 26 ? 1 : 0
+      const mal = p.distanceTo(camera.position) < 44 ? 1 : 0
       const m = post.etikett.material
       m.opacity += (mal - m.opacity) * Math.min(1, dt * 5)
       post.etikett.visible = m.opacity > 0.02
     }
 
-    this.rubrik.getWorldPosition(p)
-    const mal = p.distanceTo(camera.position) < 60 ? 1 : 0
-    const rm = this.rubrik.material
-    rm.opacity += (mal - rm.opacity) * Math.min(1, dt * 4)
-    this.rubrik.visible = rm.opacity > 0.02
   }
 
   /** Vad mätaren faktiskt visar — för `?debug=1`. */
@@ -284,7 +250,6 @@ export class Tradmatare {
   dispose() {
     for (const post of this.stavar.values()) this._riv(post)
     this.stavar.clear()
-    this.rubrik.userData.dispose?.()
     this.scene.remove(this.grupp)
     this.grupp.traverse((o) => {
       o.geometry?.dispose()

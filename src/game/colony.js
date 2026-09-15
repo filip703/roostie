@@ -137,6 +137,8 @@ export class Colony {
     this.buildings = new Map()
     this.threads = new Map()
     this.usedAccents = new Set()
+    /** Senaste arbetsmängden per tråd, så stavarna kan ställas om när plättarna flyttar. */
+    this.arbete = []
 
     this.worldGroup = new THREE.Group()
     this.worldGroup.name = 'world'
@@ -160,7 +162,8 @@ export class Colony {
     this.skarmtidsfyr = new Skarmtidsfyr(scene, { x: 0, y: 0, z: 0 })
     // Trådarnas arbete står bredvid barnens tid: kolonins två sorters arbete, båda mitt i
     // bilden. Den mäter rader på tavlan, inte Claude-kvot — den läsvägen finns inte.
-    this.tradmatare = new Tradmatare(scene, { x: 0, y: 0, z: 9.5 })
+    // Mätaren håller inga egna koordinater: varje stav ställs på sin tråds plätt.
+    this.tradmatare = new Tradmatare(scene, { x: 0, y: 0, z: 0 })
     this.astronauts = new Astronauts(scene, settings)
     this.astronauts.world = this._world()
     // Sized for the largest preset rather than the current one: unlike the astronaut meshes these
@@ -218,7 +221,6 @@ export class Colony {
       this.maskinpark,
       this.agenttavla,
       this.skarmtidsfyr,
-      this.tradmatare,
     ]) {
       const p = sak.grupp.position
       p.y = terrainHeight(p.x, p.z, this.planet)
@@ -257,7 +259,6 @@ export class Colony {
       [this.anslagstavla, 6],
       [this.maskinpark, this.maskinpark.radie()],
       [this.agenttavla, 10],
-      [this.tradmatare, 7],
     ]) {
       const p = sak.grupp.position
       clear.push({ x: p.x, z: p.z, r })
@@ -352,14 +353,24 @@ export class Colony {
   setTavla(data) {
     this.tavlan.set(data)
     this.anslagstavla.set(data?.filip || [])
-    // Staven får plättens färg, så en tråds stav och dess astronaut hör ihop.
-    this.tradmatare.set(data?.arbete || [], this._tradFarger())
+    // Varje stav ställs på sin egen tomt, i plättens färg — staven, huset och astronauten
+    // hör ihop, och kolonin läses genom att titta sig omkring i stället för på ett diagram.
+    this.arbete = Array.isArray(data?.arbete) ? data.arbete : this.arbete
+    this.tradmatare.set(this.arbete || [], this._tradPlatser())
   }
 
-  /** Trådnamn i gemener → plättens accentfärg, som mätaren målar sina stavar med. */
-  _tradFarger() {
+  /** Trådnamn i gemener → var stapeln står på plätten, och i vilken färg. */
+  _tradPlatser() {
     const ut = new Map()
-    for (const plot of this.plotOrder || []) ut.set(String(plot.name || '').toLowerCase(), plot.accent)
+    for (const plot of this.plotOrder || []) {
+      if (!plot.stapelAnkare) continue
+      ut.set(String(plot.name || '').toLowerCase(), {
+        x: plot.stapelAnkare.x,
+        y: plot.stapelAnkare.y,
+        z: plot.stapelAnkare.z,
+        farg: plot.accent,
+      })
+    }
     return ut
   }
 
@@ -550,6 +561,9 @@ export class Colony {
     })
 
     this.plotOrder = [...this.plots.values()]
+    // Plättarna flyttar sig när trådar tillkommer eller försvinner, och stavarna står PÅ dem
+    // — så de måste ställas om här, inte bara när Loggboken hämtas.
+    this.tradmatare?.set(this.arbete || [], this._tradPlatser())
     // Zones that just moved, appeared or grew are zones the scatter does not know about.
     if (this.scatterGroup && this._plotFootprint() !== this._scatterFootprint) this._buildScatter()
     // Which hex cells are decked. Ground height is asked for once per moving agent per

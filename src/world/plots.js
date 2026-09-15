@@ -453,6 +453,38 @@ export class Plot {
     this.labelAnchor = new THREE.Vector3(this.center.x + anchor.x, 0, this.center.z + anchor.z)
     this.radius = CELL * Math.sqrt(cells.length)
 
+    /**
+     * Var trådens arbetsstav står: ytterst på plätten, en bit utanför den cell som ligger
+     * längst från mitten. Byggnaderna klumpar sig kring mitten, och en mätare som ställs där
+     * hamnar inuti ett hus. Staven ska höra till tomten och ändå gå att se från sidan.
+     */
+    let yttre = this.localCenters[0]
+    let yttreD = -1
+    const mx = this.middle.x - this.center.x
+    const mz = this.middle.z - this.center.z
+    for (const p of this.localCenters) {
+      const d = (p.x - mx) ** 2 + (p.z - mz) ** 2
+      if (d > yttreD) {
+        yttreD = d
+        yttre = p
+      }
+    }
+    let ux = yttre.x - mx
+    let uz = yttre.z - mz
+    let len = Math.hypot(ux, uz)
+    if (len < 0.001) {
+      // En plätt med en enda cell har ingen ytterkant att peka mot — då pekar vi bort från
+      // koloniens mitt i stället, så staven hamnar på utsidan av tomten och inte i huset.
+      ux = this.center.x
+      uz = this.center.z
+      len = Math.hypot(ux, uz) || 1
+    }
+    this.stapelAnkare = new THREE.Vector3(
+      this.center.x + yttre.x + (ux / len) * 3.4,
+      DECK_TOP,
+      this.center.z + yttre.z + (uz / len) * 3.4
+    )
+
     this.group = new THREE.Group()
     this.group.position.copy(this.center)
     this.group.name = `plot:${id}`
