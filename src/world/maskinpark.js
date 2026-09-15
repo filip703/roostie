@@ -24,6 +24,7 @@ import * as THREE from 'three'
 import { createBuilding } from './buildings.js'
 import { atlasTexture, part } from './kit.js'
 import { createLabel, hashString } from './plots.js'
+import { deckSurface } from './surfaces.js'
 import { TAL, CSS, rgba } from './palett.js'
 import { SANS, spartext } from './skyltverk.js'
 
@@ -332,10 +333,7 @@ export class Maskinpark {
     this.nav = new THREE.Group()
     this.nav.visible = false
     this.grupp.add(this.nav)
-    this.navDack = new THREE.Mesh(
-      DACK_GEO,
-      new THREE.MeshStandardMaterial({ color: TAL.panel, roughness: 0.9, metalness: 0.08 })
-    )
+    this.navDack = new THREE.Mesh(DACK_GEO, this._golv(TAL.sage, 0.62))
     this.navDack.receiveShadow = true
     this.navSockel = new THREE.Mesh(
       SOCKEL_GEO,
@@ -351,7 +349,12 @@ export class Maskinpark {
       new THREE.MeshBasicMaterial({ color: TAL.sage, transparent: true, opacity: 0.5, toneMapped: false })
     )
     this.navRing.rotation.x = -Math.PI / 2
-    this.nav.add(this.navSockel, this.navDack, this.navPylon, this.navRing)
+    // Ett ljus i toppen: navet är parkens mittpunkt och ska gå att hitta på håll.
+    this.navLykta = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 12, 10),
+      new THREE.MeshBasicMaterial({ color: TAL.sage, transparent: true, opacity: 0.85, toneMapped: false })
+    )
+    this.nav.add(this.navSockel, this.navDack, this.navPylon, this.navRing, this.navLykta)
     this.navBlink = 0
 
     // Gårdarna. Utan dem ser maskinerna ut som skrot någon tappat i terrängen; med dem är
@@ -369,22 +372,22 @@ export class Maskinpark {
       // i stället för en rand som marken äter upp.
       const rand = new THREE.Mesh(
         RAND_GEO,
-        new THREE.MeshStandardMaterial({ color: farg, roughness: 0.7, metalness: 0.12 })
+        new THREE.MeshStandardMaterial({
+          color: farg,
+          emissive: farg,
+          emissiveIntensity: 0.28,
+          roughness: 0.7,
+          metalness: 0.12,
+        })
       )
       rand.visible = false
 
-      const dack = new THREE.Mesh(
-        DACK_GEO,
-        new THREE.MeshStandardMaterial({ color: TAL.panel, roughness: 0.92, metalness: 0.06 })
-      )
+      const dack = new THREE.Mesh(DACK_GEO, this._golv(farg, 0.78))
       dack.receiveShadow = true
       dack.visible = false
 
       // En inre platta kring masten: terrassen får ett steg, och masten en tydlig plats.
-      const inre = new THREE.Mesh(
-        DACK_GEO,
-        new THREE.MeshStandardMaterial({ color: TAL.natt, roughness: 0.94, metalness: 0.05 })
-      )
+      const inre = new THREE.Mesh(DACK_GEO, this._golv(farg, 0.52))
       inre.receiveShadow = true
       inre.visible = false
 
@@ -394,10 +397,7 @@ export class Maskinpark {
       // Bron in till navet, med räcken.
       const bro = new THREE.Group()
       bro.visible = false
-      const brodack = new THREE.Mesh(
-        new THREE.BoxGeometry(2.6, 0.26, 1),
-        new THREE.MeshStandardMaterial({ color: TAL.panel, roughness: 0.9, metalness: 0.08 })
-      )
+      const brodack = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.26, 1), this._golv(TAL.sage, 0.6))
       brodack.receiveShadow = true
       bro.add(brodack)
       const rackeMat = new THREE.MeshStandardMaterial({ color: TAL.stomme, roughness: 0.6, metalness: 0.45 })
@@ -435,6 +435,36 @@ export class Maskinpark {
         navpunkt: new THREE.Vector3(),
       }
     }
+  }
+
+  /**
+   * Golvet.
+   *
+   * Gårdarna var svarta skivor: rätt färg på kanten, men ett golv som slukade allt som stod
+   * på det. Koloniens plättar är inte svarta — de är en plåtyta i zonens färg, avmättad och
+   * nedtonad — och maskinparken är samma värld. Samma plåt, samma logik: lagets färg, långt
+   * ner i mättnad, så maskinerna syns mot den i stället för att försvinna i den.
+   */
+  _golv(farg, styrka) {
+    if (!this._plat) this._plat = deckSurface()
+    const klona = (t) => {
+      if (!t) return null
+      const k = t.clone()
+      k.wrapS = THREE.RepeatWrapping
+      k.wrapT = THREE.RepeatWrapping
+      k.repeat.set(3.5, 3.5)
+      k.needsUpdate = true
+      return k
+    }
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color(farg).offsetHSL(0, -0.4, 0).multiplyScalar(styrka),
+      map: klona(this._plat.map),
+      normalMap: klona(this._plat.normalMap),
+      roughnessMap: klona(this._plat.roughnessMap),
+      normalScale: new THREE.Vector2(0.6, 0.6),
+      roughness: 0.84,
+      metalness: 0.16,
+    })
   }
 
   /** Roosts läsväg in: pulsen per agent och kommandokön. */
@@ -739,6 +769,7 @@ export class Maskinpark {
       this.navDack.position.set(0, dackY - 0.17, 0)
       this.navPylon.position.set(0, dackY + 1.6, 0)
       this.navRing.position.set(0, dackY + 3.1, 0)
+      this.navLykta.position.set(0, dackY + 3.35, 0)
       this.navSockel.rotation.y = Math.PI / 6
       this.navDack.rotation.y = Math.PI / 6
     }
@@ -808,7 +839,7 @@ export class Maskinpark {
       if (!p.mast) {
         try {
           const mast = createBuilding({ seed: fro, accent: p.farg, kind: 'antenna' })
-          mast.scale.setScalar(0.46)
+          mast.scale.setScalar(0.55)
           mast.castShadow = true
           mast.userData.uniforms.uTime = p.masttid
           this.grupp.add(mast)
@@ -1023,6 +1054,8 @@ export class Maskinpark {
       this.navRing.rotation.z += dt * 0.5
       this.navRing.material.opacity = 0.32 + this.navBlink * 0.6
       this.navRing.scale.setScalar(1 + this.navBlink * 0.3)
+      this.navLykta.material.opacity = 0.6 + this.navBlink * 0.4
+      this.navLykta.scale.setScalar(1 + this.navBlink * 0.35)
     }
   }
 
