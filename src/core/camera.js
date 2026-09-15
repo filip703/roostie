@@ -99,6 +99,18 @@ export class CameraRig {
      * att se, så det går inte att komma dit.
      */
     this.scen = null
+    /**
+     * DRIFTEN — köksskärmens långsamma andning i scenen.
+     *
+     * Kolonins bansvep är avstängt i buren (det svepte runt stammen och ut i tomheten), och
+     * utan något i stället står bilden HELT still mellan rundturens hållplatser. En köksskärm
+     * som står still ser trasig ut, även när allt fungerar. Driften vaggar kameran en sjättedels
+     * radian kring den vinkel hållplatsen satte — tillräckligt för att bilden ska leva, för
+     * lite för att man ska tappa vad man tittar på.
+     */
+    this.drift = false
+    this._driftBas = null
+    this._driftTid = 0
     this._last = new THREE.Vector2()
     this._pinch = 0
     this._moved = 0
@@ -165,6 +177,8 @@ export class CameraRig {
     this._last.set(e.clientX, e.clientY)
     this.interacting = true
     this.idleFor = 0
+    // Den som tar tag i kameran ska inte behöva slåss mot vaggningen.
+    this._driftBas = null
     if (!orbit) this._grab(e.clientX, e.clientY)
   }
 
@@ -327,6 +341,12 @@ export class CameraRig {
     return this.scen ? Math.min(this.scen.avstandMin, MIN_DIST) : MIN_DIST
   }
 
+  /** Slår på den långsamma driften. Bara meningsfull i en scen; ett drag stänger av den. */
+  setDrift(on) {
+    this.drift = Boolean(on) && Boolean(this.scen)
+    if (!this.drift) this._driftBas = null
+  }
+
   /** Sätter eller släpper scenen. Null = kolonins fria kamera tillbaka. */
   setScen(scen) {
     this.scen = scen || null
@@ -364,6 +384,8 @@ export class CameraRig {
     // är en annan kamera än att titta ner på en plätt.
     if (polar !== undefined) this.desiredPolar = THREE.MathUtils.clamp(polar, MIN_POLAR, MAX_POLAR)
     if (azimuth !== undefined) this.desiredAzimuth = azimuth
+    // Driften vaggar kring den vinkel hållplatsen satte, inte kring noll.
+    this._driftBas = { azimut: this.desiredAzimuth, polar: this.desiredPolar }
     this._spanner()
     this._zoom = null
     // I trädläge ska den inte snäppa tillbaka till isometrin — det är den easingen som
@@ -448,6 +470,12 @@ export class CameraRig {
       this.desiredPolar = damp(this.desiredPolar, ISO_POLAR, ease, dt)
     }
 
+    if (this.drift && this._driftBas && !this.interacting) {
+      this._driftTid += dt
+      // Två perioder som inte går jämnt ut, så vaggningen aldrig ser loopad ut.
+      this.desiredAzimuth = this._driftBas.azimut + Math.sin(this._driftTid * 0.11) * 0.17
+      this.desiredPolar = this._driftBas.polar + Math.sin(this._driftTid * 0.071) * 0.055
+    }
     this._spanner()
     const lambda = this.settings.get('reducedMotion') ? 40 : 9
     this.azimuth = damp(this.azimuth, this.desiredAzimuth, lambda, dt)

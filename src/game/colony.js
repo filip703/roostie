@@ -23,6 +23,7 @@ import { Tradmatare } from '../world/tradmatare.js'
 import { Tradet, arstidNu } from '../world/tradet.js'
 import { Faglar } from '../world/faglar.js'
 import { Holkar } from '../world/holkar.js'
+import { rundtur } from '../world/rundtur.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
 import { MAX_AGENT_CAP } from '../core/settings.js'
@@ -536,6 +537,20 @@ export class Colony {
     return { utsikter: this.tradet.utsikter(this.camera), bon: this.faglar.oversikt() }
   }
 
+  /**
+   * Köksskärmens bana genom trädet, ett varv i taget.
+   *
+   * Byggs om varje varv i stället för en gång: trådar tillkommer, bon flyttar sig, och den
+   * som senast skrev en rad ska gå först nästa varv — inte det varv som redan är påbörjat.
+   */
+  tradrundtur() {
+    if (this.varld !== 'trad') return []
+    // Samma form som utsikterna, så rundturen kan behandla alla hållplatser lika — och samma
+    // närbild som ett klick ger, så köksskärmen och handen visar samma sak.
+    const bon = this.faglar.oversikt().map((b) => ({ ...b, ...this._boVy(b.punkt) }))
+    return rundtur(this.tradet.utsikter(this.camera), bon, this.senasteTrad)
+  }
+
   /** Flyger till en namngiven utsikt eller till en tråds bo. Null när den inte finns. */
   flygTill(namn) {
     if (this.varld !== 'trad') return null
@@ -546,16 +561,25 @@ export class Colony {
     // Lite utanför boet och en aning under, så grenen syns under fågeln.
     // Utanför boet och en aning under, med kameran vänd inåt mot barken — då står fågeln
     // mot stammen i stället för mot tom himmel, och man ser vilken gren hon sitter på.
-    const p = f.hem.clone()
-    // Samma omräkning som utsikterna: en närbild ska vara lika nära på alla synfält.
+    return { namn: f.trad.namn, ...this._boVy(f.hem.clone()) }
+  }
+
+  /**
+   * Närbilden på ett bo — ett ställe, två användare (klicket och köksrundturen).
+   *
+   * Avståndet var 26 först, och köksbilden visade varför det var för nära: grenarna är grova
+   * och andra bons kanter la sig över hela förgrunden. 34 lämnar luft kring boet utan att
+   * fågeln blir liten. Samma omräkning mot synfältet som utsikterna, så närbilden är lika nära
+   * på varje skärm.
+   */
+  _boVy(punkt) {
     const fov = ((this.camera?.fov || 50) * Math.PI) / 180
     const skala = Math.tan((50 * Math.PI) / 360) / Math.tan(fov / 2)
     return {
-      namn: f.trad.namn,
-      punkt: p,
-      avstand: Math.round(26 * skala),
-      lutning: 1.5,
-      azimut: Math.atan2(p.x, p.z) * 0.55,
+      punkt,
+      avstand: Math.round(34 * skala),
+      lutning: 1.42,
+      azimut: Math.atan2(punkt.x, punkt.z) * 0.55,
     }
   }
 
@@ -567,6 +591,10 @@ export class Colony {
   /** Loggbokens rader och väntelista → billboarden, och Filips egen skylt vid skeppet. */
   setTavla(data) {
     this.tavlan.set(data)
+    // Vem som senast skrev en rad. Tavlan kommer nyast först; rundturen i köket besöker den
+    // tråden först, så man kan titta upp och se vem som just gjorde något.
+    const nyast = Array.isArray(data?.rader) ? data.rader[0] : null
+    this.senasteTrad = nyast ? String(nyast.trad || '') : this.senasteTrad || null
     this.anslagstavla.set(data?.filip || [])
     // Varje stav ställs på sin egen tomt, i plättens färg — staven, huset och astronauten
     // hör ihop, och kolonin läses genom att titta sig omkring i stället för på ett diagram.

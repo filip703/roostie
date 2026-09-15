@@ -9,6 +9,7 @@ import { PLANETS } from './world/planet.js'
 import { loadKit } from './world/kit.js'
 import { FALTLISTA, JOBB } from './world/maskinpark.js'
 import { TRADHOJD } from './world/tradet.js'
+import { halltid } from './world/rundtur.js'
 import { crewRig, loadCrew } from './agents/crew.js'
 import { TIMES } from './world/sky.js'
 import {
@@ -945,7 +946,9 @@ async function boot() {
   if (new URLSearchParams(location.search).get('kiosk') === '1') {
     localStorage.setItem('botcrossing.seen-help', '1')
     hud.toggleUi(false)
-    hud.setOrbit(actions.toggleOrbit())
+    // Bansvepet hör kolonin till. I trädets bur gör det ingenting alls (det är avstängt där),
+    // så att slå på det skulle bara ljuga i HUD:en om vad kameran gör.
+    if (colony.varld !== 'trad') hud.setOrbit(actions.toggleOrbit())
 
     /**
      * Rundturen. Kolonin har vuxit förbi en enda kamerabana — billboarden står bakom skeppet,
@@ -954,6 +957,36 @@ async function boot() {
      *
      * Banan fortsätter mellan hållplatserna, så bilden står aldrig still.
      */
+    /**
+     * TRÄDETS KÖKSLÄGE — steg 5 av tavlans rad 224.
+     *
+     * Egen bana, av tre skäl som alla finns i `rundtur.js`: buren kräver lutning och vinkel,
+     * sju bon är fler hållplatser än kolonin har platser, och helheten måste komma tillbaka
+     * varannan gång. Driften håller bilden levande mellan hållplatserna i stället för
+     * kolonins bansvep, som är avstängt i scenen.
+     */
+    if (colony.varld === 'trad') {
+      hud.setOrbit(false)
+      rig.setDrift(true)
+      let bana = []
+      let steg = 0
+      const nastaStopp = () => {
+        // Banan byggs om vid varje varv: trådar tillkommer, och den som senast skrev en rad
+        // ska gå först i NÄSTA varv, inte mitt i det som redan rullar.
+        if (steg >= bana.length) {
+          bana = colony.tradrundtur()
+          steg = 0
+        }
+        const stopp = bana[steg++]
+        if (!stopp) return setTimeout(nastaStopp, 5000)
+        rig.focus(stopp.punkt, { distance: stopp.avstand, polar: stopp.lutning, azimuth: stopp.azimut })
+        rig.setDrift(true)
+        return setTimeout(nastaStopp, halltid(stopp) * 1000)
+      }
+      setTimeout(nastaStopp, onskadVy ? 90000 : 8000)
+      return
+    }
+
     let vy = 0
     const turnera = () => {
       const punkter = colony.utsiktspunkter()
