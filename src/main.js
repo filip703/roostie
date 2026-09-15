@@ -50,6 +50,18 @@ const engine = new Engine(settings).mount(app)
 const rig = new CameraRig(engine.camera, engine.canvas, settings)
 const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer)
 
+/**
+ * `?debug=1` — kolonin läggs på `window.__roostie`.
+ *
+ * Kolonin går bara att granska i en webbläsare: curl svarar 200 på alla tre API:erna medan
+ * sidan står still, och en mast som aldrig byggdes syns inte på någon skärmbild där den råkar
+ * stå bakom en maskin. Med den här kroken går det att FRÅGA scenen i stället för att gissa
+ * ur en bild. Den finns bara när man ber om den — köksskärmen får aldrig se den.
+ */
+if (new URLSearchParams(location.search).get('debug') === '1') {
+  window.__roostie = { colony, engine, settings }
+}
+
 let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {}, hiddenProjects: [], viewedAt: {} }
 let threads = []
 /** Last legend built for the bottom bar, kept so the open zone's chip can light up between polls. */
