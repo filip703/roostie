@@ -39,6 +39,8 @@ import { SANS, spartext } from './skyltverk.js'
 const SPRIDNING = 2.55 // hur glest spiralen växer
 const GYLLENE = Math.PI * (3 - Math.sqrt(5))
 const GATA = 7 // luft mellan gårdarna
+/** Hur stort torget kring masten är, uttryckt som spiralens startsteg. */
+const TORG = 3.6
 /** Hur högt gårdarnas gemensamma däck ligger över markens högsta punkt under dem. */
 const PLATAHOJD = 1.2
 /** Navets radie, där broarna möts. */
@@ -89,9 +91,9 @@ const PAKET_GEO = new THREE.SphereGeometry(0.13, 8, 6)
  * marken, ett däck ovanpå, och en lysande ring i kanten som bär maskinens status — så att
  * gården går att läsa på håll även när lyktorna är för små för att synas.
  */
-const HEM_SOCKEL = new THREE.CylinderGeometry(1.26, 1.42, 0.2, 6)
-const HEM_DACK = new THREE.CylinderGeometry(1.12, 1.26, 0.16, 6)
-const HEM_RING = new THREE.TorusGeometry(1.17, 0.045, 5, 6)
+const HEM_SOCKEL = new THREE.CylinderGeometry(1.1, 1.24, 0.2, 6)
+const HEM_DACK = new THREE.CylinderGeometry(0.98, 1.1, 0.16, 6)
+const HEM_RING = new THREE.TorusGeometry(1.03, 0.042, 5, 6)
 const HEM_STOLPE = new THREE.CylinderGeometry(0.045, 0.062, 1.1, 5)
 
 /** Gårdarnas terrass: sockel, däck, färgad rand och en inre platta. Skalas per gård. */
@@ -500,7 +502,7 @@ export class Maskinpark {
   /** Gårdens egen radie: så långt ut spiralen når för det största laget, plus lite kant. */
   _faltradie() {
     const flest = Math.max(...Object.values(this.antal), 1)
-    return SPRIDNING * Math.sqrt(flest - 0.4) + 3
+    return SPRIDNING * Math.sqrt(flest - 1 + TORG) + 2.2
   }
 
   /** Avståndet från parkens mitt ut till en gårds mitt. */
@@ -532,9 +534,15 @@ export class Maskinpark {
     return { hogst, lagst }
   }
 
-  /** Plats nummer i i spiralen, i gårdens eget koordinatsystem. */
+  /**
+   * Plats nummer i i spiralen, i gårdens eget koordinatsystem.
+   *
+   * Spiralen börjar utanför masttorget. Förut startade den i gårdens mittpunkt, så den
+   * första maskinen ställde sig ovanpå masten och åt upp den: masten fanns, men ingen kunde
+   * se den. Ett torg i mitten är också vad som gör kablarna läsbara som ekrar.
+   */
   _spiral(i, fro) {
-    const r = SPRIDNING * Math.sqrt(i + 0.55)
+    const r = SPRIDNING * Math.sqrt(i + TORG)
     const a = i * GYLLENE + fro
     return { x: Math.cos(a) * r, z: Math.sin(a) * r, vinkel: a }
   }
@@ -713,8 +721,8 @@ export class Maskinpark {
 
     // Lyktan sitter på en stolpe på hemmets insida — mot masten, så kabeln går rakt in.
     const ut = new THREE.Vector3(Math.cos(plats.vinkel), 0, Math.sin(plats.vinkel))
-    const sx = x - ut.x * 0.9
-    const sz = z - ut.z * 0.9
+    const sx = x - ut.x * 0.78
+    const sz = z - ut.z * 0.78
     post.stolpe.position.set(sx, y + DACKY + 0.5, sz)
     post.fyr.position.set(sx, y + DACKY + 1.12, sz)
     post.fyrY = y + DACKY + 1.12
