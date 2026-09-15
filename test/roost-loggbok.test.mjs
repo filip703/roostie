@@ -64,6 +64,16 @@ test('en notis till Filip vinkar', async () => {
   ])
   assert.equal(av('ledning').unread, true)
   assert.equal(av('produkt').unread, false)
+  assert.equal(av('ledning').notis, 'TILL FILIP: Stripe-nyckeln behövs', 'texten till anslagstavlan')
+  assert.equal(av('produkt').notis, '')
+})
+
+test('anslagstavlan får den nyaste raden, inte den första', async () => {
+  const { av } = await medTavla([
+    rad('ledning', 'notis', 300, { rubrik: 'TILL FILIP: gammal fråga' }),
+    rad('ledning', 'notis', 20, { rubrik: 'TILL FILIP: ny fråga' }),
+  ])
+  assert.equal(av('ledning').notis, 'TILL FILIP: ny fråga')
 })
 
 test('varje tråd får en zon och ett stabilt id', async () => {
@@ -115,6 +125,35 @@ test('Open pekar på projektchatten, och bara för en giltig tråd', async () =>
   assert.equal(adapter.openThread({ trad: 'produkt' }).ok, true)
   assert.equal(adapter.openThread({ trad: '../hack' }).ok, false)
   assert.equal(adapter.newSession('/tmp').ok, false)
+})
+
+test('varje tråd får sin egen chatt när den står i miljön', async () => {
+  process.env.ROOSTIE_PROJEKT_URL = 'https://claude.ai/project/proj'
+  process.env.ROOSTIE_CHATTAR = JSON.stringify({
+    produkt: 'https://claude.ai/cowork/cse_PRODUKT',
+    ledning: 'http://claude.ai/chat/osakert',
+    design: 'https://example.com/nagon-annanstans',
+  })
+  const { av, adapter } = await medTavla([
+    rad('produkt', 'klart', 5),
+    rad('ledning', 'klart', 5),
+    rad('design', 'klart', 5),
+    rad('nexus', 'klart', 5),
+  ])
+  assert.equal(av('produkt').openUrl, 'https://claude.ai/cowork/cse_PRODUKT')
+  assert.equal(adapter.openThread({ trad: 'produkt' }).url, 'https://claude.ai/cowork/cse_PRODUKT')
+  assert.equal(av('ledning').openUrl, 'https://claude.ai/project/proj', 'http duger inte')
+  assert.equal(av('design').openUrl, 'https://claude.ai/project/proj', 'annan värd duger inte')
+  assert.equal(av('nexus').openUrl, 'https://claude.ai/project/proj', 'ingen rad = projektet')
+  delete process.env.ROOSTIE_CHATTAR
+  delete process.env.ROOSTIE_PROJEKT_URL
+})
+
+test('trasig JSON i ROOSTIE_CHATTAR fäller inte skanningen', async () => {
+  process.env.ROOSTIE_CHATTAR = '{inte json'
+  const { av } = await medTavla([rad('produkt', 'klart', 5)])
+  assert.match(av('produkt').openUrl, /^https:\/\/claude\.ai\//)
+  delete process.env.ROOSTIE_CHATTAR
 })
 
 test('utan källa finns adaptern inte alls', async () => {

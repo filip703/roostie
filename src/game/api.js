@@ -86,7 +86,20 @@ export async function saveState(state) {
  * thread again, and the browser only ever passes it straight back. Nothing in the UI knows
  * what a Claude Code session id, or a Codex rollout id, actually looks like.
  */
-export const openThread = (thread) => post('/api/open', { harness: thread.harness, ref: thread.ref })
+export const openThread = (thread) => {
+  /**
+   * En tråd som själv vet var den bor (`openUrl`) öppnas i den här webbläsaren, inte av
+   * servern. Roosts trådar är samtal i claude.ai, och kolonin kan stå på en köksskärm medan
+   * servern kör i en container utan skrivbord — då hade `/api/open` skickat länken till en
+   * maskin där ingen sitter. Anropet kommer ur ett klick, så fönstret får öppnas.
+   */
+  if (thread.openUrl) {
+    const fonster = window.open(thread.openUrl, '_blank', 'noopener,noreferrer')
+    if (!fonster) throw new Error('Webbläsaren blockerade fönstret — tillåt popup för kolonin')
+    return Promise.resolve({ ok: true, url: thread.openUrl })
+  }
+  return post('/api/open', { harness: thread.harness, ref: thread.ref })
+}
 
 /** A brand new thread in a repo, via that harness's own new-session deep link. */
 export const newSession = (folder, harness) => post('/api/new-session', { folder, harness })

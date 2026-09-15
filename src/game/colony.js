@@ -14,6 +14,7 @@ import {
 } from '../world/plots.js'
 import { createBuilding, buildingUniforms, Scaffolds } from '../world/buildings.js'
 import { Ship } from '../world/ship.js'
+import { Anslagstavla } from '../world/anslagstavla.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
 import { MAX_AGENT_CAP } from '../core/settings.js'
@@ -137,6 +138,10 @@ export class Colony {
     scene.add(this.worldGroup)
 
     this.ship = new Ship(scene, shipPosition())
+    // Anslagstavlan står bredvid skeppet: det Filip måste svara på ska synas där blicken
+    // landar, inte bara ovanför den astronaut som råkar hålla upp handen.
+    const tavlaPlats = shipPosition()
+    this.anslagstavla = new Anslagstavla(scene, { x: tavlaPlats.x + 8.2, y: 0, z: tavlaPlats.z + 5.2 })
     this.astronauts = new Astronauts(scene, settings)
     this.astronauts.world = this._world()
     // Sized for the largest preset rather than the current one: unlike the astronaut meshes these
@@ -187,6 +192,9 @@ export class Colony {
     // at construction — a world with more relief would otherwise leave it hovering.
     const ship = shipPosition()
     this.ship.group.position.y = terrainHeight(ship.x, ship.z, this.planet)
+    // Samma sak för skylten: stolparna ska stå i marken, inte i luften ovanför den.
+    const tavla = this.anslagstavla.grupp.position
+    tavla.y = terrainHeight(tavla.x, tavla.z, this.planet)
 
     this._dustTint.set(this.planet.ground.high)
   }
@@ -266,6 +274,15 @@ export class Colony {
   setThreads(threads, archivedIds = new Set(), hiddenProjects = new Set(), knownIds = new Set()) {
     const now = Date.now()
     const live = liveThreadsForColony(threads, archivedIds, hiddenProjects)
+
+    // Skylten vid skeppet läser samma `unread` som astronauternas `?`, alltså efter att
+    // Viewed räknats av — det som står där är det som faktiskt väntar på svar.
+    this.anslagstavla.set(
+      live
+        .filter((t) => t.unread && t.notis)
+        .sort((a, b) => b.lastActivityAt - a.lastActivityAt)
+        .map((t) => ({ trad: t.title, rubrik: t.notis }))
+    )
 
     // Group by repo, biggest project first so the busiest work lands nearest the middle.
     const byProject = new Map()
@@ -715,6 +732,7 @@ export class Colony {
     // One write turns every rotor in the colony.
     buildingUniforms.uTime.value = elapsed
     this.ship.update(dt, elapsed, night)
+    this.anslagstavla.update(this.camera)
 
     this._growBuildings(dt)
     this.astronauts.update(dt, elapsed)
@@ -867,6 +885,7 @@ export class Colony {
   dispose() {
     this.sky.dispose()
     this.ship.dispose()
+    this.anslagstavla.dispose()
     this.astronauts.dispose()
     this.indicators.dispose()
     this.particles.dispose()

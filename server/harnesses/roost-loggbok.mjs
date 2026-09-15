@@ -15,7 +15,11 @@
  *   ROOST_ADMIN_TOKEN   samma token som trådarna postar med
  *   ROOST_LOGGBOK_FIL   alternativ källa för utveckling/test: en JSON-fil i API:ts form
  *   ROOST_REPO_DIR      var repona ligger på den här maskinen (default ~/Developer)
- *   ROOSTIE_PROJEKT_URL projektchatten som Open öppnar
+ *   ROOSTIE_PROJEKT_URL projektet i claude.ai som Open faller tillbaka på
+ *   ROOSTIE_CHATTAR     JSON {"trad":"https://claude.ai/cowork/…"} — en chatt per tråd
+ *
+ * Chattadresserna står i miljön och aldrig i koden: repot är publikt, och adresserna är
+ * Filips egna. Byter en tråd samtal räcker det att ändra raden i miljöfilen.
  */
 import fsp from 'node:fs/promises'
 import path from 'node:path'
@@ -63,6 +67,29 @@ function tid(varde) {
 }
 
 const text = (v, max) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, max)
+
+/**
+ * Trådens eget samtal i claude.ai, ur ROOSTIE_CHATTAR. Bara https till claude.ai släpps
+ * igenom — adressen kommer ur miljön, men den hamnar i en länk som öppnas med ett klick,
+ * och en länk man inte läst innan man klickar ska inte kunna peka vart som helst.
+ */
+function chattUrl(trad) {
+  const { projektUrl } = konfig()
+  let karta = {}
+  try {
+    karta = JSON.parse(process.env.ROOSTIE_CHATTAR || '{}')
+  } catch {
+    karta = {}
+  }
+  const rak = karta && typeof karta === 'object' ? karta[trad] : ''
+  try {
+    const u = new URL(String(rak || ''))
+    if (u.protocol === 'https:' && (u.hostname === 'claude.ai' || u.hostname.endsWith('.claude.ai'))) return u.href
+  } catch {
+    /* ingen eller trasig adress — projektet får duga */
+  }
+  return projektUrl
+}
 
 /**
  * Senast kända läge. En tavla som inte svarar ska inte få kolonin att tömmas — men den ska
@@ -154,8 +181,10 @@ async function scanThreads() {
     const pagar = fardig && senaste.fas === 'borjar' && nu - senaste.nar < ARBETSFONSTER_MS
 
     // "TILL FILIP" i en notisrubrik är tavlans sätt att vinka. Kolonin håller upp ett ? tills
-    // du klickat Viewed; skriver tråden något nytt vinkar den igen.
-    const vinkar = r.some((x) => x.fas === 'notis' && /TILL FILIP/i.test(x.rubrik))
+    // du klickat Viewed; skriver tråden något nytt vinkar den igen. Den nyaste rubriken följer
+    // med som `notis` — det är den som hamnar på anslagstavlan vid landningsplattan.
+    const tillFilip = r.filter((x) => x.fas === 'notis' && /TILL FILIP/i.test(x.rubrik))
+    const vinkar = tillFilip.length > 0
 
     const projectPath = await repoSokvag(info.repo)
     tradar.push({
@@ -175,6 +204,7 @@ async function scanThreads() {
       lastFocusedAt: 0,
       running: pagar,
       unread: vinkar,
+      notis: vinkar ? text(tillFilip[tillFilip.length - 1].rubrik, 160) : '',
       hasError: senaste.fas === 'stoppat',
       starred: false,
       routine: '',
@@ -186,6 +216,9 @@ async function scanThreads() {
       hasTranscript: true,
       source: 'loggbok',
       canOpen: true,
+      // Kolonin öppnar chatten i webbläsaren själv. Servern kan inte göra det åt den:
+      // containern på NUC:en har ingen xdg-open, och skärmen står i köket, inte i serverrummet.
+      openUrl: chattUrl(trad),
       ref: { trad },
     })
   }
@@ -193,13 +226,13 @@ async function scanThreads() {
 }
 
 /**
- * Trådarna bor i claude.ai-projektet. Det finns ingen djuplänk till ett enskilt samtal som vi
- * kan känna till härifrån, så Open öppnar projektet — det är den ärliga länken.
+ * Kvar för den maskin som kör kolonin lokalt och har en webbläsare på samma dator — då
+ * öppnar servern chatten som vanligt. På köksskärmen går vägen genom `openUrl` i stället.
  */
 function openThread(ref) {
   const trad = String(ref?.trad || '')
   if (!TRAD_OK.test(trad)) return { ok: false, error: 'Okänd tråd' }
-  return { ok: true, url: konfig().projektUrl }
+  return { ok: true, url: chattUrl(trad) }
 }
 
 function newSession() {
