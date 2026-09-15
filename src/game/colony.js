@@ -302,6 +302,25 @@ export class Colony {
    *
    * Det som inte finns att se hoppas över — en tom gård eller en släckt skylt är ingen utsikt.
    */
+  /**
+   * Koloniens egen redovisning: vad som faktiskt är byggt och synligt just nu.
+   *
+   * Curl svarar 200 på alla tre API:erna medan sidan står still, och en skärmbild visar bara
+   * det som råkar vara framför kameran. Det här är enda sättet att FRÅGA scenen — läses av
+   * `?debug=1`, aldrig av köksskärmen.
+   */
+  diagnos() {
+    return {
+      tradar: this.threads.size,
+      platter: this.plotOrder.length,
+      tavlan: this.tavlan.grupp.visible,
+      anslagstavla: this.anslagstavla.grupp.visible,
+      agenttavla: this.agenttavla.grupp.visible,
+      skarmtidsfyr: this.skarmtidsfyr.grupp.visible,
+      maskinpark: this.maskinpark.diagnos(),
+    }
+  }
+
   utsiktspunkter() {
     const ut = [{ namn: 'kolonin', punkt: new THREE.Vector3(0, 0, 0), avstand: 64 }]
     const kandidater = [

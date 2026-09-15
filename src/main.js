@@ -60,6 +60,15 @@ const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer
  */
 if (new URLSearchParams(location.search).get('debug') === '1') {
   window.__roostie = { colony, engine, settings }
+  // Också som ett attribut på <html>: ett verktyg som granskar sidan utifrån delar DOM med
+  // den, men inte `window` — och redovisningen är värdelös om den bara går att läsa inifrån.
+  setInterval(() => {
+    try {
+      document.documentElement.dataset.roostie = JSON.stringify(colony.diagnos())
+    } catch {
+      // En diagnos som kraschar får inte ta sidan med sig.
+    }
+  }, 1000)
 }
 
 let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {}, hiddenProjects: [], viewedAt: {} }

@@ -881,6 +881,36 @@ export class Maskinpark {
     return p.mast
   }
 
+  /**
+   * Vad parken faktiskt innehåller, i klartext.
+   *
+   * En skärmbild bevisar inte att en mast står där — den kan stå bakom en maskin, eller inte
+   * finnas alls. Det här är parkens egen redovisning, och den läses av `?debug=1`.
+   */
+  diagnos() {
+    const falt = {}
+    for (const [nyckel, p] of Object.entries(this.plattor)) {
+      falt[nyckel] = {
+        antal: this.antal[nyckel],
+        dack: p.dack.visible,
+        mast: Boolean(p.mast && p.mast.visible),
+        dronare: Boolean(p.dronare && p.dronare.visible),
+        skylt: p.skylt.visible,
+        bro: p.bro.visible,
+        radie: p.radie ? Number(p.radie.toFixed(1)) : null,
+      }
+    }
+    return {
+      maskiner: this.maskiner.size,
+      dackY: Number(this.dackY.toFixed(2)),
+      nav: this.nav.visible,
+      rover: Boolean(this.rover),
+      puls: this.puls.size,
+      pulsFardig: this.pulsFardig,
+      falt,
+    }
+  }
+
   /** Bygger rovern när kitet är inne och kommandoprocessorn har fått sin plats. */
   _rover() {
     const post = this.maskiner.get('nexus-commands')
