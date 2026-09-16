@@ -140,7 +140,8 @@ function adershader(mat, u) {
          varying vec3 vAder;
          uniform float uTid;
          uniform float uNatt;
-         uniform float uPuls;`
+         uniform float uPuls;
+         uniform vec3 uPulsFarg;`
       )
       .replace(
         '#include <dithering_fragment>',
@@ -154,7 +155,9 @@ function adershader(mat, u) {
          // Vandringen uppåt: ljuset går mot kronan, aldrig ner.
          float vag = 0.45 + 0.55 * sin(vAder.y * 0.11 - uTid * 0.75);
          float styrka = ader * vag * (0.1 + uNatt * 0.5 + uPuls * 0.7);
-         gl_FragColor.rgb += vec3(0.42, 0.78, 0.66) * styrka;`
+         // Vilofärgen är trädets egen; under ett slag går ådran över i barnets färg.
+         vec3 sav = mix(vec3(0.42, 0.78, 0.66), uPulsFarg, clamp(uPuls, 0.0, 1.0));
+         gl_FragColor.rgb += sav * styrka;`
       )
   }
   mat.customProgramCacheKey = () => 'ader'
@@ -201,6 +204,9 @@ export class Tradet {
       vind: { value: 0.5 },
       natt: { value: 0 },
       puls: { value: 0 },
+      // Saven bär FÄRGEN på den minut som gick — barnets egen. Ådrorna i barken är annars
+      // samma gröna hela dygnet, och då säger ett slag bara "något hände", inte "vems".
+      pulsFarg: { value: new THREE.Color(0x6bc7a8) },
     }
     this.arstid = ARSTIDER.sommar
     this.tid = 0
@@ -209,9 +215,13 @@ export class Tradet {
     this._material = []
     this._geometrier = []
 
+    this._barMal = 0
+    this._vindMal = 0.42
+    this._ekorrfart = 0
     this._stam()
     this._grenfläkt()
     this._hang()
+    this._liv()
     this._dis()
   }
 
@@ -492,6 +502,149 @@ export class Tradet {
     this.grupp.add(lov2)
   }
 
+  // ── agenternas liv ────────────────────────────────────────────────────────────────────
+
+  /**
+   * Bären, löven och ekorren.
+   *
+   * Tre olika sorters signal, med flit byggda olika:
+   *   BÄREN är ett TILLSTÅND — de hänger kvar tills felet är åtgärdat.
+   *   LÖVEN är en HÄNDELSE — ett löv faller en gång, i den stund en agent går ner.
+   *   EKORREN är ett FLÖDE — den springer så länge kommandokön har något i sig.
+   * Ett tillstånd som ritas som en händelse blinkar förbi; en händelse som ritas som ett
+   * tillstånd blir ett regn som aldrig upphör. Det är samma läxa som fyren gav.
+   */
+  _liv() {
+    const r = fro(0x4b21)
+
+    // Bären sitter vid grenarnas lövklasar, där ögat redan är.
+    const barMat = this._mat(
+      new THREE.MeshStandardMaterial({ color: 0xc0392f, roughness: 0.3, metalness: 0.05, flatShading: true, emissive: 0x7a1a12, emissiveIntensity: 0.9 })
+    )
+    this.bar = new THREE.InstancedMesh(this._geo(new THREE.IcosahedronGeometry(1.5, 0)), barMat, 8)
+    this.bar.count = 0
+    this.bar.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    this._barPunkter = []
+    const m = new THREE.Matrix4()
+    for (let i = 0; i < 8; i++) {
+      const g = this._grenar[i % this._grenar.length]
+      // Vid grenen, strax under den — inte nere i kronmassan där de blir en röd fläck bland
+      // tiotusen orange löv.
+      const p = g.kurva.getPointAt(0.6 + r() * 0.28).add(new THREE.Vector3((r() - 0.5) * 4, -3 - r() * 1.6, (r() - 0.5) * 3))
+      this._barPunkter.push(p)
+      m.makeTranslation(p.x, p.y, p.z)
+      this.bar.setMatrixAt(i, m)
+    }
+    this.bar.instanceMatrix.needsUpdate = true
+    this.grupp.add(this.bar)
+
+    // Löven: en liten pool som återanvänds. Ett löv som faller ur bild återvänder till poolen
+    // i stället för att skapa geometri varje gång en agent hostar till.
+    const lovMat = this._mat(
+      new THREE.MeshStandardMaterial({ color: this.arstid.lov, roughness: 0.85, flatShading: true, side: THREE.DoubleSide })
+    )
+    this.fallLovMat = lovMat
+    this._lovPool = []
+    for (let i = 0; i < 8; i++) {
+      const geo = new THREE.IcosahedronGeometry(1.6, 0)
+      geo.scale(1.3, 0.22, 1)
+      const mesh = new THREE.Mesh(this._geo(geo), lovMat)
+      mesh.visible = false
+      this.grupp.add(mesh)
+      this._lovPool.push({ mesh, y: 0, fart: 0, snurr: 0, fas: 0, x: 0, z: 0 })
+    }
+
+    /**
+     * EKORREN på stammen — kommandokön.
+     *
+     * Rad 224 bad om en ekorre, och det var precis vad första bygget INTE blev: sedd rakt
+     * framifrån var det en brun potatis med vit mage. En ekorre känns igen på SVANSEN, och
+     * svansen låg rakt bakom kroppen där kameran aldrig ser den. Nu böjer den sig upp och ut
+     * åt sidan, och hela djuret står i trekvartsprofil så silhuetten får göra jobbet.
+     */
+    const ek = new THREE.Group()
+    const pals = this._mat(new THREE.MeshStandardMaterial({ color: 0x9a5f30, roughness: 0.82, flatShading: true }))
+    const mage = this._mat(new THREE.MeshStandardMaterial({ color: 0xe0cdaa, roughness: 0.85, flatShading: true }))
+    const morkt = this._mat(new THREE.MeshStandardMaterial({ color: 0x2a2118, roughness: 0.9, flatShading: true }))
+
+    const kropp = new THREE.Mesh(this._geo(new THREE.IcosahedronGeometry(1.25, 0)), pals)
+    kropp.scale.set(0.85, 1.45, 0.8)
+    ek.add(kropp)
+
+    const buk = new THREE.Mesh(this._geo(new THREE.IcosahedronGeometry(0.95, 0)), mage)
+    buk.position.set(0.15, -0.15, 0.55)
+    buk.scale.set(0.75, 1.25, 0.5)
+    ek.add(buk)
+
+    const huvud = new THREE.Group()
+    huvud.position.set(0.15, 1.7, 0.25)
+    ek.add(huvud)
+    const skalle = new THREE.Mesh(this._geo(new THREE.IcosahedronGeometry(0.85, 0)), pals)
+    skalle.scale.set(0.9, 0.95, 0.95)
+    huvud.add(skalle)
+    const nos = new THREE.Mesh(this._geo(new THREE.ConeGeometry(0.34, 0.8, 5)), pals)
+    nos.rotation.x = Math.PI / 2
+    nos.position.set(0, -0.1, 0.65)
+    huvud.add(nos)
+    for (const sida of [1, -1]) {
+      // Öronen är höga och smala. Runda öron gör en ekorre till en björnunge.
+      const ora = new THREE.Mesh(this._geo(new THREE.ConeGeometry(0.26, 0.95, 4)), pals)
+      ora.position.set(0.42 * sida, 0.85, -0.05)
+      ora.rotation.z = -0.25 * sida
+      huvud.add(ora)
+      const oga = new THREE.Mesh(this._geo(new THREE.SphereGeometry(0.15, 6, 5)), morkt)
+      oga.position.set(0.42 * sida, 0.12, 0.5)
+      huvud.add(oga)
+    }
+
+    // Framtassarna hålls mot bröstet — det är den hållningen man ritar en ekorre i.
+    for (const sida of [1, -1]) {
+      const tass = new THREE.Mesh(this._geo(new THREE.IcosahedronGeometry(0.3, 0)), pals)
+      tass.position.set(0.3 * sida, 0.55, 0.8)
+      ek.add(tass)
+    }
+
+    /**
+     * SVANSEN, och den är halva ekorren.
+     *
+     * En båge upp bakom ryggen och ut åt sidan, bredare ju högre den kommer — sedd framifrån
+     * blir den en plym bredvid kroppen i stället för att försvinna bakom den.
+     */
+    const svans = new THREE.Group()
+    svans.position.set(-0.5, -0.9, -0.35)
+    ek.add(svans)
+    for (let i = 0; i < 6; i++) {
+      const t = i / 5
+      const del = new THREE.Mesh(this._geo(new THREE.IcosahedronGeometry(0.45 + t * 0.55, 0)), pals)
+      del.position.set(-0.35 * t, 0.85 * i * (1 - t * 0.25), -0.75 - Math.sin(t * 2.2) * 0.9)
+      del.scale.set(0.85, 1, 0.75)
+      svans.add(del)
+    }
+
+    ek.scale.setScalar(2.6)
+    this.ekorre = { grupp: ek, svans, huvud, t: 0.3, riktning: 1, vinkel: 1.62 }
+    this.grupp.add(ek)
+  }
+
+  /** Släpper lös `antal` löv från kronan. Fler än poolen rymmer blir helt enkelt poolen. */
+  _falLov(antal) {
+    let kvar = antal
+    for (const l of this._lovPool) {
+      if (kvar <= 0) break
+      if (l.mesh.visible) continue
+      const g = this._grenar[Math.floor(Math.random() * this._grenar.length)]
+      const p = g.kurva.getPointAt(0.4 + Math.random() * 0.5)
+      l.x = p.x + (Math.random() - 0.5) * 8
+      l.z = p.z + (Math.random() - 0.5) * 6
+      l.y = p.y - 2
+      l.fart = 3.4 + Math.random() * 2.2
+      l.snurr = 1.2 + Math.random() * 1.8
+      l.fas = Math.random() * 6
+      l.mesh.visible = true
+      kvar -= 1
+    }
+  }
+
   // ── hängande ──────────────────────────────────────────────────────────────────────────
 
   _hang() {
@@ -704,6 +857,7 @@ export class Tradet {
     const a = ARSTIDER[namn] || ARSTIDER.sommar
     this.arstid = a
     this.lovMat?.color.setHex(a.lov)
+    this.fallLovMat?.color.setHex(a.lov)
     this.lovMat2?.color.setHex(a.under)
     this.massaMat?.color.setHex(a.lov).lerp(new THREE.Color(0x232a20), 0.68)
   }
@@ -721,22 +875,93 @@ export class Tradet {
     }
   }
 
-  /** Ett slag genom trädet — ådrorna flammar. Samma händelse som fyren och tavlan får. */
-  slag() {
+  /**
+   * Ett slag genom trädet — saven stiger.
+   *
+   * Samma händelse som fyren och holkarna får, och samma regel: ett slag per minut som
+   * faktiskt lämnat en budget (`raknaSlag` i skarmtidsfyr.js). Reglerna FLYTTAS hit, de
+   * skrivs inte om — två räkningar av samma minut skulle förr eller senare säga olika saker.
+   */
+  slag(farg) {
     this._pulsKo = 1
+    if (Number.isFinite(farg)) this.u.pulsFarg.value.setHex(farg)
+  }
+
+  /**
+   * Agenternas liv i trädet: bär, vind och ekorre.
+   *
+   * `bar` = agenter i fel just nu (ett tillstånd, syns tills någon åtgärdar det).
+   * `lov` = agenter som gick ner sedan förra hämtningen (en händelse, faller en gång).
+   * `vind` = hur många som arbetar. `ekorre` = kommandokön.
+   */
+  setLiv({ bar = 0, lov = 0, vind = 0.35, ekorre = 0 } = {}) {
+    this._barMal = Math.max(0, Math.round(bar))
+    this._vindMal = vind
+    this._ekorrfart = ekorre
+    if (lov > 0) this._falLov(Math.round(lov))
   }
 
   update(dt) {
     if (!this.grupp.visible) return
     this.tid += dt
     this.u.tid.value = this.tid
-    // Vinden är inte konstant. Byar som kommer och går gör att kronan aldrig ser loopad ut.
-    this.u.vind.value = 0.42 + Math.sin(this.tid * 0.21) * 0.2 + Math.sin(this.tid * 0.07) * 0.16
+    // Vinden är inte konstant, och grundstyrkan kommer från hur många agenter som arbetar.
+    // Byarna ovanpå gör att kronan aldrig ser loopad ut.
+    const grund = this._vindMal ?? 0.42
+    this.u.vind.value = grund + Math.sin(this.tid * 0.21) * 0.16 + Math.sin(this.tid * 0.07) * 0.12
     if (this._pulsKo > 0) {
       this.u.puls.value = this._pulsKo
       this._pulsKo = Math.max(0, this._pulsKo - dt * 0.9)
     } else if (this.u.puls.value > 0) {
       this.u.puls.value = Math.max(0, this.u.puls.value - dt * 0.9)
+    }
+
+    // Bären tänds och släcks genom antalet instanser — ingen geometri skapas eller kastas.
+    if (this.bar) this.bar.count = Math.min(8, this._barMal || 0)
+
+    // Löven faller, fladdrar i sidled och försvinner ur bild.
+    for (const l of this._lovPool || []) {
+      if (!l.mesh.visible) continue
+      l.y -= l.fart * dt
+      l.fas += dt * l.snurr
+      l.mesh.position.set(l.x + Math.sin(l.fas) * 3.2, l.y, l.z + Math.cos(l.fas * 0.7) * 2)
+      l.mesh.rotation.set(l.fas * 0.8, l.fas * 0.5, Math.sin(l.fas) * 0.9)
+      if (l.y < -70) l.mesh.visible = false
+    }
+
+    // Ekorren springer upp och ner på barken så länge kön har något i sig, och sitter still
+    // annars — med svansen i rörelse, för en stillasittande ekorre är inte en död ekorre.
+    if (this.ekorre) {
+      const e = this.ekorre
+      const fart = this._ekorrfart || 0
+      if (fart > 0) {
+        e.t += dt * fart * 0.16 * e.riktning
+        if (e.t > 1) {
+          e.t = 1
+          e.riktning = -1
+        } else if (e.t < 0) {
+          e.t = 0
+          e.riktning = 1
+        }
+      }
+      /**
+       * Banan ligger OVANFÖR grenfläkten, på den rena barken mellan holkarna.
+       *
+       * Andra försöket satt på rätt radie men fel höjd: mitt i fläkten, och grenarna ligger
+       * framför barken sett härifrån — ekorren fanns, var rättvänd och rätt stor, och syntes
+       * ändå inte i en enda bild. Tredje gången mäts skärmläget i stället för att antas.
+       */
+      const h = THREE.MathUtils.lerp(24, 56, e.t)
+      const rad = STAM_R * 1.22
+      e.grupp.position.set(Math.cos(e.vinkel) * rad, h, Math.sin(e.vinkel) * rad)
+      // Vänd mestadels mot kameran, av samma skäl som holkarna: en ekorre i profil mot barken
+      // är en brun fläck.
+      // Trekvartsprofil: rakt framifrån döljer kroppen svansen, och då är det ingen ekorre.
+      e.grupp.rotation.y = (Math.PI / 2 - e.vinkel) * 0.4 + 0.65
+      e.grupp.rotation.z = fart > 0 ? Math.sin(this.tid * 9) * 0.12 : 0
+      e.grupp.rotation.x = fart > 0 ? (e.riktning > 0 ? -0.3 : 0.3) : 0
+      e.svans.rotation.x = Math.sin(this.tid * (fart > 0 ? 7 : 1.6)) * 0.35 - 0.2
+      e.huvud.rotation.y = fart > 0 ? 0 : Math.sin(this.tid * 0.9) * 0.6
     }
 
     const p = this.fron.geometry.attributes.position
@@ -755,6 +980,10 @@ export class Tradet {
 
   diagnos() {
     return {
+      bar: this.bar ? this.bar.count : 0,
+      fallandeLov: (this._lovPool || []).filter((l) => l.mesh.visible).length,
+      ekorre: Math.round((this._ekorrfart || 0) * 100) / 100,
+      vind: Math.round((this._vindMal || 0) * 100) / 100,
       grenar: this._grenar.length,
       stamR: STAM_R,
       lov: Boolean(this.lov),

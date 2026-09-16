@@ -24,6 +24,7 @@ import { Tradet, arstidNu } from '../world/tradet.js'
 import { Faglar } from '../world/faglar.js'
 import { Holkar } from '../world/holkar.js'
 import { rundtur } from '../world/rundtur.js'
+import { bar as radaBar, ekorrfart, fallandeLov, vind as vindstyrka } from '../world/tradliv.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
 import { MAX_AGENT_CAP } from '../core/settings.js'
@@ -629,19 +630,54 @@ export class Colony {
     // Samma data, två världar: fyren står i kolonin, holkarna hänger i trädet. Båda räknar
     // med samma regler, så de kan aldrig säga olika saker om samma barn.
     this.holkar.set(data)
-    // Samma slag i barken. Fyren och trädet får aldrig säga olika saker om samma minut.
-    if (this.skarmtidsfyr.slagKo > 0 || [...this.skarmtidsfyr.barn.values()].some((b) => b.slagKo > 0)) this.tradet.slag()
+    /**
+     * Samma slag i barken — och nu i BARNETS färg.
+     *
+     * Fyren räknar minuterna (`raknaSlag`), trädet ritar dem. Reglerna flyttas, de skrivs
+     * inte om: två räkningar av samma minut skulle förr eller senare säga olika saker, och
+     * då vet ingen vilken av dem som ljuger.
+     */
+    const slaget = [...this.skarmtidsfyr.barn.values()].find((b) => b.slagKo > 0)
+    if (this.skarmtidsfyr.slagKo > 0 || slaget) this.tradet.slag(slaget ? slaget.farg : undefined)
+
+    // Ekorren är kommandokön. Utan färsk läsväg sitter den still — en ekorre som springer
+    // utan att veta varför är en lögn i rörelse.
+    this._ko = data?.ko || null
+    this._pulsFardig = Boolean(data?.fardig)
+    this._satTradliv()
     this.maskinpark.setPuls(data)
   }
 
   /** NUC:ens containrar → maskinparken. */
   setMaskiner(maskiner) {
+    // Löven faller på SKILLNADEN mot förra hämtningen, inte på tillståndet: annars regnar
+    // det löv så länge en container ligger, och då säger trädet inte längre vilken minut
+    // något gick sönder. Listan sparas därför innan den skrivs över.
+    this._forraMaskiner = this._maskiner || null
+    this._maskiner = Array.isArray(maskiner) ? maskiner : []
+    this._satTradliv(true)
     const fore = this.maskinpark.radie()
     this.maskinpark.set(maskiner)
     this.agenttavla.set(maskiner)
     // Marken under parken ströddes med stenar innan vi visste hur stor den skulle bli. Växer
     // eller krymper den, läggs strösslet om — annars står ett klippblock mitt i ett fält.
     if (Math.abs(this.maskinpark.radie() - fore) > 0.5) this._buildScatter()
+  }
+
+  /**
+   * Agenternas liv in i trädet.
+   *
+   * `nyaMaskiner` skiljer en maskinhämtning från en pulshämtning: löven får bara falla när
+   * maskinlistan faktiskt är ny. Utan den flaggan hade var femtonde sekunds pulshämtning
+   * släppt samma löv en gång till.
+   */
+  _satTradliv(nyaMaskiner = false) {
+    this.tradet.setLiv({
+      bar: radaBar(this._maskiner),
+      lov: nyaMaskiner ? fallandeLov(this._forraMaskiner, this._maskiner) : 0,
+      vind: vindstyrka(this._maskiner),
+      ekorre: ekorrfart(this._ko, this._pulsFardig),
+    })
   }
 
   // ── roster ──────────────────────────────────────────────────────────────────────────
@@ -1122,7 +1158,7 @@ export class Colony {
       this.tradet.setNatt(night)
       this.tradet.update(dt)
       this.faglar.update(dt, this.camera, night)
-      this.holkar.update(dt, this.camera)
+      this.holkar.update(dt, this.camera, night)
     }
 
     this._growBuildings(dt)

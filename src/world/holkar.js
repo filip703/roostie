@@ -17,6 +17,18 @@
  *     taket utan att något är fel, för det har tjänat tid på uppdrag
  *   · utan färsk data är holken grå och stilla, aldrig grön (LAXOR 23)
  *
+ * FÄRGEN ÄR ETT MÄRKE, INTE EN FYLLNAD (tavlans rad 286, Lednings beslut).
+ *
+ * Holken bar först barnets färg som fyllnad i mätaren, och det var fel av två skäl. Lednings:
+ * en fri färgväljare och en fylld yta blir förr eller senare en kontrastfälla. Och ett eget,
+ * som bilden visade: FYLLNADEN KRYMPER. När Bill har två minuter kvar är hans blå nästan
+ * borta — identiteten försvinner precis i det ögonblick man tittar efter den.
+ *
+ * Nu bär en RING kring hålet och en LIST på taket barnets färg. De är lika stora hela dygnet.
+ * Mätaren får lägesfärgen, som en mätare ska ha: grön, honung, lera. Och hålets blossning vid
+ * en förbrukad minut behåller barnets färg — den är en händelse, inte en yta, och den matchar
+ * saven som stiger i barken i samma sekund.
+ *
  * AVLÄSNINGEN STÅR KVAR. Läxan från fyren gäller här också: ett tillstånd ska gå att läsa
  * när som helst, inte bara under de två sekunder en händelse spelas upp. Ljusribban på
  * holkens sida visar hur mycket som är kvar hela tiden; hålet blossar och fågelhuvudet
@@ -202,6 +214,28 @@ export class Holkar {
     g.add(sken)
 
     // Pinnen under hålet, och fågelhuvudet som tittar ut när en minut går.
+    /**
+     * MÄRKET: ringen kring hålet och listen på taket, i barnets färg.
+     *
+     * De ändrar aldrig storlek. Det är hela skillnaden mot fyllnaden de ersätter — ett märke
+     * som krymper med mätvärdet är inte ett märke, det är mätvärdet en gång till.
+     */
+    const markMat = new THREE.MeshStandardMaterial({
+      color: TAL.sage,
+      roughness: 0.4,
+      metalness: 0.05,
+      flatShading: true,
+      emissive: 0x000000,
+      emissiveIntensity: 0.35,
+    })
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(2.75, 0.42, 4, 18), markMat)
+    ring.position.set(0, form.hojd * 0.16, DJUP / 2 + 0.1)
+    g.add(ring)
+
+    const list = new THREE.Mesh(new THREE.BoxGeometry(form.bredd * 1.3, 0.5, 0.6), markMat)
+    list.position.set(0, form.hojd / 2 + 0.3, DJUP / 2 + 0.75)
+    g.add(list)
+
     const pinne = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 4.2, 6), tra)
     pinne.rotation.x = Math.PI / 2
     pinne.position.set(0, form.hojd * 0.16 - 2.2, DJUP / 2 + 1.2)
@@ -264,6 +298,7 @@ export class Holkar {
       grupp: g,
       form,
       ribbaH,
+      markMat,
       sken,
       huvud,
       skalle,
@@ -284,7 +319,7 @@ export class Holkar {
     }
   }
 
-  update(dt, camera) {
+  update(dt, camera, natt = 0) {
     if (!this.grupp.visible) return
     this.tid += dt
     const nu = performance.now()
@@ -309,8 +344,15 @@ export class Holkar {
       post.fyllnad.scale.y = post.satt ? damp(post.fyllnad.scale.y, mal, 8, dt) : mal
       post.satt = true
       post.fyllnad.position.y = -post.ribbaH / 2 + post.fyllnad.scale.y / 2
-      post.fyllnad.material.color.setHex(post.farg)
+      // Mätaren bär läget — grön, honung, lera — och aldrig identiteten. Se filhuvudet.
+      post.fyllnad.material.color.setHex(post.lagesFarg)
       post.fyllnad.material.opacity = this.fardig ? 0.95 : 0.25
+
+      // Märket bär identiteten och står stilla. Utan färsk data är det dämpat, inte borta:
+      // vems holk det är slutar inte vara sant för att mätningen tystnat.
+      post.markMat.color.setHex(post.farg)
+      post.markMat.emissive.setHex(this.fardig ? post.farg : 0x000000)
+      post.markMat.emissiveIntensity = this.fardig ? 0.22 + natt * 0.3 : 0
 
       // Farofältet lyser bara när det faktiskt är farligt, och andas i stället för att blinka.
       const farligt = this.fardig && post.andel <= FARA
