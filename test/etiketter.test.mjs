@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { gomKrockar, ruta, tacke, KROCK } from '../src/world/etiketter.js'
+import { gomKrockar, ruta, tacke, KROCK, VIKT } from '../src/world/etiketter.js'
 
 const R = (x, y, b = 100, h = 20) => ({ x, y, b, h })
 
@@ -75,4 +75,52 @@ test('taket går att ändra utan att regeln ändras', () => {
   ]
   assert.equal(gomKrockar(rutor, KROCK).size, 0)
   assert.equal(gomKrockar(rutor, 0.05).size, 1)
+})
+
+/**
+ * Barnets holk väger tyngre än en tråds namn. I överblicken sitter holkarna på barken,
+ * längre bort än bona som hänger ut mot kameran, så utan vikten förlorar barnet alltid.
+ */
+test('barnets holk vinner över ett trådnamn även när den står längre bort', () => {
+  const gom = gomKrockar([
+    { namn: 'tråd', ruta: { x: 100, y: 100, b: 100, h: 20 }, avstand: 95, vikt: VIKT.trad },
+    { namn: 'holk', ruta: { x: 104, y: 102, b: 100, h: 20 }, avstand: 130, vikt: VIKT.holk },
+  ])
+  assert.deepEqual([...gom], ['tråd'])
+})
+
+test('utan vikt gäller avståndet som förut', () => {
+  const gom = gomKrockar([
+    { namn: 'bort', ruta: { x: 100, y: 100, b: 100, h: 20 }, avstand: 130 },
+    { namn: 'nära', ruta: { x: 104, y: 102, b: 100, h: 20 }, avstand: 95 },
+  ])
+  assert.deepEqual([...gom], ['bort'])
+})
+
+/**
+ * Hysteresen. Kameran svajar i köksläget, och med en enda gräns korsar två närliggande namn
+ * den fram och tillbaka med svajet — namnet blinkar. Två gränser stoppar det.
+ */
+test('ett gömt namn kommer inte tillbaka förrän täcket sjunkit ordentligt', () => {
+  const rutor = (dx) => [
+    { namn: 'a', ruta: { x: 0, y: 0, b: 100, h: 20 }, avstand: 10 },
+    { namn: 'b', ruta: { x: dx, y: 0, b: 100, h: 20 }, avstand: 20 },
+  ]
+  // 15 % täcke: b göms.
+  const forst = gomKrockar(rutor(85))
+  assert.deepEqual([...forst], ['b'])
+  // 9 % täcke: över återgränsen (6 %), så b står kvar gömt i stället för att blinka fram.
+  const sedan = gomKrockar(rutor(91), KROCK, forst)
+  assert.deepEqual([...sedan], ['b'])
+  // 4 % täcke: nu kommer b tillbaka.
+  const till = gomKrockar(rutor(96), KROCK, sedan)
+  assert.equal(till.size, 0)
+})
+
+test('utan tidigare läge gäller bara den vanliga gränsen', () => {
+  const rutor = [
+    { namn: 'a', ruta: { x: 0, y: 0, b: 100, h: 20 }, avstand: 10 },
+    { namn: 'b', ruta: { x: 91, y: 0, b: 100, h: 20 }, avstand: 20 },
+  ]
+  assert.equal(gomKrockar(rutor).size, 0, '9 % är under 12 % och är alltså ingen krock')
 })

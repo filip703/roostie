@@ -743,11 +743,23 @@ export class Plot {
 /**
  * Textens mått på köksskärmen.
  *
- * Riggen mäter en etikett till tio bågminuter på tre meters håll med kolonins eget mått.
- * Sexton är gränsen för att läsa en text i en blick, så 1.7 är inte en smaksak utan kvoten
- * mellan de två talen, avrundad uppåt.
+ * Talet är inte en smaksak utan en kvot, och kvoten hör till EN bestämd skärm på ETT bestämt
+ * avstånd. Ändras skärmen ändras talet — och det gjorde den den 16 september.
+ *
+ * FÖRSTA GISSNINGEN var en 43-tumsskärm på tre meters håll, och där räckte 1.7. Köksskärmen
+ * blev i stället en iPad på 10,2 tum, som står på bänken och läses på drygt en meter. Den är
+ * mycket mindre OCH står närmare, och de två tar inte ut varandra: mätt i riggen höll samma
+ * etikett elva bågminuter på iPaden mot sjutton på tv:n. Antalet bildpunkter var oförändrat —
+ * det är därför bildpunkter är ett oanvändbart mått på läsbarhet och bågminuter inte är det.
+ *
+ * RÄKNINGEN: iPadens bildyta är 0,1555 m hög liggande. På 1,2 meter behöver en text som ska
+ * läsas i en blick sexton bågminuter, alltså 3,6 procent av skärmhöjden. Med 1.7 fick vi 2,6
+ * procent. 2.6 är kvoten däremellan med en liten marginal uppåt.
+ *
+ * Byts skärmen eller flyttas den är det den här raden som ändras, och `verktyg/lasbarhet.mjs`
+ * har skärmarna i en tabell för att räkna fram det nya talet.
  */
-export const KOKSMATT = 1.7
+export const KOKSMATT = 2.6
 
 /**
  * @param skala  Hur stor texten står på skärmen, 1 = kolonins mått.

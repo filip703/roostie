@@ -37,6 +37,7 @@
 import * as THREE from 'three'
 import { TAL } from './palett.js'
 import { createLabel, KOKSMATT } from './plots.js'
+import { VIKT } from './etiketter.js'
 import { identitetsFarg, raknaSlag, stapelFarg } from './skarmtidsfyr.js'
 
 /** Holkens grundmått. Satt av läsbarheten i överblicken, inte av en riktig fågelholk. */
@@ -267,6 +268,15 @@ export class Holkar {
       this.grupp.remove(post.grupp)
       this.barn.delete(namn)
     }
+  }
+
+  /** Skyltarna, för den gemensamma krockrensningen i `etiketter.js`. */
+  etikettposter() {
+    const ut = []
+    for (const post of this.barn.values()) {
+      if (post.skylt?.visible) ut.push({ namn: 'holk:' + post.namn, etikett: post.skylt, vikt: VIKT.holk })
+    }
+    return ut
   }
 
   _skylt(text, farg) {

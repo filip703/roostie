@@ -27,7 +27,7 @@
 import * as THREE from 'three'
 import { TAL } from './palett.js'
 import { createLabel, KOKSMATT } from './plots.js'
-import { gomKrockar, ruta } from './etiketter.js'
+import { VIKT } from './etiketter.js'
 import { HAMTAR, SYSSLA_ORD, SYSSLA_TAKT, bostorlek, skatter, syssla, ungar } from './sysslor.js'
 
 export { bostorlek, syssla }
@@ -600,66 +600,16 @@ export class Faglar {
       f.etikett.material.opacity = THREE.MathUtils.clamp(1.25 - avst / 150, 0.45, 0.95)
     }
 
-    this._rensaKrockar(camera)
   }
 
-  /**
-   * NAMN SOM LIGGER PÅ VARANDRA GÖMS — den närmaste vinner.
-   *
-   * Sju bon på sju grenar ligger på olika DJUP, och djup syns inte i sidled. Två bon långt
-   * ifrån varandra i världen kan därför hamna på samma ställe i bilden, och gjorde det:
-   * "roadmap" skrev över "Box & moln" i samma överblick där läsbarhetsriggen rapporterade
-   * noll underkända namn. Storleken var rätt mätt, men storlek är ett av två villkor.
-   *
-   * Det går inte att lösa genom att flytta etiketten i världen, för vilka två som krockar
-   * beror på var kameran står. Det räknas i bilden, varje bild, mot kamerans faktiska
-   * synfält. Reglerna ligger i `etiketter.js` och provas utan webbläsare.
-   */
-  _rensaKrockar(camera) {
-    if (!camera) return
-    const h = this._bildhojd || 1080
-    const fov = (camera.fov * Math.PI) / 180
-    const rutor = []
+
+  /** Etiketterna, för den gemensamma krockrensningen i `etiketter.js`. */
+  etikettposter() {
+    const ut = []
     for (const f of this.faglar.values()) {
-      if (!f.etikett?.visible) continue
-      /**
-       * Avståndet mäts till ETIKETTEN, inte till fågeln.
-       *
-       * Första versionen mätte till fågeln, och fåglarna flyger. Två namn som krockade bytte
-       * då plats i turordningen varje gång banorna korsades, så det ena namnet blinkade fram
-       * och det andra bort flera gånger i minuten — och riggen gav olika svar på två
-       * körningar i rad. Etiketten hänger på boet och står stilla; med den som mått ändras
-       * beslutet bara när KAMERAN flyttar sig, vilket är precis när det ska ändras.
-       */
-      const avstand = camera.position.distanceTo(f.etikett.position)
-      const p = VK.copy(f.etikett.position).project(camera)
-      // Bakom kameran projiceras till en punkt som ser giltig ut men inte är det.
-      const bakom = p.z > 1
-      const plan = f.etikett.geometry?.parameters || { width: 2, height: 0.56 }
-      rutor.push({
-        namn: f.trad.id,
-        etikett: f.etikett,
-        avstand,
-        iBild: !bakom && Math.abs(p.x) < 1.35 && Math.abs(p.y) < 1.35,
-        ruta: ruta(
-          { x: (p.x * 0.5 + 0.5) * h * (camera.aspect || 1.777), y: (-p.y * 0.5 + 0.5) * h },
-          { bredd: plan.width, hojd: plan.height },
-          avstand,
-          f.etikett.userData?.skala ?? 1,
-          fov,
-          h
-        ),
-      })
+      if (f.etikett?.visible) ut.push({ namn: f.trad.id, etikett: f.etikett, vikt: VIKT.trad })
     }
-    const gom = gomKrockar(rutor)
-    // Bara opaciteten rörs, aldrig `visible`: den styrs av tråden själv på rad 325, och två
-    // ställen som sätter samma flagga slutar alltid med att det ena vinner tyst.
-    for (const r of rutor) if (gom.has(r.namn)) r.etikett.material.opacity = 0
-  }
-
-  /** Bildhöjden i punkter — riggen och kiosken kör olika, och rutorna räknas i punkter. */
-  setBildhojd(h) {
-    this._bildhojd = Number.isFinite(h) && h > 0 ? h : 1080
+    return ut
   }
 
   /** Vilken tråd pekaren träffar. Boet räknas, fågeln räknas — allt annat är bakgrund. */

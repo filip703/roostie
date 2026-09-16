@@ -1,29 +1,47 @@
 /**
- * LÄSBARHET PÅ TRE METER — Lednings rad 240, krav 1.
+ * LÄSBARHETEN PÅ KÖKSSKÄRMEN — Lednings rad 240, krav 1.
  *
- * Kör: node verktyg/lasbarhet.mjs [bild.png]   (servern på 5274; ROOSTIE_URL och CHROMIUM
- * finns om adressen eller webbläsaren ligger någon annanstans.)
+ * Kör: node verktyg/lasbarhet.mjs [bild.png]
+ * Miljö: ROOSTIE_URL, CHROMIUM, VY, och SKARM (se nedan).
  *
- * Kravet är inte "det ser bra ut" utan "det går att LÄSA på tre meters håll mitt på dagen".
- * Det går att räkna på. En 43-tumsskärm är 0,535 m hög; på tre meters avstånd upptar den 6,1
- * grader, alltså 368 bågminuter. Ett tecken behöver omkring 16 bågminuter för att läsas i en
- * blick — synskärpans gräns är 5, men en gräns är inte en läsning — och en form omkring 30
- * för att gå att känna igen på avstånd.
+ * Kravet är inte "det ser bra ut" utan "det går att LÄSA på köksskärmen". Det går att räkna
+ * på, men bara om man vet VILKEN skärm och på vilket avstånd — och det är två uppgifter som
+ * ändras. Riggen antog först en 43-tumsskärm på tre meter, och den 16 september blev svaret
+ * en 10,2-tums iPad i stället. Skärmen ligger därför i en tabell och inte i koden.
  *
- * Riggen mäter därför i ANDEL AV SKÄRMHÖJDEN och räknar om till bågminuter: måttet blir
- * oberoende av upplösningen, och det är formatet kravet faktiskt är skrivet i. Den skriver en
- * rad per sak, och listar separat det den INTE kunde mäta — se `synlig()` om varför.
+ * Måttet är BÅGMINUTER: hur stor en sak är för ögat, inte hur många bildpunkter den fyller.
+ * En text behöver omkring 16 bågminuter för att läsas i en blick — synskärpans gräns är 5,
+ * men en gräns är inte en läsning — och en form omkring 30 för att kännas igen på avstånd.
+ * Bildpunkter duger inte som mått: samma 29 punkter är läsbara på en TV och för små på en
+ * iPad. Andelen av skärmhöjden gånger skärmens höjd delat med avståndet är det som gäller.
  */
 import pw from 'playwright'
 const { chromium } = pw
 
-const SKARM_M = 0.535 // 43 tum, 16:9
-const AVSTAND_M = 3.0
-const bagmin = (andel) => (andel * SKARM_M) / AVSTAND_M * (180 / Math.PI) * 60
+/**
+ * Skärmarna, med aktiv bildyta i meter och det avstånd de faktiskt läses på.
+ *
+ * `vy` är webbläsarens yta i CSS-punkter, inte skärmens upplösning: en iPad har 2160×1620
+ * fysiska punkter men 1080×810 i CSS, och det är CSS-ytan sidan ritar i. Formatet är det som
+ * betyder något — 4:3 är inte 16:9, och en komposition som sitter i det ena kan falla utanför
+ * i det andra.
+ */
+const SKARMAR = {
+  // iPad 10,2 tum, liggande. Aktiv yta 207 × 155 mm. Avståndet är ett antagande: en iPad på
+  // köksbänken läses på drygt en meter. Ändras avståndet ändras gränsen, inte tvärtom.
+  ipad: { namn: 'iPad 10,2 liggande', hojd: 0.1555, avstand: 1.2, vy: { width: 1080, height: 810 } },
+  ipadStaende: { namn: 'iPad 10,2 stående', hojd: 0.2073, avstand: 1.2, vy: { width: 810, height: 1080 } },
+  tv: { namn: '43 tum 16:9', hojd: 0.535, avstand: 3.0, vy: { width: 1920, height: 1080 } },
+}
+const skarm = SKARMAR[process.env.SKARM || 'ipad'] || SKARMAR.ipad
+const bagmin = (andel) => ((andel * skarm.hojd) / skarm.avstand) * (180 / Math.PI) * 60
+/** Gränsen för en text som ska läsas i en blick. */
+const TEXTGRANS = 16
+
 
 const ut = process.argv[2] || 'lasbarhet.png'
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined, args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'] })
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
+const page = await browser.newPage({ viewport: skarm.vy })
 await page.addInitScript(() => {
   try {
     localStorage.setItem('botcrossing.seen-help', '1')
@@ -57,13 +75,18 @@ await page.evaluate(() => {
  */
 await page.waitForFunction(() => {
   const r = window.__roostie
-  const kam = r.engine.camera.position
-  const nu = [kam.x, kam.y, kam.z].map((v) => Math.round(v)).join(',')
+  const rig = r.rig
+  // Kameran står ALDRIG helt still i köksläget — driften svajar den med flit, så ett test på
+  // kamerans position går i timeout på en iPad-yta och blir slumpmässigt sant på en tv-yta.
+  // Det som ska vara stilla är MÅLET: vart kameran är på väg, och att den hunnit fram.
+  const mal = rig.desiredTarget
+  const nu = `${Math.round(mal.x)},${Math.round(mal.y)},${Math.round(mal.z)},${Math.round(rig.desiredDistance)}`
+  const framme = Math.abs(rig.distance - rig.desiredDistance) < Math.max(1, rig.desiredDistance * 0.02)
   const stilla = window.__stilla || { nu: '', varv: 0 }
-  stilla.varv = nu === stilla.nu ? stilla.varv + 1 : 0
+  stilla.varv = nu === stilla.nu && framme ? stilla.varv + 1 : 0
   stilla.nu = nu
   window.__stilla = stilla
-  return stilla.varv > 12
+  return stilla.varv > 8
 }, null, { timeout: 60000, polling: 250 })
 await page.waitForTimeout(1500)
 
@@ -261,5 +284,5 @@ for (let i = 0; i < synliga.length; i++) {
   }
 }
 const omatta = matt.rad.filter((d) => d.omatt).map((d) => d.sak)
-console.log(JSON.stringify({ fel, tackning, omatta, krockar, rader }, null, 1))
+console.log(JSON.stringify({ skarm: skarm.namn, avstand: skarm.avstand, grans: TEXTGRANS, fel, tackning, omatta, krockar, rader }, null, 1))
 await browser.close()

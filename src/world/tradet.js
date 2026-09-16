@@ -59,6 +59,41 @@ export const SLOTTAR = [
   { x: 28, y: 21, z: 102, vrid: 0.5 },
 ]
 
+/**
+ * Samma sju bon, men staplade för en SMAL bild.
+ *
+ * Fläkten ovanför är femtiosex enheter bred och arton hög — drygt tre mot ett. Den sitter i
+ * en sexton-mot-nio-bild och faller isär i en fyra-mot-tre: för att få in bredden måste
+ * kameran backa en tredjedel, och då blir hela trädet ett smalt band mitt i en hög bild med
+ * tomt över och under. Köksskärmen blev den 16 september en iPad på 10,2 tum, alltså just
+ * fyra mot tre, och då var det inte längre ett hypotetiskt fall.
+ *
+ * Den här fläkten är fyrtio bred och trettiofyra hög — drygt ett mot ett — och ryms därför i
+ * den smala bilden UTAN att kameran backar. Djupen är desamma, så avstånden till kameran
+ * ligger kvar i sitt spann och ingen fågel blir stor eller en prick.
+ */
+export const SLOTTAR_SMAL = [
+  { x: -19, y: 30, z: 101, vrid: -0.42 },
+  { x: -13, y: 12, z: 95, vrid: -0.26 },
+  { x: -6, y: 33, z: 91, vrid: -0.12 },
+  { x: 1, y: 4, z: 87, vrid: 0.02 },
+  { x: 7, y: 34, z: 92, vrid: 0.14 },
+  { x: 14, y: 13, z: 96, vrid: 0.28 },
+  { x: 20, y: 29, z: 102, vrid: 0.44 },
+]
+
+/**
+ * Var gränsen mellan bred och smal bild går.
+ *
+ * 1.55 ligger mellan fyra-mot-tre (1.33) och sexton-mot-tio (1.6), alltså mellan en iPad och
+ * den smalaste vanliga datorskärmen. Talet är en gräns och inte en skala: en bild är antingen
+ * bred nog för den vida fläkten eller inte, och att interpolera mellan två kompositioner ger
+ * en tredje som ingen har tittat på.
+ */
+export const SMAL_GRANS = 1.55
+export const arSmal = (bredd) => Number(bredd || 16 / 9) < SMAL_GRANS
+export const slottarFor = (bredd) => (arSmal(bredd) ? SLOTTAR_SMAL : SLOTTAR)
+
 export const ARSTIDER = {
   var: { lov: 0x7fa07f, under: 0x92a68e, ton: 0.22 },
   sommar: { lov: 0x5f8a63, under: 0x7fa07f, ton: 0.16 },
@@ -192,8 +227,16 @@ function grenGeometri(kurva, r0, r1, langd = 26, radiella = 7) {
 }
 
 export class Tradet {
-  constructor(scene) {
+  /**
+   * @param bredd  bildens format (bredd/höjd). Avgör vilken bo-fläkt som byggs, och kan inte
+   *               ändras efteråt: fläkten sitter i grenarnas geometri. Köksskärmen och en
+   *               riggbild byter aldrig format mitt i, och en människa som drar i ett fönster
+   *               får en komposition som är byggd för det format sidan öppnades i.
+   */
+  constructor(scene, bredd = 16 / 9) {
     this.scene = scene
+    this.slottar = slottarFor(bredd)
+    this.smal = arSmal(bredd)
     this.grupp = new THREE.Group()
     this.grupp.name = 'megatrad'
     this.grupp.visible = false
@@ -326,7 +369,7 @@ export class Tradet {
     const lovDelar = []
     const lovDelar2 = []
 
-    SLOTTAR.forEach((s, i) => {
+    this.slottar.forEach((s, i) => {
       const bo = new THREE.Vector3(s.x, s.y, s.z)
       const vinkel = Math.atan2(bo.z, bo.x)
       // Fästet sitter på barken, en bit under boet: grenar går uppåt när de går utåt.
@@ -498,8 +541,13 @@ export class Tradet {
        * går att skymma av dekor är ingen mätare. Luftregeln för grenarnas klasar skyddade
        * redan tavlan — kronmassan hade ingen sådan regel, och första bilden lade en klase
        * tvärs över Bills holk.
+       *
+       * Bandet går upp till 74 och inte till 52. Utsikten `loggboken` tittar på tavlan från
+       * (0, 47, 70), alltså UPPIFRÅN och snett, och då syns massan som ligger ovanför
+       * instrumenten framför dem i bild. Höjden på en regel som handlar om vad som skymmer
+       * vad måste täcka det kameran faktiskt står i, inte bara det som är ovanför i världen.
        */
-      if (y > 20 && y < 52 && Math.abs(p.x) < 78 && p.z > 26) continue
+      if (y > 20 && y < 74 && Math.abs(p.x) < 78 && p.z > 26) continue
       const s2 = 6 + r() * 12
       const geo = new THREE.IcosahedronGeometry(s2, 0)
       geo.scale(1.2, 0.8, 1.15)
@@ -785,7 +833,7 @@ export class Tradet {
   // ── det kolonin frågar om ─────────────────────────────────────────────────────────────
 
   /** Boplatserna, i ordning. Fler trådar än grenar får dela på grenarna längst ut. */
-  boplatser(antal = SLOTTAR.length) {
+  boplatser(antal = this.slottar.length) {
     const n = Math.max(1, antal)
     const ut = []
     /**
@@ -892,8 +940,16 @@ export class Tradet {
      */
     const fov = ((kamera?.fov || 50) * Math.PI) / 180
     const bredd = kamera?.aspect || 16 / 9
-    const skala =
-      (Math.tan(BASFOV / 2) / Math.tan(fov / 2)) * Math.max(1, (16 / 9) / Math.max(0.8, bredd))
+    /**
+     * Breddkorrigeringen gäller BARA den vida fläkten.
+     *
+     * Den finns för att en smal bild inte rymmer femtiosex enheter bo på bredden, och svaret
+     * var att backa kameran. Bygger vi i stället den smala fläkten är bredden redan löst i
+     * kompositionen, och att backa då är att lösa samma problem två gånger — resultatet blev
+     * ett litet träd mitt i en tom bild på just den skärm som har minst yta att ge bort.
+     */
+    const breddkorr = this.smal ? 1 : Math.max(1, 16 / 9 / Math.max(0.8, bredd))
+    const skala = (Math.tan(BASFOV / 2) / Math.tan(fov / 2)) * breddkorr
     const v = (namn, punkt, avstand, lutning, azimut) => ({
       namn,
       punkt,

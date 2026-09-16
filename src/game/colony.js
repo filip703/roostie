@@ -27,6 +27,7 @@ import { rundtur } from '../world/rundtur.js'
 import { bar as radaBar, ekorrfart, fallandeLov, vind as vindstyrka } from '../world/tradliv.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
+import { rensaKrockar } from '../world/etiketter.js'
 import { MAX_AGENT_CAP } from '../core/settings.js'
 import { Particles } from '../agents/particles.js'
 import { Navigation } from '../agents/navigation.js'
@@ -186,7 +187,9 @@ export class Colony {
      * trådar. Lednings rad 224 säger uttryckligen att 1.0 ska stå kvar körande tills 2.0 är
      * godkänd, och en flagga är det enda ärliga sättet att hålla båda vid liv i en container.
      */
-    this.tradet = new Tradet(scene)
+    // Bildens format avgör bo-fläkten, och det måste vara känt INNAN trädet byggs — fläkten
+    // sitter i grenarnas geometri. Kameran finns redan här, så den får svara.
+    this.tradet = new Tradet(scene, camera?.aspect || (renderer?.domElement?.clientWidth || 16) / (renderer?.domElement?.clientHeight || 9))
     this.faglar = new Faglar(scene)
     // Barnens holkar hänger på trädets bark och får sina platser av trädet självt.
     this.holkar = new Holkar(scene, (i, n) => this.tradet.holkplatser(i, n))
@@ -1231,12 +1234,25 @@ export class Colony {
       // skärmtidsfyren: en minut som lämnat någons konto syns i barken.
       this.tradet.setNatt(night)
       this.tradet.update(dt)
-      // Rutorna räknas i bildpunkter, så fåglarna måste veta hur hög bilden är. Köksskärmen
-      // och en riggbild kör olika upplösning, och en krock i den ena är ingen krock i den andra.
-      this.faglar.setBildhojd(this.renderer?.domElement?.clientHeight || window.innerHeight)
       this.faglar.update(dt, this.camera, night)
       this.holkar.update(dt, this.camera, night)
       this.stamtavlan.update(dt, this.camera)
+
+      /**
+       * Krockrensningen körs SIST, när alla som äger en etikett har satt sin opacitet.
+       *
+       * Den såg förut bara trådarnas namn, eftersom den bodde inne i fåglarna — och barnens
+       * holkskyltar krockade med dem utan att någon regel sa något. Här ser den allas.
+       * Rutorna räknas i bildpunkter, så den behöver bildens verkliga höjd: köksskärmen och
+       * en riggbild kör olika upplösning, och en krock i den ena är ingen krock i den andra.
+       */
+      rensaKrockar(
+        [...this.faglar.etikettposter(), ...this.holkar.etikettposter()],
+        this.camera,
+        this.renderer?.domElement?.clientHeight || window.innerHeight,
+        THREE,
+        (this._etikettlage = this._etikettlage || {})
+      )
     }
 
     this._growBuildings(dt)
