@@ -470,6 +470,36 @@ export class Colony {
       }
     }
 
+    /**
+     * HIMLEN SLÄCKS I TRÄDET — men bara himlen, aldrig ljuset.
+     *
+     * Bakom bona stod en stjärnhimmel. Dimman är varm sedan tidigare, men dimma målar bara
+     * geometri; där ingenting fanns lyste rymden igenom, och en tredjedel av överblicken var
+     * svart med stjärnor i. Ett träd som slutar i rymden läses inte som ett träd som är för
+     * stort för bilden — det läses som en modell i en låda.
+     *
+     * Kupolen, stjärnorna och följeslagaren göms, och scenens bakgrund sätts till dimmans
+     * egen färg, så det som inte är träd är mer skog längre bort. `sky.group` i sin helhet
+     * får INTE gömmas: solen, himmelsljuset och utfyllnadsljuset hänger i den, och ett
+     * osynligt ljus lyser inte — det hade släckt hela scenen.
+     */
+    for (const del of [this.sky?.dome, this.sky?.stars, this.sky?.companion].filter(Boolean)) {
+      if (trad) {
+        del.userData.synligForut = del.userData.synligForut ?? del.visible
+        del.visible = false
+      } else if (del.userData.synligForut !== undefined) {
+        del.visible = del.userData.synligForut
+        del.userData.synligForut = undefined
+      }
+    }
+    if (trad) {
+      this._bakgrundForut = this._bakgrundForut !== undefined ? this._bakgrundForut : this.scene.background
+      this.scene.background = new THREE.Color(0x2a2119)
+    } else if (this._bakgrundForut !== undefined) {
+      this.scene.background = this._bakgrundForut
+      this._bakgrundForut = undefined
+    }
+
     if (trad) {
       this.tradet.satArstid(arstidNu())
       this._satFaglar()
@@ -1187,6 +1217,9 @@ export class Colony {
       // skärmtidsfyren: en minut som lämnat någons konto syns i barken.
       this.tradet.setNatt(night)
       this.tradet.update(dt)
+      // Rutorna räknas i bildpunkter, så fåglarna måste veta hur hög bilden är. Köksskärmen
+      // och en riggbild kör olika upplösning, och en krock i den ena är ingen krock i den andra.
+      this.faglar.setBildhojd(this.renderer?.domElement?.clientHeight || window.innerHeight)
       this.faglar.update(dt, this.camera, night)
       this.holkar.update(dt, this.camera, night)
       this.stamtavlan.update(dt, this.camera)

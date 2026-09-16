@@ -471,14 +471,35 @@ export class Tradet {
      * slutar i mer träd. Och den kostar ingenting i läsbarhet, för den står bakom bonas plan.
      */
     const massa = []
-    for (let k = 0; k < 110; k++) {
-      const v = -Math.PI * 0.08 + r() * Math.PI * 1.16
-      const rad = STAM_R * (1.05 + r() * 1.5)
-      // UNDER bonas plan, aldrig ovanför. Ovanför bona ska det vara bark och luft — det är
-      // den luften som gör att ett bo syns, och den fanns inte i de tre första försöken.
-      const y = -96 + r() * 96
+    for (let k = 0; k < 240; k++) {
+      const v = -Math.PI * 0.16 + r() * Math.PI * 1.32
+      const rad = STAM_R * (1.05 + r() * 2.1)
+      /**
+       * BÄLTET GÅR NU OCKSÅ UPPÅT, och det är en rättelse av min egen regel.
+       *
+       * Den gamla raden lade all massa under bona, med motiveringen att luft ovanför ett bo
+       * är det som gör att boet syns. Luften behövs — men den fanns bara i mitten. Ute vid
+       * kanterna och uppe i hörnen slutade bilden i ingenting, och mätt på överblicken var
+       * trettiofyra procent av ytan tom och övre tredjedelen halvtom. Ett träd som är för
+       * stort för bilden ska inte ha en himmel runt sig.
+       *
+       * Luften ovanför bona är därför skyddad av `z > 62`-filtret i stället för av höjden:
+       * allt som hamnar framför bonas plan kastas, oavsett var det står. Kvar blir djup vid
+       * kanterna och bakom, som är precis det som saknades.
+       */
+      const y = -96 + r() * 240
       const p = new THREE.Vector3(Math.cos(v) * rad, y, Math.sin(v) * rad)
-      if (p.z > 76) continue
+      if (p.z > 62) continue
+      // Massan högst upp hålls utanför mitten: rakt ovanför bona ska det vara bark och luft.
+      if (y > 40 && Math.abs(p.x) < 46 && p.z > 10) continue
+      /**
+       * INSTRUMENTBÄLTET är fredat. Holkarna hänger på barken kring y 34 och tavlan strax
+       * intill; en lövklase som lägger sig i det bandet skymmer en mätare, och en mätare som
+       * går att skymma av dekor är ingen mätare. Luftregeln för grenarnas klasar skyddade
+       * redan tavlan — kronmassan hade ingen sådan regel, och första bilden lade en klase
+       * tvärs över Bills holk.
+       */
+      if (y > 20 && y < 52 && Math.abs(p.x) < 78 && p.z > 26) continue
       const s2 = 6 + r() * 12
       const geo = new THREE.IcosahedronGeometry(s2, 0)
       geo.scale(1.2, 0.8, 1.15)
