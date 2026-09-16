@@ -19,7 +19,7 @@ import { HARNESSES, detectedHarnesses, harnessById } from './harnesses/index.mjs
  * name is also the key a saved layout is stored under, so disambiguating unconditionally would
  * move every plot on everybody's map to fix something most people never hit.
  */
-function disambiguateProjects(threads) {
+export function disambiguateProjects(threads) {
   // Windows hands the same checkout back as `c:\…` from one transcript and `C:\…` from
   // another: the CLI's project-directory encoding keeps whatever case the drive letter was
   // given. Those are one path, not two — and counted as two they make an unambiguous name look
@@ -64,6 +64,24 @@ function disambiguateProjects(threads) {
 }
 
 /**
+ * Plättens namn, med harnessen synlig för allt som inte är Roosts Loggbok.
+ *
+ * Filip kör Roost-pass i Claude Code sedan 16 september, och då krockar två världar: en
+ * Claude Code-session i `~/Developer/nexus` får `project: "nexus"`, och Roosts Loggbokstråd
+ * heter `"Nexus"`. Två helt olika saker med i praktiken samma namn — samma rad i panelen,
+ * samma plätt på marken, samma fågel i trädet. Ingen kan se vilken som är vilken.
+ *
+ * Loggboken är kolonins egen värld och behåller sitt namn oförändrat; allt lokalt får sin
+ * harness framför sig. Det är ETT ställe att ändra på, och det syns överallt på en gång
+ * eftersom `project` är den nyckel plättar, etiketter och bon delar.
+ */
+export function plattnamn(trad) {
+  const namn = String(trad?.project || '')
+  if (!namn || trad.harness === 'roost-loggbok') return namn
+  return `${trad.harnessName || trad.harness} · ${namn}`
+}
+
+/**
  * Every thread from every detected harness.
  *
  * A harness that throws is skipped rather than allowed to take the scan down with it: one
@@ -82,7 +100,10 @@ export async function scanThreads() {
       }
     })
   )
-  const threads = disambiguateProjects(lists.flat())
+  // Prefixet läggs på EFTER särskiljningen, inte före. `disambiguateProjects` skriver om hela
+  // namnet när två mappar heter lika ("2026-09-09/ti"), och åt sju Codex-plättars prefix när
+  // det låg först — de såg ut som Roost-trådar i panelen.
+  const threads = disambiguateProjects(lists.flat()).map((t) => ({ ...t, project: plattnamn(t) }))
   threads.sort((a, b) => b.lastActivityAt - a.lastActivityAt)
   return threads
 }
