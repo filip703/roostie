@@ -190,6 +190,16 @@ export class Colony {
     this.faglar = new Faglar(scene)
     // Barnens holkar hänger på trädets bark och får sina platser av trädet självt.
     this.holkar = new Holkar(scene, (i, n) => this.tradet.holkplatser(i, n))
+    /**
+     * Loggboken på stammen — SAMMA KLASS som kolonins billboard, andra mått.
+     *
+     * Trädvärlden hade ingen tavla alls: kolonins göms när trädet tänds, och kvar blev sju
+     * fåglar som gör något obestämt. Loggboken är det Roost faktiskt är, och den hör hemma i
+     * båda världarna. En andra ritkod hade drivit isär från kolonins inom en vecka.
+     */
+    const tp = this.tradet.tavlaplats()
+    this.stamtavlan = new Tavlan(scene, tp.punkt, { bredd: 30, hojd: 15, benhojd: 0, vrid: false, vinkel: tp.vinkel })
+    this.stamtavlan.grupp.visible = false
     this.varld = 'koloni'
     this.astronauts = new Astronauts(scene, settings)
     this.astronauts.world = this._world()
@@ -424,6 +434,7 @@ export class Colony {
     this.tradet.setVisible(trad)
     this.faglar.setVisible(trad)
     this.holkar.setVisible(trad)
+    this.stamtavlan.grupp.visible = trad && (this.stamtavlan.rader.length > 0 || this.stamtavlan.vantar.length > 0)
 
     /**
      * Kronans egen luft.
@@ -600,6 +611,9 @@ export class Colony {
   /** Loggbokens rader och väntelista → billboarden, och Filips egen skylt vid skeppet. */
   setTavla(data) {
     this.tavlan.set(data)
+    // Samma rader på stammen. `set` tänder gruppen själv; i kolonin ska den vara släckt.
+    this.stamtavlan.set(data)
+    this.stamtavlan.grupp.visible = this.varld === 'trad' && this.stamtavlan.grupp.visible
     // Vem som senast skrev en rad. Tavlan kommer nyast först; rundturen i köket besöker den
     // tråden först, så man kan titta upp och se vem som just gjorde något.
     const nyast = Array.isArray(data?.rader) ? data.rader[0] : null
@@ -1167,6 +1181,7 @@ export class Colony {
       this.tradet.update(dt)
       this.faglar.update(dt, this.camera, night)
       this.holkar.update(dt, this.camera, night)
+      this.stamtavlan.update(dt, this.camera)
     }
 
     this._growBuildings(dt)
@@ -1339,6 +1354,7 @@ export class Colony {
     this.tradet.dispose()
     this.faglar.dispose()
     this.holkar.dispose()
+    this.stamtavlan.dispose()
     this.astronauts.dispose()
     this.indicators.dispose()
     this.particles.dispose()

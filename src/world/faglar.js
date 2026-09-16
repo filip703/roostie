@@ -435,12 +435,11 @@ export class Faglar {
     }
 
     // Hämtrundorna: ut till grönskan eller grenen, tillbaka till boet.
+    // En tom lista får aldrig nå fram hit: boet självt är den sista utvägen, och en fågel som
+    // hämtar hemma är en tråkig fågel — en krasch i bildslingan är värre.
+    const plocka = (lista, i) => (lista && lista.length ? lista[i % lista.length] : hem)
     const mal =
-      f.lage === 'matar'
-        ? p.gron[Math.floor(f.u * 0 + (f.rundNr || 0)) % p.gron.length]
-        : f.lage === 'bygger'
-          ? p.stig[(f.rundNr || 0) % p.stig.length]
-          : p.stig[(f.rundNr || 0) % p.stig.length]
+      f.lage === 'matar' ? plocka(p.gron, f.rundNr || 0) : plocka(p.stig, f.rundNr || 0)
 
     if (f.lage === 'pysslar') {
       // Ingen hämtning: småhopp längs grenen, och putsning på plats.

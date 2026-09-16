@@ -40,24 +40,40 @@ const klocka = (ms) => {
 }
 
 export class Tavlan {
-  constructor(scene, plats) {
+  /**
+   * @param plats  var tavlan står
+   * @param form   {bredd, hojd, benhojd, vrid} — måtten och om den får vrida sig
+   *
+   * MÅTTEN ÄR PARAMETRAR SEDAN 16 SEPTEMBER, och det är ett medvetet val framför en andra
+   * klass. Trädet behöver samma tavla på stammen: samma rader, samma faser, samma spalter,
+   * samma bläddring — men bredare, utan ben och fast på barken. En kopia av ritkoden hade
+   * drivit isär från kolonins inom en vecka, och då hade Loggboken sagt olika saker på två
+   * skärmar i samma kök.
+   */
+  constructor(scene, plats, form = {}) {
     this.scene = scene
+    this.bredd = form.bredd ?? BREDD
+    this.hojd = form.hojd ?? HOJD
+    this.benhojd = form.benhojd ?? BENHOJD
+    // En tavla som hänger på en stam ska inte vrida sig ur barken.
+    this.farVrida = form.vrid !== false
     this.grupp = new THREE.Group()
     this.grupp.position.set(plats.x, plats.y, plats.z)
+    if (Number.isFinite(form.vinkel)) this.grupp.rotation.y = form.vinkel
     this.grupp.visible = false
-    this.riktning = 0
+    this.riktning = form.vinkel || 0
     this.sida = 0
     this.sidklocka = 0
     this.rader = []
     this.vantar = []
 
     const { mittY, stal } = byggPlank(this.grupp, {
-      bredd: BREDD,
-      hojd: HOJD,
-      benhojd: BENHOJD,
+      bredd: this.bredd,
+      hojd: this.hojd,
+      benhojd: this.benhojd,
       accent: TAL.clay,
     })
-    const duk = byggDuk(this.grupp, { bredd: BREDD, hojd: HOJD, pixlar: PIXLAR, mittY })
+    const duk = byggDuk(this.grupp, { bredd: this.bredd, hojd: this.hojd, pixlar: PIXLAR, mittY })
     this.duk = duk.duk
     this.textur = duk.textur
 
@@ -68,13 +84,13 @@ export class Tavlan {
       emissiveIntensity: 0.55,
       roughness: 0.5,
     })
-    for (const dx of [-BREDD / 4, BREDD / 4]) {
+    for (const dx of [-this.bredd / 4, this.bredd / 4]) {
       const arm = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 1.1), stal)
-      arm.position.set(dx, mittY + HOJD / 2 + 0.5, 0.45)
+      arm.position.set(dx, mittY + this.hojd / 2 + 0.5, 0.45)
       arm.rotation.x = -0.35
       this.grupp.add(arm)
       const lampa = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.34, 0.9, 8), lampMat)
-      lampa.position.set(dx, mittY + HOJD / 2 + 0.62, 0.92)
+      lampa.position.set(dx, mittY + this.hojd / 2 + 0.62, 0.92)
       lampa.rotation.x = Math.PI / 2 - 0.55
       this.grupp.add(lampa)
     }
@@ -233,7 +249,7 @@ export class Tavlan {
   /** Vrider sig mot kameran, och bläddrar flödet så att hela tavlan syns över tid. */
   update(dt, camera) {
     if (!this.grupp.visible) return
-    this.riktning = vridMot(this.grupp, camera, this.riktning, dt)
+    if (this.farVrida) this.riktning = vridMot(this.grupp, camera, this.riktning, dt)
 
     if (this.rader.length > PER_SIDA) {
       this.sidklocka += dt

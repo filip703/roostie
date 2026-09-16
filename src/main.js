@@ -901,6 +901,13 @@ async function boot() {
      */
     const stallIn = () => {
       stallLogg.varv += 1
+      // En uttrycklig `?vy=` vinner över startbilden. Utan den här raden slog omställningen
+      // tillbaka till överblicken fyra gånger under de första sex sekunderna, och `?vy=` såg
+      // ut att vara trasig i trädet fast den gjorde precis vad den skulle.
+      if (new URLSearchParams(location.search).get('vy')) {
+        stallLogg.sist = 'en uttrycklig ?vy= vann'
+        return true
+      }
       if (rig.interacting) {
         stallLogg.sist = 'användaren höll i kameran'
         return true
@@ -936,7 +943,9 @@ async function boot() {
   if (onskadVy) {
     const gaTill = () => {
       const v = colony.utsiktspunkter().find((p) => p.namn === onskadVy.toLowerCase())
-      if (v) rig.focus(v.punkt, { distance: v.avstand })
+      // Lutning och vinkel med: i trädets bur avgör de lika mycket som avståndet, och utan
+      // dem hamnade `?vy=` någonstans i närheten i stället för på utsikten.
+      if (v) rig.focus(v.punkt, { distance: v.avstand, polar: v.lutning, azimuth: v.azimut })
       return Boolean(v)
     }
     // Gårdarna finns först när första pollen kommit hem, så vi försöker en gång till sedan.

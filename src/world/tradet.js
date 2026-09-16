@@ -409,7 +409,16 @@ export class Tradet {
        * varit lösare har kronan blivit tät och vacker och fåglarna borta — det är exakt det
        * skärmbilderna den 15 september visade, tre gånger i rad.
        */
-      const klasPunkter = kvistar.filter((k) => k.z < bo.z - 3)
+      /**
+       * Luftregeln gäller Loggboken också.
+       *
+       * Tavlan hänger på barken kring (0, 34, 66), och en lövklase mellan den och kameran
+       * täcker en spalt text. Samma regel som skyddar bona, samma skäl: det som ska LÄSAS får
+       * inte ha grönska framför sig. Rutan är tavlans egen plus marginal.
+       */
+      const klasPunkter = kvistar.filter(
+        (k) => k.z < bo.z - 3 && !(Math.abs(k.x) < 32 && k.y > 12 && k.z > 46 && k.z < 100)
+      )
       for (const p of klasPunkter) {
         for (let k = 0; k < 2; k++) {
           const s2 = 2.6 + r() * 2.2
@@ -434,7 +443,15 @@ export class Tradet {
         sida,
         kvistar,
         // Ut längs grenen och tillbaka — fågelns arbetsrunda. Alltid i bild, aldrig ur den.
-        gron: klasPunkter.map((p) => p.clone()),
+        /**
+         * Fågelns hämtpunkter är EGNA, inte lövklasarnas.
+         *
+         * De delade lista med lövklasarna förut, och när luftregeln tömde klaslistan framför
+         * Loggboken tömdes fågelns arbetsväg med den: `_runda` slog i en tom lista och hela
+         * bildslingan dog. Det som RITAS och det som BETYDER något får inte hänga i samma
+         * tråd — en filtrering som bara skulle flytta ett löv tog ner sidan.
+         */
+        gron: kvistar.map((k) => k.clone().add(new THREE.Vector3(0, -2.5, 0))),
         // Fågelns arbetsväg: fyra fästen längs grenen in mot stammen, plus en bit ut på
         // fortsättningen. Allt inom bild — en fågel som flyger ur bild går inte att räkna.
         stig: [
@@ -622,7 +639,7 @@ export class Tradet {
     }
 
     ek.scale.setScalar(2.6)
-    this.ekorre = { grupp: ek, svans, huvud, t: 0.3, riktning: 1, vinkel: 1.62 }
+    this.ekorre = { grupp: ek, svans, huvud, t: 0.3, riktning: 1, vinkel: 2.05 }
     this.grupp.add(ek)
   }
 
@@ -810,6 +827,24 @@ export class Tradet {
     }
   }
 
+  /**
+   * Var Loggboken hänger på stammen.
+   *
+   * Mitt i bild ovanför grenfläkten, på samma rena bark som holkarna. Rad 224 kallar den
+   * anslagstavlan på stammen, och det är rätt plats av ett skäl som inte är estetiskt:
+   * Loggboken ÄR Roost. En trädvärld utan den visar sju fåglar som gör något obestämt.
+   */
+  tavlaplats() {
+    const vinkel = Math.PI / 2
+    const rad = STAM_R * 1.2
+    return {
+      // Höjden är MÄTT, inte vald: lägre och lövklasarna på kvistarna (y upp till ~24) lägger
+      // sig framför tavlan, högre och överkanten går ur bild i överblicken.
+      punkt: new THREE.Vector3(Math.cos(vinkel) * rad, 34, Math.sin(vinkel) * rad),
+      vinkel: 0,
+    }
+  }
+
   /** Hålet i stammen. Kvar för kolonins skull; i mega-trädet är det barkens mitt i bild. */
   stamhal() {
     return new THREE.Vector3(0, 14, STAM_R * 1.02)
@@ -850,6 +885,8 @@ export class Tradet {
       v('barken', new THREE.Vector3(0, 20, 62), 40, 1.5, 0.2),
       v('underifrån', new THREE.Vector3(6, 4, 82), 58, 1.86, -0.06),
       v('kronan', new THREE.Vector3(6, 28, 88), 58, 1.2, 0.05),
+      // Loggboken på nära håll — den ska gå att LÄSA, inte bara anas.
+      v('loggboken', new THREE.Vector3(0, 47, 70), 42, 1.42, 0),
     ]
   }
 
