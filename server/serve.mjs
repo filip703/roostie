@@ -30,6 +30,13 @@ function resolveInDist(pathname) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
 
+  // Kiosk: redirect bare root to tree world (rad 443)
+  if (url.pathname === '/' && !url.searchParams.has('varld')) {
+    res.writeHead(302, { Location: '/?varld=trad&kiosk=1', 'Cache-Control': 'no-cache' })
+    res.end()
+    return
+  }
+
   if (url.pathname.startsWith('/api/')) {
     return apiMiddleware(req, res, null)
   }
