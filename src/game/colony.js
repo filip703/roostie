@@ -412,6 +412,13 @@ export class Colony {
       this.ship.group,
       this.astronauts.group,
       this.indicators?.group,
+      /**
+       * MÄRKENA LIGGER INTE I SIN EGEN GRUPP. `Indicators` lägger sin InstancedMesh direkt i
+       * scenen, så att gömma `indicators.group` gömde ingenting alls — två blå märken svävade
+       * kvar över trädets bon, på astronauternas platser i en värld utan astronauter. Det tog
+       * en extra runda att hitta, för gruppen fanns och såg gömd ut.
+       */
+      this.indicators?.mesh,
       this.scaffolds?.group,
       this.maskinpark.grupp,
       this.agenttavla.grupp,
@@ -522,6 +529,13 @@ export class Colony {
       this.ship.group,
       this.astronauts.group,
       this.indicators?.group,
+      /**
+       * MÄRKENA LIGGER INTE I SIN EGEN GRUPP. `Indicators` lägger sin InstancedMesh direkt i
+       * scenen, så att gömma `indicators.group` gömde ingenting alls — två blå märken svävade
+       * kvar över trädets bon, på astronauternas platser i en värld utan astronauter. Det tog
+       * en extra runda att hitta, för gruppen fanns och såg gömd ut.
+       */
+      this.indicators?.mesh,
       this.scaffolds?.group,
       this.maskinpark.grupp,
       this.agenttavla.grupp,
@@ -1228,13 +1242,31 @@ export class Colony {
     this._growBuildings(dt)
     this.astronauts.update(dt, elapsed)
     this.astronauts.updateRings(elapsed)
-    this.indicators.update(this.astronauts.agents, elapsed, (a) => this._badgeFor(a))
+    // Märkena hör kolonin till. I trädet finns inga astronauter att märka, och att räkna om
+    // dem varje bildruta för att sedan gömma dem är arbete som bara kan gå fel.
+    if (this.varld !== 'trad') this.indicators.update(this.astronauts.agents, elapsed, (a) => this._badgeFor(a))
     this._emit(dt, elapsed)
     this.particles.ambient(dt, this.camera, this.planet)
     this.particles.update(dt)
     this._updatePlots(night, elapsed)
     this._updateScaffolds()
     this._updateLabels(dt)
+
+    /**
+     * OCH EN GÅNG TILL, SIST I BILDRUTAN.
+     *
+     * `_hallVarld` körs högst upp, och det räcker inte: kolonins egna lager tänder sina
+     * grupper själva när de uppdateras. `indicators.update` gör det, och skärmtidsfyren gör
+     * det vid varje hämtning — båda kördes EFTER gömningen, så de ritades ändå. Det syntes
+     * som två märken som svävade över "Ledning" i trädets överblick, på astronauternas
+     * platser i en värld där astronauterna inte finns.
+     *
+     * Att jaga varje lager som tänder sig själv är ett spel man förlorar i längden; en ny
+     * modul i morgon gör om det. Den sista raden i bildrutan avgör vad som ritas, så det är
+     * där gömningen ska stå. Den första raden får vara kvar — flera lager läser `visible`
+     * för att hoppa över sitt eget arbete.
+     */
+    this._hallVarld()
   }
 
   _growBuildings(dt) {
