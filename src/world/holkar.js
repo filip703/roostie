@@ -51,25 +51,126 @@ const FARA = 0.2
 const SLAG_MS = 2200
 
 /**
- * Holkens form ur bonivån i Boet 2.0.
+ * Kvistfärgerna, blandade ur paletten i stället för skrivna som nya bruna värden.
  *
- * Designs fem steg (regelboken §1): nivån styr bredd, höjd, antal varv och antal invävda
- * fjädrar. Här styr den holkens storlek och hur många kvistvarv som syns.
- *
- * NIVÅ NOLL ÄR INTE EN NIVÅ — det är "vi vet inte". Kolonin kan inte läsa fjädrar, så det
- * är det enda ärliga svaret tills läsvägen bär dem. Funktionen finns och är testad så att
- * dagen siffran kommer är det en rad som ändras, inte en holk som ska byggas om.
+ * Designs rad 301: "kvistarna är color-mix av honung, sand och espresso, inte nya bruna
+ * värden. Boet följer med när paletten ändras." Samma regel här — `bland()` gör i three vad
+ * `color-mix()` gör i CSS, så en ändrad palett flyttar boet med sig.
  */
-export function holkform(niva) {
+const bland = (a, b, del) => new THREE.Color(a).lerp(new THREE.Color(b), del).getHex()
+const KVIST = [
+  bland(TAL.honey, TAL.sand, 0.35),
+  bland(TAL.honey, TAL.charcoal, 0.42),
+  bland(TAL.charcoal, TAL.honey, 0.22),
+  bland(TAL.charcoal, TAL.natt, 0.35),
+]
+/** Fjädrarnas accenter — palettens, aldrig barnets färg. Se `_bo()`. */
+const FJADERFARG = [TAL.clay, TAL.camel, TAL.honey, TAL.forest]
+/** Designs fasta fjäderplatser, så samma nivå ger samma bo på varje skärm. */
+const FJADERPLATS = [0.22, 0.7, 0.44, 0.86]
+/** Skräp utan slump, ordagrant ur boritningen: samma nivå ger alltid samma bo. */
+const skak = (i, m) => ((i * 37) % m) - m / 2
+
+/**
+ * Holkens mått. Fasta — och det är en ändring, inte en förenkling.
+ *
+ * Holken bar först Designs fem steg själv: den blev bredare och högre med bonivån. Nu bär
+ * BOET PÅ PINNEN de fem stegen (`boform()`), och då får holken inte bära dem också. Två
+ * ställen som ritar samma nivå är samma fel som två ställen som bar barnets färg — den ena
+ * vinner tyst över den andra den dagen de går isär, och ingen ser vilken. En källa, inte två.
+ *
+ * Det finns ett eget skäl också: ribban, märkesringen och taklisten är alla måttsatta mot
+ * holkens höjd. En holk som växer flyttar sin egen mätare mitt under avläsningen, och en
+ * mätare som byter storlek när värdet ändras är svår att lita på.
+ */
+export function holkform() {
+  return { bredd: BREDD, hojd: HOJD, djup: DJUP }
+}
+
+/**
+ * NIVÅTRAPPAN — samma som Boet 2.0, inte en egen.
+ *
+ * Trösklarna står i Designs regelbok §1 (`src/lib/boritning.ts`, Loggboken rad 301) och
+ * kopieras hit MED SINA SIFFROR, inte med en egen tolkning. Om de två någonsin går isär ser
+ * ett barn ett bo i appen och ett annat bo på köksskärmen samma kväll, och då är köksskärmen
+ * inte längre samma värld som telefonen. Ändras regelboken ändras den här raden också.
+ *
+ * Namnen och texterna är Designs, ordagrant. De är designtext och inte data.
+ */
+export const NIVAER = [
+  { niva: 0, troskel: 0, namn: 'En kvist', text: 'Allt börjar med en kvist.' },
+  { niva: 1, troskel: 10, namn: 'Några strån', text: 'Det börjar likna något.' },
+  { niva: 2, troskel: 30, namn: 'Boet tar form', text: 'Nu syns det att någon bor här.' },
+  { niva: 3, troskel: 65, namn: 'Väggar och varv', text: 'Det håller för vind nu.' },
+  { niva: 4, troskel: 120, namn: 'Mjukt och djupt', text: 'Fjädrarna ligger invävda.' },
+  { niva: 5, troskel: 200, namn: 'Ett färdigt bo', text: 'Härifrån blir fjädrarna ägg.' },
+]
+
+/** Vilken nivå ett antal fjädrar räcker till. Samma trappa som NIVAER. */
+export function nivaAv(fjadrar) {
+  if (!Number.isFinite(fjadrar) || fjadrar < 0) return 0
+  let n = 0
+  for (const s of NIVAER) if (fjadrar >= s.troskel) n = s.niva
+  return n
+}
+
+/**
+ * Fjädrarna ur EN budgetrad — eller `null` när fältet inte finns.
+ *
+ * Skillnaden mellan noll och null är hela poängen. Noll fjädrar är ett mätvärde: barnet har
+ * inte tjänat något än, och boet ska visa tre kvistar på marken därför att det är sant. Null
+ * är frånvaron av en läsväg: `/api/roostie` bär inget fält alls ännu, och då får holken inte
+ * låtsas veta. Båda ritar samma tre kvistar i dag — men bara den ena kommer att växa, och
+ * `kand` är det som skiljer dem åt i diagnosen när Sajt har lagt till fältet.
+ *
+ * `boniva` läses också, för det fall Sajt hellre skickar den färdiga nivån än råtalet. Den
+ * vinner aldrig över `fjadrar`: råtalet är källan, nivån är en avledning av den.
+ */
+export function fjaderlasning(budget) {
+  const f = budget?.fjadrar
+  if (Number.isFinite(f) && f >= 0) return { fjadrar: f, niva: nivaAv(f), kand: true }
+  const b = budget?.boniva
+  if (Number.isFinite(b) && b >= 0) return { fjadrar: null, niva: Math.max(0, Math.min(5, Math.round(b))), kand: true }
+  return { fjadrar: null, niva: 0, kand: false }
+}
+
+/**
+ * Boets form ur nivån — Designs fem steg, översatta från yta till rymd.
+ *
+ * Boritningen ritar framsidan av varje varv som en båge som dippar på mitten, för den ser
+ * boet rakt framifrån. Holken står på en stam och ses snett underifrån, så här är ett varv
+ * en hel ring. Det är samma bo: samma trappa, samma antal invävda fjädrar (n − 1), samma
+ * regel att NIVÅ 0 INTE ÄR ETT LITET BO utan tre kvistar som ligger på pinnen.
+ *
+ * Varvantalet är inte Designs (7 + n·4). Ett bo som är fem centimeter på skärmen behöver
+ * inte tjugosju ringar för att läsas som ett bo — det behöver att ringarna GÅR ATT SKILJA
+ * ÅT. Fyra till nio varv är vad som får plats innan de smälter ihop till en klump, och en
+ * klump var precis det fel Design själv rättade i rad 301.
+ */
+export function boform(niva) {
   const n = Number.isFinite(niva) ? Math.max(0, Math.min(5, Math.round(niva))) : 0
+  if (n === 0) return { niva: 0, varv: 0, kvistar: 3, fjadrar: 0, radie: 1.9, hojd: 0, hal: false }
+  if (n === 1) return { niva: 1, varv: 0, kvistar: 9, fjadrar: 0, radie: 2.1, hojd: 0.5, hal: false }
   return {
     niva: n,
-    bredd: BREDD * (1 + n * 0.06),
-    hojd: HOJD * (1 + n * 0.04),
-    varv: n === 0 ? 0 : 1 + n,
-    fjadrar: n === 0 ? 0 : n,
-    kand: n > 0,
+    varv: 2 + n,
+    kvistar: 2 + n,
+    // Fjädrarna är n − 1, precis som i boritningen: en ensam fjäder på nivå 2 säger att
+    // något har vävts in, och full skål på nivå 5 säger att det gjorts fyra gånger.
+    fjadrar: n - 1,
+    // Stegen ska gå att SKILJA ÅT i en bild, inte bara i en siffra. Designs yta växer
+    // nästan femtio procent från nivå två till fem; en radie som växte trettio gjorde alla
+    // fyra stegen till samma bo på köksskärmen. Nu växer den lika mycket som hennes.
+    radie: 1.78 + n * 0.43,
+    hojd: 0.36 + n * 0.5,
+    hal: true,
   }
+}
+
+/** Boets namn på nivån, Designs ord. Tomt när läsvägen inte bär fjädrar. */
+export function bonamn(niva, kand) {
+  if (!kand) return ''
+  return NIVAER[Math.max(0, Math.min(5, Math.round(niva)))]?.namn || ''
 }
 
 /**
@@ -141,6 +242,16 @@ export class Holkar {
       post.farg = this.fardig ? identitetsFarg(b.farg, post.andel, true) : TAL.sage
       post.slut = this.fardig && Number(b.kvar) <= 0
 
+      // Fjädrarna. Boet byggs om bara när nivån faktiskt ändras — en holk som river och
+      // reser sitt bo varje hämtning flimrar på en skärm som står på hela dagen.
+      const las = fjaderlasning(b)
+      if (las.niva !== post.niva || las.kand !== post.bokand || !post.bo) {
+        post.niva = las.niva
+        post.bokand = las.kand
+        this._bo(post, las.niva, las.kand)
+      }
+      post.fjadrar = las.fjadrar
+
       const text = holktext(b.namn, b.kvar, this.fardig)
       if (text !== post.text) {
         post.text = text
@@ -166,6 +277,134 @@ export class Holkar {
     return s
   }
 
+  /**
+   * BOET PÅ PINNEN — fjäderdatan, i samma språk som appen.
+   *
+   * Holken är instrumentet: den mäter skärmtid, bär barnets färg som märke och blossar när
+   * en minut går. Boet på pinnen är något annat — det är vad barnet har BYGGT, och det ska
+   * inte kunna förväxlas med mätningen. Därför sitter de bredvid varandra och inte i
+   * varandra: ribban kan falla till noll samma kväll som boet når nivå fyra, och båda är
+   * sanna samtidigt.
+   *
+   * Kvistfärgerna blandas ur paletten (honung, sand, kol) i stället för att skrivas som nya
+   * bruna värden. Samma skäl som Designs: boet ska följa med när paletten ändras, inte ligga
+   * bredvid den. Fjädrarna bär palettens accenter — aldrig barnets färg, för färgen är ett
+   * märke (rad 286) och en fjäder som bytte färg med barnet vore märket en gång till.
+   */
+  _bo(post, niva, kand) {
+    if (post.bo) {
+      post.grupp.remove(post.bo)
+      post.bo.traverse((o) => {
+        o.geometry?.dispose?.()
+        o.material?.dispose?.()
+      })
+    }
+
+    const form = boform(kand ? niva : 0)
+    const g = new THREE.Group()
+    // På pinnen under hålet, mitt på, och en aning fram så att varven syns mot barken.
+    g.position.set(0, post.form.hojd * 0.16 - 4.35, DJUP / 2 + 1.2)
+    post.grupp.add(g)
+    post.bo = g
+    post.boform = form
+
+    const kvistMat = KVIST.map(
+      (f) => new THREE.MeshStandardMaterial({ color: f, roughness: 0.95, flatShading: true })
+    )
+    const pinnar = (n, langd, radie, plats) => {
+      for (let i = 0; i < n; i++) {
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(radie, radie * 0.8, langd(i), 4), kvistMat[i % 4])
+        plats(m, i)
+        m.castShadow = true
+        g.add(m)
+      }
+    }
+
+    if (form.varv === 0) {
+      /**
+       * NIVÅ 0 OCH 1 ÄR INTE SMÅ BON. Noll är tre kvistar som ligger; ett är strån i en
+       * grop, utan hål. Designs skäl står i rad 301 och gäller ordagrant här: ett bo som
+       * ser färdigt ut på dag ett tar bort hela poängen med att bygga det.
+       */
+      pinnar(
+        form.kvistar,
+        (i) => form.radie * (1.5 + (i % 3) * 0.35),
+        0.13,
+        (m, i) => {
+          m.rotation.z = Math.PI / 2
+          m.rotation.y = (i / form.kvistar) * Math.PI + skak(i, 7) * 0.1
+          m.position.set(skak(i, 9) * 0.16, form.hojd * 0.5 + (i % 2) * 0.14, skak(i + 3, 9) * 0.12)
+        }
+      )
+      return
+    }
+
+    // Varven. Ett varv är en hel ring — holken ses snett underifrån, inte rakt framifrån.
+    // Vid som en skål: smal i botten, bred vid kanten, precis som boritningens sqrt-kurva.
+    for (let v = 0; v < form.varv; v++) {
+      const t = v / (form.varv - 1)
+      const r = form.radie * (0.52 + 0.48 * Math.sqrt(t))
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(r, 0.15 + (v % 3) * 0.035, 4, 12),
+        kvistMat[v % 4]
+      )
+      ring.rotation.x = Math.PI / 2
+      ring.rotation.z = skak(v, 11) * 0.06
+      ring.position.set(skak(v, 7) * 0.05, form.hojd * t, skak(v + 2, 7) * 0.05)
+      ring.castShadow = true
+      g.add(ring)
+    }
+
+    // Hålet. Varmt, aldrig grått — ett grått hål ser ut som ett fel, inte som ett bo.
+    const hal = new THREE.Mesh(
+      new THREE.CircleGeometry(form.radie * 0.56, 12),
+      new THREE.MeshStandardMaterial({ color: KVIST[3], roughness: 1 })
+    )
+    hal.rotation.x = -Math.PI / 2
+    hal.position.y = form.hojd * 0.72
+    g.add(hal)
+
+    // Lösa kviständar vid kanten. De är skillnaden mellan en skål och ett bo.
+    pinnar(
+      form.kvistar,
+      (i) => 1.5 + ((i * 23) % 12) * 0.14,
+      0.1,
+      (m, i) => {
+        const a = (i / form.kvistar) * Math.PI * 2 + 0.4
+        m.rotation.z = Math.PI / 2 - 0.25 - (i % 3) * 0.12
+        m.rotation.y = -a
+        m.position.set(
+          Math.cos(a) * form.radie * 1.02,
+          form.hojd * (0.5 + (i % 3) * 0.16),
+          Math.sin(a) * form.radie * 1.02
+        )
+      }
+    )
+
+    /**
+     * De invävda fjädrarna, n − 1 stycken på Designs egna platser. De ligger i kanten och
+     * lutar utåt — aldrig en ensam rakt upp i mitten, för den läses som ett misstag och
+     * inte som en fjäder.
+     */
+    for (let i = 0; i < form.fjadrar; i++) {
+      const s = FJADERPLATS[i % FJADERPLATS.length]
+      const a = s * Math.PI * 2
+      const f = new THREE.Mesh(
+        new THREE.ConeGeometry(0.42, 1.7, 3),
+        new THREE.MeshStandardMaterial({ color: FJADERFARG[i % 4], roughness: 0.6, flatShading: true })
+      )
+      f.scale.z = 0.3
+      f.position.set(
+        Math.cos(a) * form.radie * 0.82,
+        form.hojd * 0.92 + 0.5,
+        Math.sin(a) * form.radie * 0.82
+      )
+      f.rotation.z = Math.cos(a) * -0.55
+      f.rotation.x = Math.sin(a) * 0.55
+      g.add(f)
+    }
+  }
+
   _bygg(namn, i, antal) {
     const plats = this.platser(i, antal)
     const g = new THREE.Group()
@@ -174,7 +413,7 @@ export class Holkar {
     g.rotation.y = plats.vinkel
     this.grupp.add(g)
 
-    const form = holkform(0)
+    const form = holkform()
     const tra = new THREE.MeshStandardMaterial({ color: 0x6b5947, roughness: 0.92, flatShading: true })
     const morkt = new THREE.MeshStandardMaterial({ color: 0x2a2118, roughness: 1, flatShading: true })
 
@@ -236,9 +475,18 @@ export class Holkar {
     list.position.set(0, form.hojd / 2 + 0.3, DJUP / 2 + 0.75)
     g.add(list)
 
+    /**
+     * Pinnen sitter LÄGRE än den gjorde, och det är boet som flyttade den.
+     *
+     * Första bilden satte boet på den gamla pinnen, en bit under hålets mitt — och eftersom
+     * hålet är brett låg boet mitt i det. Det såg fint ut och var fel: hålet är instrumentets
+     * ansikte. Det blossar när en minut lämnar budgeten och fågelhuvudet tittar ut genom det.
+     * Ett bo framför hålet döljer händelsen bakom bygget. Nu står de under varandra, och båda
+     * går att läsa samtidigt.
+     */
     const pinne = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 4.2, 6), tra)
     pinne.rotation.x = Math.PI / 2
-    pinne.position.set(0, form.hojd * 0.16 - 2.2, DJUP / 2 + 1.2)
+    pinne.position.set(0, form.hojd * 0.16 - 4.6, DJUP / 2 + 1.2)
     g.add(pinne)
 
     const huvud = new THREE.Group()
@@ -293,7 +541,7 @@ export class Holkar {
     const skylt = this._skylt(`${namn} okänd`, TAL.sage)
     g.add(skylt)
 
-    return {
+    const post = {
       namn,
       grupp: g,
       form,
@@ -312,11 +560,20 @@ export class Holkar {
       farg: TAL.sage,
       lagesFarg: TAL.sage,
       slut: false,
+      bo: null,
+      boform: null,
+      bokand: false,
+      fjadrar: null,
       slagKo: 0,
       slagTill: 0,
       satt: false,
       anvantForut: null,
     }
+
+    // Tre kvistar på pinnen från första bilden. Det är vad kolonin vet i dag, och det är
+    // sant: ingen läsväg bär fjädrar ännu. Se `fjaderlasning()`.
+    this._bo(post, 0, false)
+    return post
   }
 
   update(dt, camera, natt = 0) {
@@ -382,6 +639,9 @@ export class Holkar {
       andel: Math.round(p.andel * 100) / 100,
       ribba: Math.round(p.mal * 100) / 100,
       niva: p.niva,
+      bo: p.bokand ? bonamn(p.niva, true) : 'ingen läsväg',
+      fjadrar: p.fjadrar,
+      varv: p.boform?.varv ?? 0,
       slut: p.slut,
     }))
   }

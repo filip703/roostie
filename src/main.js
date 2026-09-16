@@ -62,7 +62,10 @@ const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer
  * ur en bild. Den finns bara när man ber om den — köksskärmen får aldrig se den.
  */
 if (new URLSearchParams(location.search).get('debug') === '1') {
-  window.__roostie = { colony, engine, settings }
+  // `rig` med: utan den går det inte att STÄLLA kameran från en riggbild, och en riggbild
+  // som inte kan välja utsikt kan bara fotografera de fem utsikter panelen råkar ha knappar
+  // för. Holkarna sitter inte på någon av dem.
+  window.__roostie = { colony, engine, settings, rig }
   /**
    * Felfällan. Ett kast som fångas av ett tomt `.catch(() => {})` någonstans i pollen tar
    * kolonin ur drift utan att lämna ett spår någon utifrån kan läsa. Med `?debug=1` skrivs

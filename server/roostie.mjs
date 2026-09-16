@@ -56,6 +56,15 @@ const konfig = () => ({
 const HEX = /^#[0-9a-f]{6}$/i
 
 const tal = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0)
+/**
+ * Samma som `tal()`, men behåller frånvaron. Ett fält som inte finns blir `null` och inte
+ * noll — se `fjadrar` längre ned för varför den skillnaden är hela poängen.
+ */
+const heltal = (v) => {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
+}
 
 async function hamta() {
   const { url, token, fil } = konfig()
@@ -135,6 +144,23 @@ function tolka(rad) {
       andel: ram > 0 ? Math.max(0, Math.min(1, kvar / ram)) : 0,
       // Barnets egen färg, enbart ur läsvägen. Se filhuvudet.
       farg: typeof b?.farg === 'string' && HEX.test(b.farg.trim()) ? b.farg.trim().toLowerCase() : null,
+      /**
+       * Fjädrarna — Boet 2.0:s räknare, per barn.
+       *
+       * FÄLTET FINNS INTE I `/api/roostie` ÄNNU. Begäran till Sajt ligger på tavlan; det här
+       * är läsvägen som väntar på den, så att dagen siffran kommer är det data som börjar
+       * komma och inte kod som ska skrivas. Tills dess är `fjadrar` null i varje rad, och
+       * holken ritar tre kvistar på pinnen.
+       *
+       * NULL OCH NOLL ÄR INTE SAMMA SAK, och därför går den här inte genom `tal()` som gör
+       * allt till ett tal. Noll fjädrar betyder att barnet inte tjänat någon än — ett
+       * mätvärde, och sant. Null betyder att ingen har mätt. Ritade vi dem lika skulle
+       * köksskärmen påstå något den inte vet, och det är samma fel som en grön vakt utan
+       * mätning (LAXA 23).
+       */
+      fjadrar: heltal(b?.fjadrar),
+      // Nivån direkt, om Sajt hellre skickar den färdiga än råtalet. Råtalet vinner.
+      boniva: heltal(b?.boniva),
     }
   })
 
