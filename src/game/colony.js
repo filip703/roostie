@@ -501,6 +501,14 @@ export class Colony {
       this.skarmtidsfyr.grupp,
       this.terrain,
       this.scatterGroup,
+      /**
+       * Kolonins mark. Den låg inte i listan, och det syntes först när köksskärmen mättes i
+       * dagsljus: bakom trädet stod ett fält av orange stenar. Trädet fyller mitten av
+       * överblicken, så allt runt omkring är bakgrund — och bakgrunden var en annan värld.
+       * `terrain` och `scatterGroup` hänger dessutom UNDER den här gruppen, så de två
+       * raderna ovanför gömde barnen medan föräldern stod kvar synlig.
+       */
+      this.worldGroup,
     ]) {
       if (g && g.visible) g.visible = false
     }

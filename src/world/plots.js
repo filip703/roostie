@@ -740,7 +740,26 @@ export class Plot {
  * shader, so they stay upright and legible from any camera angle without a per-frame
  * lookAt on the CPU.
  */
-export function createLabel(text, accent, pixelRatio = 4) {
+/**
+ * Textens mått på köksskärmen.
+ *
+ * Riggen mäter en etikett till tio bågminuter på tre meters håll med kolonins eget mått.
+ * Sexton är gränsen för att läsa en text i en blick, så 1.7 är inte en smaksak utan kvoten
+ * mellan de två talen, avrundad uppåt.
+ */
+export const KOKSMATT = 1.7
+
+/**
+ * @param skala  Hur stor texten står på skärmen, 1 = kolonins mått.
+ *
+ * Kolonins plättar läses av någon som sitter vid skärmen. Trädet läses av någon som står i
+ * ett kök tre meter bort, och det är inte samma mått. Mätt i riggen: en etikett håller 17
+ * bildpunkter av 1080 i trädets överblick, vilket på en 43-tumsskärm på tre meters håll är
+ * tio bågminuter. Under sexton går en text inte att läsa i en blick, och Lednings rad 240
+ * krav 1 säger att fåglarna, holkarna och skylten SKA gå att läsa där. Därför får trädet
+ * skicka in ett eget mått i stället för att alla skärmar tvingas dela kolonins.
+ */
+export function createLabel(text, accent, pixelRatio = 4, skala = 1) {
   const fontSize = 34
   const font = `500 ${fontSize}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`
   const dot = 9
@@ -808,16 +827,22 @@ export function createLabel(text, accent, pixelRatio = 4) {
     toneMapped: false,
     opacity: 0,
   })
+  const k = Number.isFinite(skala) && skala > 0 ? skala : 1
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace(
       '#include <project_vertex>',
       `vec4 mvPosition = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );
        float dist = -mvPosition.z;
-       mvPosition.xy += position.xy * ( 0.55 + dist * 0.03 );
+       mvPosition.xy += position.xy * ( 0.55 + dist * 0.03 ) * ${k.toFixed(3)};
        gl_Position = projectionMatrix * mvPosition;`
     )
   }
   const mesh = new THREE.Mesh(geo, mat)
+  // Måttet läggs på plattan så att en rigg kan RÄKNA på skärmstorleken. Geometrins hörn
+  // ligger inte där bilden visar dem — shadern flyttar dem — så utan det här talet mäter en
+  // rigg fel och rapporterar tryggt att en oläslig text är läslig.
+  mesh.userData.skala = k
+  mesh.userData.textandel = fontSize / h
   mesh.renderOrder = 8
   mesh.frustumCulled = false
   mesh.visible = false

@@ -26,7 +26,7 @@
  */
 import * as THREE from 'three'
 import { TAL } from './palett.js'
-import { createLabel } from './plots.js'
+import { createLabel, KOKSMATT } from './plots.js'
 import { HAMTAR, SYSSLA_ORD, SYSSLA_TAKT, bostorlek, skatter, syssla, ungar } from './sysslor.js'
 
 export { bostorlek, syssla }
@@ -363,7 +363,8 @@ export class Faglar {
     // Skylten sköter sin egen storlek och riktning i shadern (samma som kolonins plättar
     // använder) — den ska varken skalas eller vridas här. Den kommer dold och genomskinlig;
     // det är opaciteten som tänder den, inte `visible`.
-    const etikett = createLabel(t.namn, t.farg)
+    // 1.7 = kökets mått, inte skrivbordets. Se `createLabel` och Lednings rad 240 krav 1.
+    const etikett = createLabel(t.namn, t.farg, 4, KOKSMATT)
     etikett.position.copy(plats.punkt).add(new THREE.Vector3(0, -6, 4))
     this.grupp.add(etikett)
 

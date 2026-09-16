@@ -36,7 +36,7 @@
  */
 import * as THREE from 'three'
 import { TAL } from './palett.js'
-import { createLabel } from './plots.js'
+import { createLabel, KOKSMATT } from './plots.js'
 import { identitetsFarg, raknaSlag, stapelFarg } from './skarmtidsfyr.js'
 
 /** Holkens grundmått. Satt av läsbarheten i överblicken, inte av en riktig fågelholk. */
@@ -270,7 +270,7 @@ export class Holkar {
   }
 
   _skylt(text, farg) {
-    const s = createLabel(text, farg)
+    const s = createLabel(text, farg, 4, KOKSMATT)
     s.material.opacity = 0.92
     s.position.set(0, -HOJD * 0.62, 4)
     s.visible = true
