@@ -37,38 +37,23 @@ const konfig = () => ({
 })
 
 /**
- * Barnens egna färger, och varför ordningen är omvänd mot vad jag bad om.
+ * Barnens egna färger — numera bara från läsvägen.
  *
- * Bill är blå och Tod är grön i Roost — Filips egna ord den 15 september. Kolonin ska inte
- * hitta på egna färger, så jag bad Ledning (tavlans rad 174) att lägga färgen i läsvägen och
- * tänkte låta den vinna över kopian i miljön.
+ * Bill är blå och Tod är grön i Roost (Filips ord 15 september). Kolonin hittade aldrig på
+ * en färg, men den bar en KOPIA i `ROOSTIE_BARNFARGER` så länge `/api/roostie` inte hade
+ * fältet. Kopian är borta sedan 16 september: Sajt läser `nx_profiles.color` (rad 320),
+ * Produkt har skrivit blått och grönt (rad 324), och jag mätte svaret själv innan jag tog
+ * bort miljöraden — `#4e7f8a` och `#7fa07f`, exakt de beslutade värdena.
  *
- * DEN 15 SEPTEMBER BÖRJADE `/api/roostie` BÄRA `farg` — men den säger `#B5562B` för Bill och
- * `#6B6B3A` för Tod. Det är rost och oliv ur Roosts palett, inte blått och grönt. Läsvägen
- * bär alltså EN färg, men inte den färg Filip sagt att barnen har, och köksskärmen ritade
- * Bill i rost i några timmar innan det upptäcktes.
+ * Kopian NEDPRIORITERADES inte, den TOGS BORT. En stale kopia som kan vinna igen är precis
+ * det fel som gjorde Bill rostfärgad i några timmar dagen innan: läsvägen började bära ett
+ * `farg` som ingen kontrollerat, och rangordningen avgjorde tyst vilken av två sanningar
+ * köksskärmen visade. Två källor till samma fakta är en källa för mycket.
  *
- * Därför vinner `ROOSTIE_BARNFARGER` tills vidare: en uttalad uppgift från Filip slår ett
- * värde ingen bekräftat. Kopian är fortfarande fel plats för färgen, och raden till Ledning
- * står kvar — den dagen läsvägen säger blått och grönt tas miljövariabeln bort och det här
- * stycket med. Saknas båda får fyren statusfärgen som förut; då ljuger den inte, den säger
+ * Saknas fältet får fyren och holken statusfärgen som förut. Då ljuger de inte — de säger
  * bara mindre.
  */
 const HEX = /^#[0-9a-f]{6}$/i
-let barnfargerCache = null
-function barnfarger() {
-  if (barnfargerCache) return barnfargerCache
-  barnfargerCache = new Map()
-  try {
-    const rad = JSON.parse(process.env.ROOSTIE_BARNFARGER || '{}')
-    for (const [namn, hex] of Object.entries(rad)) {
-      if (typeof hex === 'string' && HEX.test(hex.trim())) barnfargerCache.set(namn, hex.trim().toLowerCase())
-    }
-  } catch {
-    // En trasig karta är ingen färg, och ingen färg är ett giltigt svar.
-  }
-  return barnfargerCache
-}
 
 const tal = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0)
 
@@ -148,10 +133,8 @@ function tolka(rad) {
       kvar,
       // Andelen mot ram, aldrig mot tak. Se filhuvudet.
       andel: ram > 0 ? Math.max(0, Math.min(1, kvar / ram)) : 0,
-      // Filips uttalade färg först, läsvägen sedan, annars ingen. Se filhuvudet.
-      farg:
-        barnfarger().get(String(b?.namn || '')) ||
-        (typeof b?.farg === 'string' && HEX.test(b.farg.trim()) ? b.farg.trim().toLowerCase() : null),
+      // Barnets egen färg, enbart ur läsvägen. Se filhuvudet.
+      farg: typeof b?.farg === 'string' && HEX.test(b.farg.trim()) ? b.farg.trim().toLowerCase() : null,
     }
   })
 

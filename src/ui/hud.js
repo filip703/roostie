@@ -47,11 +47,11 @@ const ICON = {
 }
 
 const STAT_DEFS = [
-  { key: 'working', label: 'building', cls: 'working' },
-  { key: 'waiting', label: 'need you', cls: 'waiting' },
-  { key: 'blocked', label: 'blocked', cls: 'blocked' },
-  { key: 'celebrating', label: 'shipped', cls: 'done' },
-  { key: 'agents', label: 'crew', cls: 'idle' },
+  { key: 'working', label: 'bygger', cls: 'working' },
+  { key: 'waiting', label: 'vill dig', cls: 'waiting' },
+  { key: 'blocked', label: 'stoppat', cls: 'blocked' },
+  { key: 'celebrating', label: 'levererat', cls: 'done' },
+  { key: 'agents', label: 'trådar', cls: 'idle' },
 ]
 
 export class Hud {
@@ -86,7 +86,7 @@ export class Hud {
       b.className = `stat ${def.cls}`
       b.type = 'button'
       b.dataset.key = def.key
-      b.title = `Jump to the next ${def.label} astronaut`
+      b.title = `Hoppa till nästa som ${def.label}`
       b.innerHTML = `<i class="pip"></i><span class="n">0</span><span class="lbl">${def.label}</span>`
       b.type = 'button'
       b.addEventListener('click', () => this.actions.focusStatus?.(def.key))
@@ -103,7 +103,7 @@ export class Hud {
     // Quality presets.
     body.appendChild(
       group(
-        'Quality preset',
+        'Kvalitet',
         chips(
           Object.entries(PRESETS).map(([id, p]) => ({ id, label: p.label, title: p.hint })),
           () => s.get('preset'),
@@ -114,64 +114,64 @@ export class Hud {
     )
 
     // Performance.
-    const perf = group('Performance')
+    const perf = group('Prestanda')
     perf.append(
-      this._toggle('HDR + bloom', 'bloom', 'Glowing eyes, lamps and windows. The first thing to drop.'),
-      this._toggle('Tilt-shift', 'tiltShift', 'A shallow depth of field, which is what makes the colony read as a model.'),
+      this._toggle('HDR och sken', 'bloom', 'Lysande ögon, lyktor och fönster. Det första som stryks.'),
+      this._toggle('Tiltskift', 'tiltShift', 'Kort skärpedjup — det är det som får kolonin att läsas som en modell.'),
       this._slider(
-        'Tilt-shift blur',
+        'Tiltskiftets oskärpa',
         'tiltShiftStrength',
         0,
         1,
         0.05,
         (v) => `${Math.round(v * 100)}%`,
-        'Aperture: how shallow the focus is, and how far out of it things go.'
+        'Bländare: hur kort skärpan är, och hur långt utanför den saker hamnar.'
       ),
       this._slider(
-        'Tilt-shift angle',
+        'Tiltskiftets vinkel',
         'tiltShiftAngle',
         -90,
         90,
         1,
         (v) => `${v}°`,
-        'Swings the plane of focus, the way tilting a real lens does.'
+        'Vrider skärpeplanet, som när man tiltar ett riktigt objektiv.'
       ),
-      this._select('Shadows', 'shadows', [
+      this._select('Skuggor', 'shadows', [
         ['off', 'Off'],
         ['low', 'Low'],
         ['high', 'High'],
         ['ultra', 'Ultra'],
       ]),
-      this._select('Particles', 'particles', [
+      this._select('Partiklar', 'particles', [
         ['off', 'Off'],
         ['low', 'Low'],
         ['full', 'Full'],
       ]),
-      this._select('Textures', 'textureQuality', [
+      this._select('Texturer', 'textureQuality', [
         ['low', 'Low'],
         ['medium', 'Medium'],
         ['high', 'High'],
         ['ultra', 'Ultra'],
       ]),
-      this._select('Ground detail', 'groundDetail', [
+      this._select('Markens detalj', 'groundDetail', [
         ['low', 'Low'],
         ['medium', 'Medium'],
         ['high', 'High'],
       ]),
-      this._toggle('Anti-aliasing', 'antialias', 'SMAA pass. Cheap, but not free.'),
+      this._toggle('Kantutjämning', 'antialias', 'SMAA. Billigt, men inte gratis.'),
       this._slider(
-        'Render scale',
+        'Upplösning',
         'renderScale',
         0.35,
         2,
         0.05,
         (v) => `${Math.round(v * 100)}%`,
-        '100% is your display’s own resolution, retina included.'
+        '100 % är skärmens egen upplösning, retina inräknad.'
       ),
-      this._toggle('Adaptive quality', 'autoQuality', 'Quietly drops render scale if frames get expensive.'),
-      this._slider('Scatter', 'scatterDensity', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`),
-      this._slider('Max crew', 'maxAgents', 10, 200, 10, (v) => String(v)),
-      this._toggle('Stars', 'stars')
+      this._toggle('Anpassad kvalitet', 'autoQuality', 'Sänker upplösningen tyst när bilderna blir dyra.'),
+      this._slider('Strössel', 'scatterDensity', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`),
+      this._slider('Högst antal trådar', 'maxAgents', 10, 200, 10, (v) => String(v)),
+      this._toggle('Stjärnor', 'stars')
     )
     body.appendChild(perf)
 
@@ -196,7 +196,7 @@ export class Hud {
     body.appendChild(world)
 
     // Lighting.
-    const light = group('Lighting')
+    const light = group('Ljus')
     light.append(
       chips(
         // `Live` is a time of day like the others from where you are standing, so it belongs
@@ -211,25 +211,25 @@ export class Hud {
         },
         this.controls
       ),
-      this._slider('Time of day', 'timeOfDay', 0, 1, 0.005, clockLabel, undefined, () => {
+      this._slider('Tid på dygnet', 'timeOfDay', 0, 1, 0.005, clockLabel, undefined, () => {
         // Reaching for the slider is a request for a particular light, so stop following the
         // clock — otherwise the next frame would drag the thumb straight back.
         this.settings.set('clockTime', false)
       }),
       this._toggle(
-        'Cycle day/night',
+        'Dygnet går',
         'autoTime',
         'Runs the clock forward on its own. Ignored while the sky is following this machine’s clock.'
       ),
-      this._slider('Cycle length', 'dayLength', 30, 900, 30, (v) => `${Math.round(v / 60)}m`),
+      this._slider('Dygnets längd', 'dayLength', 30, 900, 30, (v) => `${Math.round(v / 60)}m`),
       this._toggle(
-        'Environment light',
+        'Omgivningsljus',
         'ibl',
-        'Image-based lighting taken from this planet’s own sky. Metals get something to reflect.'
+        'Ljus hämtat ur planetens egen himmel. Metall får något att spegla.'
       ),
-      this._slider('Environment', 'iblIntensity', 0, 2, 0.05, (v) => v.toFixed(2)),
-      this._slider('Exposure', 'exposure', 0.4, 2, 0.05, (v) => v.toFixed(2)),
-      this._slider('Bloom', 'bloomStrength', 0, 1.6, 0.02, (v) => v.toFixed(2))
+      this._slider('Omgivning', 'iblIntensity', 0, 2, 0.05, (v) => v.toFixed(2)),
+      this._slider('Exponering', 'exposure', 0.4, 2, 0.05, (v) => v.toFixed(2)),
+      this._slider('Sken', 'bloomStrength', 0, 1.6, 0.02, (v) => v.toFixed(2))
     )
     body.appendChild(light)
 
@@ -237,17 +237,17 @@ export class Hud {
     const view = group('View')
     view.append(
       this._toggle(
-        'Hide dormant repos',
+        'Göm sovande plättar',
         'hideDormant',
         'Takes a repo off the map when every thread in it has been quiet for three days. Its threads are untouched, and it comes back to the same ground the moment one wakes up.'
       )
     )
     view.append(
-      this._toggle('Return to isometric', 'autoFrame', 'Eases the angle back when you stop dragging.'),
-      this._slider('Field of view', 'fov', 20, 60, 1, (v) => `${v}°`),
-      this._toggle('Project labels', 'showLabels'),
-      this._toggle('Reduced motion', 'reducedMotion', 'Calms the bobbing and the camera easing.'),
-      this._toggle('Show FPS', 'showFps')
+      this._toggle('Tillbaka till isometrin', 'autoFrame', 'Vrider tillbaka vinkeln när du släpper.'),
+      this._slider('Synfält', 'fov', 20, 60, 1, (v) => `${v}°`),
+      this._toggle('Namn på plättarna', 'showLabels'),
+      this._toggle('Dämpad rörelse', 'reducedMotion', 'Lugnar guppandet och kamerans mjukhet.'),
+      this._toggle('Visa bilder per sekund', 'showFps')
     )
     body.appendChild(view)
   }
@@ -418,7 +418,7 @@ export class Hud {
       const b = document.createElement('button')
       b.type = 'button'
       b.className = 'repo'
-      b.title = `${p.count} thread${p.count === 1 ? '' : 's'} in ${p.name}`
+      b.title = `${p.count} ${p.count === 1 ? 'tråd' : 'trådar'} i ${p.name}`
       b.setAttribute('aria-pressed', String(p.name === activeName))
       b.innerHTML =
         `<i class="swatch" style="background:${hex(p.accent)};color:${hex(p.accent)}"></i>` +
@@ -428,7 +428,7 @@ export class Hud {
       b.addEventListener('click', () => this.actions.pickProject?.(p.name))
       wrap.appendChild(b)
     }
-    this.$('.sec-head span').textContent = `${projects.length} repo${projects.length === 1 ? '' : 's'}`
+    this.$('.sec-head span').textContent = `${projects.length} ${projects.length === 1 ? 'tråd' : 'trådar'}`
 
     // The hidden list is its own block at the foot of the sidebar: collapsed by default, because
     // the whole point of hiding a repo is not to look at it.
@@ -447,8 +447,8 @@ export class Hud {
       const show = document.createElement('button')
       show.type = 'button'
       show.className = 'btn ghost show-repo'
-      show.title = `Show ${p.name} on the map again`
-      show.textContent = 'Show'
+      show.title = `Visa ${p.name} på kartan igen`
+      show.textContent = 'Visa'
       show.addEventListener('click', () => this.actions.unhideProject?.(p.name))
       row.appendChild(show)
       hiddenWrap.appendChild(row)
@@ -461,13 +461,13 @@ export class Hud {
       const row = document.createElement('div')
       row.className = 'repo hidden-repo folded-note'
       row.innerHTML =
-        `<span class="n">${folded.length} quiet repo${folded.length === 1 ? '' : 's'}` +
-        `, ${n} thread${n === 1 ? '' : 's'}</span>`
+        `<span class="n">${folded.length} ${folded.length === 1 ? 'tyst tråd' : 'tysta trådar'}` +
+        `, ${n} ${n === 1 ? 'samtal' : 'samtal'}</span>`
       const show = document.createElement('button')
       show.type = 'button'
       show.className = 'btn ghost show-repo'
-      show.title = 'Put dormant repos back on the map'
-      show.textContent = 'Show'
+      show.title = 'Lägg tillbaka sovande plättar på kartan'
+      show.textContent = 'Visa'
       show.addEventListener('click', () => this.settings.set('hideDormant', false))
       row.appendChild(show)
       hiddenWrap.appendChild(row)
@@ -634,7 +634,7 @@ export class Hud {
     swatch.style.color = hex(project.accent) // the halo is `currentColor`
     this.$('.side .name').textContent = project.name
     const path = this.$('.side .path')
-    path.textContent = project.path ? shortPath(project.path) : 'folder unknown'
+    path.textContent = project.path ? shortPath(project.path) : 'okänd mapp'
     path.title = project.path || ''
     // Nothing to open a new thread in, and nothing to reveal, without a folder on disk.
     this.$('#btn-new-session').disabled = !project.path
@@ -644,7 +644,7 @@ export class Hud {
     const n = project.threads.length
     const waiting = project.threads.filter((t) => t.status === 'waiting' || t.status === 'blocked').length
     this.$('.side .threads-head').innerHTML =
-      `<span>${n} thread${n === 1 ? '' : 's'}</span>` + (waiting ? `<span class="want">${waiting} need you</span>` : '')
+      `<span>${n} ${n === 1 ? 'tråd' : 'trådar'}</span>` + (waiting ? `<span class="want">${waiting} vill dig</span>` : '')
 
     const list = this.$('.side .threads')
     // A poll rewrites these rows every time a live thread's timestamp moves. Losing your
@@ -659,7 +659,7 @@ export class Hud {
       b.title = STATUS_LABEL[t.status] || t.status
       b.innerHTML =
         '<i class="pip"></i>' +
-        `<span class="t">${escapeHtml(t.title || 'Untitled thread')}</span>` +
+        `<span class="t">${escapeHtml(t.title || 'Namnlös tråd')}</span>` +
         `<span class="when">${ago(t.lastActivityAt)}</span>` +
         (t.worktree ? `<span class="wt">⑂ ${escapeHtml(t.worktree)}</span>` : '')
       b.addEventListener('click', () => this.actions.focusThread?.(t.id))
@@ -700,7 +700,7 @@ export class Hud {
     this.selected = { agent, thread }
     card.classList.add('on')
 
-    this.$('.thread-pop .title').textContent = thread.title || 'Untitled thread'
+    this.$('.thread-pop .title').textContent = thread.title || 'Namnlös tråd'
     const status = STATUS_LABEL[agent.status] || agent.status
     const meta = this.$('.thread-pop .meta')
     const bits = [
@@ -1060,7 +1060,7 @@ function agentSedan(ts) {
 function ago(ts) {
   if (!ts) return 'never'
   const s = Math.max(0, (Date.now() - ts) / 1000)
-  if (s < 60) return 'just now'
+  if (s < 60) return 'nyss'
   if (s < 3600) return `${Math.floor(s / 60)}m ago`
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`
   return `${Math.floor(s / 86400)}d ago`
@@ -1069,18 +1069,18 @@ function ago(ts) {
 const TEMPLATE = `
 <aside class="side panel">
   <header class="brandbar">
-    <div class="brand"><i class="dot"></i>Bot Crossing</div>
-    <button class="btn icon ghost" id="btn-shot" title="Screenshot (P)">${ICON.camera}</button>
-    <button class="btn icon ghost" id="btn-help" title="Help (?)">${ICON.help}</button>
-    <button class="btn icon ghost" id="btn-hide" title="Hide all UI (H)">${ICON.eye}</button>
-    <button class="btn icon ghost" id="btn-settings" title="Settings (S)" aria-pressed="false">${ICON.settings}</button>
+    <div class="brand"><i class="dot"></i>Roostie</div>
+    <button class="btn icon ghost" id="btn-shot" title="Skärmbild (P)">${ICON.camera}</button>
+    <button class="btn icon ghost" id="btn-help" title="Hjälp (?)">${ICON.help}</button>
+    <button class="btn icon ghost" id="btn-hide" title="Göm allt (H)">${ICON.eye}</button>
+    <button class="btn icon ghost" id="btn-settings" title="Inställningar (S)" aria-pressed="false">${ICON.settings}</button>
   </header>
 
   <div class="stats"></div>
 
   <div class="side-body">
     <div class="projects-pane">
-      <div class="sec-head"><span>Repos</span></div>
+      <div class="sec-head"><span>Trådar</span></div>
       <div class="trad-block" hidden>
         <div class="sec-head"><span>Trädet</span><span class="trad-hint">klicka för att flyga dit</span></div>
         <div class="trad-utsikter"></div>
@@ -1097,29 +1097,29 @@ const TEMPLATE = `
       </div>
       <div class="hidden-block" hidden>
         <button type="button" class="hidden-toggle" id="btn-hidden-toggle" aria-expanded="false">
-          <span class="label">0 hidden</span>
+          <span class="label">0 gömda</span>
         </button>
         <div class="hidden-projects" hidden></div>
       </div>
     </div>
 
     <div class="project-detail">
-      <button class="btn ghost back" id="btn-close-project" title="Back to every repo (Esc)">${ICON.back} All repos</button>
+      <button class="btn ghost back" id="btn-close-project" title="Tillbaka till alla trådar (Esc)">${ICON.back} Alla trådar</button>
       <div class="who">
         <i class="swatch"></i>
         <div class="text">
           <div class="name"></div>
           <div class="path"></div>
         </div>
-        <button class="btn icon ghost" id="btn-locate" title="Fly to this zone">${ICON.locate}</button>
+        <button class="btn icon ghost" id="btn-locate" title="Flyg hit">${ICON.locate}</button>
       </div>
       <div class="project-actions">
-        <button class="btn primary" id="btn-new-session" title="Start a new thread in this folder (C)">${ICON.plus} New conversation</button>
+        <button class="btn primary" id="btn-new-session" title="Starta ett nytt samtal i tråden (C)">${ICON.plus} Nytt samtal</button>
         <div class="pair">
-          <button class="btn" id="btn-reveal" title="Show this folder in ${FILE_MANAGER}">${ICON.folder} ${FILE_MANAGER}</button>
-          <button class="btn" id="btn-copy-path" title="Copy the folder path">${ICON.copy} Copy path</button>
+          <button class="btn" id="btn-reveal" title="Visa mappen i ${FILE_MANAGER}">${ICON.folder} ${FILE_MANAGER}</button>
+          <button class="btn" id="btn-copy-path" title="Kopiera sökvägen">${ICON.copy} Kopiera sökväg</button>
         </div>
-        <button class="btn" id="btn-hide-project" title="Hide this repo from the colony — does not archive its threads">${ICON.eyeOff} Hide from colony</button>
+        <button class="btn" id="btn-hide-project" title="Göm plätten i kolonin — arkiverar inga trådar">${ICON.eyeOff} Göm i kolonin</button>
       </div>
       <div class="threads-head"></div>
       <div class="threads"></div>
@@ -1128,16 +1128,16 @@ const TEMPLATE = `
 </aside>
 
 <div class="rail panel">
-  <button class="btn icon" id="btn-home" title="Reset the view (0)">${ICON.home}</button>
-  <button class="btn icon" id="btn-next" title="Next astronaut waiting on you (N)">${ICON.next}</button>
+  <button class="btn icon" id="btn-home" title="Nollställ vyn (0)">${ICON.home}</button>
+  <button class="btn icon" id="btn-next" title="Nästa som väntar på dig (N)">${ICON.next}</button>
   <div class="sep"></div>
-  <button class="btn icon" id="btn-orbit" title="Orbit mode — sweep around the colony (O)" aria-pressed="false">${ICON.orbit}</button>
-  <button class="btn icon" id="btn-planet" title="Change planet (Tab)">${ICON.globe}</button>
-  <button class="btn icon" id="btn-time" title="Change the time of day (L)">${ICON.sun}</button>
+  <button class="btn icon" id="btn-orbit" title="Kamerabana runt kolonin (O)" aria-pressed="false">${ICON.orbit}</button>
+  <button class="btn icon" id="btn-planet" title="Byt planet (Tab)">${ICON.globe}</button>
+  <button class="btn icon" id="btn-time" title="Byt tid på dygnet (L)">${ICON.sun}</button>
 </div>
 
 <div class="settings panel closed">
-  <header>Settings <button class="btn icon ghost" id="btn-close-settings" title="Close">${ICON.close}</button></header>
+  <header>Inställningar <button class="btn icon ghost" id="btn-close-settings" title="Stäng">${ICON.close}</button></header>
   <div class="body"></div>
 </div>
 
@@ -1149,7 +1149,7 @@ const TEMPLATE = `
       <div class="title"></div>
       <div class="meta"></div>
     </div>
-    <button class="btn icon ghost" id="btn-deselect" title="Deselect (Esc)">${ICON.close}</button>
+    <button class="btn icon ghost" id="btn-deselect" title="Avmarkera (Esc)">${ICON.close}</button>
   </div>
   <div class="progress"><i></i></div>
   <!-- Vad tråden senast skrev på tavlan, och framför allt vad den ber om när den håller upp
@@ -1157,8 +1157,8 @@ const TEMPLATE = `
   <div class="rad"></div>
   <div class="pair">
     <button class="btn primary" id="btn-open" title="Open this thread in the harness it came from (Enter)">${ICON.open} Open</button>
-    <button class="btn" id="btn-viewed" title="Stop this thread asking for you until it moves on again (V)">${ICON.eye} Viewed</button>
-    <button class="btn" id="btn-archive" title="Archive — this astronaut walks back to the ship (A)">${ICON.archive} Archive</button>
+    <button class="btn" id="btn-viewed" title="Sluta be om dig tills tråden gjort något nytt (V)">${ICON.eye} Sedd</button>
+    <button class="btn" id="btn-archive" title="Arkivera — astronauten går tillbaka till skeppet (A)">${ICON.archive} Arkivera</button>
   </div>
 </div>
 
@@ -1168,42 +1168,42 @@ const TEMPLATE = `
 
 <div class="help">
   <div class="sheet panel">
-    <h2>Bot Crossing</h2>
-    <p class="sub">Every coding-agent thread on this machine is an astronaut. They walk out of the ship, claim a plot for their repo, and build. Click one to open its thread; click a zone — its deck or its name — for the repo itself, and start a new conversation there. Hide a repo from that panel if you would rather not see it — its threads stay in your harness, and you can show it again from the list. Navigation works like Google Earth — drag the ground itself, right-drag to tilt, scroll to zoom in on whatever is under the cursor.</p>
+    <h2>Roostie</h2>
+    <p class="sub">Varje tråd i Roost är en astronaut i kolonin och en fågel i trädet. Klicka på en för att öppna dess samtal; klicka på en plätt — däcket eller namnet — för repot självt. Göm en plätt du inte vill se, så ligger dess trådar kvar i Loggboken och går att ta fram igen ur listan. Navigeringen fungerar som Google Earth: dra i marken, högerdra för att luta, rulla för att zooma mot det som ligger under pekaren. <code>?varld=trad</code> byter till trädet och <code>?kiosk=1</code> till köksläget.</p>
     <div class="cols">
       <div>
-        <div class="k"><span>Drag the ground</span><kbd>drag</kbd></div>
-        <div class="k"><span>Tilt &amp; rotate</span><kbd>right-drag</kbd></div>
+        <div class="k"><span>Dra i marken</span><kbd>dra</kbd></div>
+        <div class="k"><span>Luta och vrid</span><kbd>högerdra</kbd></div>
         <div class="k"><span>&nbsp;</span><kbd>⌃ or ⇧ + drag</kbd></div>
-        <div class="k"><span>Zoom to cursor</span><kbd>scroll</kbd></div>
-        <div class="k"><span>Move / zoom</span><kbd>arrows</kbd> <kbd>+ −</kbd></div>
-        <div class="k"><span>Reset view</span><kbd>0</kbd></div>
-        <div class="k"><span>Hide all UI</span><kbd>H</kbd> <kbd>${IS_MAC ? '⌘' : 'Ctrl'}\\</kbd></div>
-        <div class="k"><span>Settings</span><kbd>S</kbd></div>
-        <div class="k"><span>Screenshot</span><kbd>P</kbd></div>
+        <div class="k"><span>Zooma mot pekaren</span><kbd>rulla</kbd></div>
+        <div class="k"><span>Flytta och zooma</span><kbd>piltangenter</kbd> <kbd>+ −</kbd></div>
+        <div class="k"><span>Nollställ vyn</span><kbd>0</kbd></div>
+        <div class="k"><span>Göm allt</span><kbd>H</kbd> <kbd>${IS_MAC ? '⌘' : 'Ctrl'}\\</kbd></div>
+        <div class="k"><span>Inställningar</span><kbd>S</kbd></div>
+        <div class="k"><span>Skärmbild</span><kbd>P</kbd></div>
       </div>
       <div>
-        <div class="k"><span>Next needing you</span><kbd>N</kbd></div>
-        <div class="k"><span>Open thread</span><kbd>Enter</kbd></div>
-        <div class="k"><span>Mark viewed</span><kbd>V</kbd></div>
-        <div class="k"><span>Archive</span><kbd>A</kbd></div>
-        <div class="k"><span>New conversation</span><kbd>C</kbd></div>
-        <div class="k"><span>Orbit mode</span><kbd>O</kbd></div>
-        <div class="k"><span>Change planet</span><kbd>Tab</kbd></div>
-        <div class="k"><span>Time of day</span><kbd>L</kbd></div>
-        <div class="k"><span>Deselect</span><kbd>Esc</kbd></div>
-        <div class="k"><span>This sheet</span><kbd>?</kbd></div>
+        <div class="k"><span>Nästa som vill dig</span><kbd>N</kbd></div>
+        <div class="k"><span>Öppna tråden</span><kbd>Enter</kbd></div>
+        <div class="k"><span>Markera sedd</span><kbd>V</kbd></div>
+        <div class="k"><span>Arkivera</span><kbd>A</kbd></div>
+        <div class="k"><span>Nytt samtal</span><kbd>C</kbd></div>
+        <div class="k"><span>Kamerabana</span><kbd>O</kbd></div>
+        <div class="k"><span>Byt planet</span><kbd>Tab</kbd></div>
+        <div class="k"><span>Tid på dygnet</span><kbd>L</kbd></div>
+        <div class="k"><span>Avmarkera</span><kbd>Esc</kbd></div>
+        <div class="k"><span>Det här bladet</span><kbd>?</kbd></div>
       </div>
     </div>
     <div style="margin-top:16px">
-      <div class="legend-row"><i class="badge" style="background:#1a2b46;color:#8fb4ee">?</i> waiting on your reply — click to open the thread</div>
-      <div class="legend-row"><i class="badge" style="background:#3d1c1c;color:#e88b8b">!</i> the session hit an error</div>
-      <div class="legend-row"><i class="badge" style="background:#16301f;color:#7fd39a">⚒</i> running right now, building</div>
-      <div class="legend-row"><i class="badge" style="background:#332b12;color:#e6c67f">✓</i> its pull request landed</div>
-      <div class="legend-row"><i class="badge" style="background:#1d1f2e;color:#a9a8c0">z</i> nothing for three days</div>
+      <div class="legend-row"><i class="badge" style="background:#1a2b46;color:#8fb4ee">?</i> väntar på ditt svar — klicka för att öppna tråden</div>
+      <div class="legend-row"><i class="badge" style="background:#3d1c1c;color:#e88b8b">!</i> tråden har stannat på ett fel</div>
+      <div class="legend-row"><i class="badge" style="background:#16301f;color:#7fd39a">⚒</i> arbetar just nu</div>
+      <div class="legend-row"><i class="badge" style="background:#332b12;color:#e6c67f">✓</i> har levererat</div>
+      <div class="legend-row"><i class="badge" style="background:#1d1f2e;color:#a9a8c0">z</i> tyst i tre dygn</div>
     </div>
     <div style="margin-top:18px;display:flex;justify-content:flex-end">
-      <button class="btn primary" id="btn-help-close">Got it</button>
+      <button class="btn primary" id="btn-help-close">Uppfattat</button>
     </div>
   </div>
 </div>

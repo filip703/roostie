@@ -61,15 +61,23 @@ const LAYOUT_MEMORY = 80
 
 export const STATUS_ORDER = ['blocked', 'waiting', 'working', 'celebrating', 'idle', 'sleeping']
 
+/**
+ * Trådarnas läge i ord. Svenska, som resten av köksskärmen.
+ *
+ * Skärmen står i ett kök i Sollentuna och läses av en familj. Att hälften av den talade
+ * engelska var arv från bot-crossing, inte ett val — och ett gränssnitt som talar två språk
+ * läses som två gränssnitt. Upphovet står kvar där det hör hemma: LICENSE, CREDITS.md och
+ * ROOSTIE.md.
+ */
 export const STATUS_LABEL = {
-  working: 'Working',
-  waiting: 'Waiting on you',
-  blocked: 'Blocked',
-  celebrating: 'Shipped',
-  idle: 'Idle',
-  sleeping: 'Dormant',
-  spawning: 'Arriving',
-  leaving: 'Heading home',
+  working: 'Arbetar',
+  waiting: 'Väntar på dig',
+  blocked: 'Stoppad',
+  celebrating: 'Levererat',
+  idle: 'Vilar',
+  sleeping: 'Sover',
+  spawning: 'Kommer',
+  leaving: 'På väg hem',
 }
 
 /** Thread → behaviour. First match wins, exactly like the board's auto-sort. */
