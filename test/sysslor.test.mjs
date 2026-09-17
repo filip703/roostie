@@ -53,8 +53,9 @@ test('nyss aktiv utan dagsverke bygger i stället för att mata', () => {
   assert.equal(syssla({ sist: sedan(60 * 1000), rader: 0 }, NU), 'bygger')
 })
 
-test('utan tidsstämpel gissas ingenting', () => {
-  assert.equal(syssla({ running: true }, NU), 'matar')
+test('running = hamrar, oavsett tidsstämpel', () => {
+  assert.equal(syssla({ running: true }, NU), 'hamrar')
+  assert.equal(syssla({ running: true, sist: sedan(60 * 1000) }, NU), 'hamrar')
   assert.equal(syssla({ running: false }, NU), 'sover')
   assert.equal(syssla({ running: false, vantar: [1] }, NU), 'ruvar')
   assert.equal(syssla(null, NU), 'sover')

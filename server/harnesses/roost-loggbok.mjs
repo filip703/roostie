@@ -143,6 +143,28 @@ function chattUrl(trad) {
  * är aldrig "ok").
  */
 let cache = { at: 0, rader: null, fel: '' }
+let passCache = { at: 0, perTrad: null }
+
+/** Hämtar pass-status från /api/pass. Returnerar null tyst om endpoint saknas eller fäller. */
+async function hamtaPass() {
+  if (Date.now() - passCache.at < CACHE_MS) return passCache.perTrad
+  const { url, token } = konfig()
+  if (!url || !token) return null
+  try {
+    const passUrl = url.replace(/\/loggbok\b/, '/pass')
+    const svar = await fetch(`${passUrl}?token=${encodeURIComponent(token)}`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(HAMTA_TIMEOUT_MS),
+    })
+    if (!svar.ok) return null
+    const data = await svar.json()
+    const perTrad = data?.perTrad || null
+    passCache = { at: Date.now(), perTrad }
+    return perTrad
+  } catch {
+    return null
+  }
+}
 
 async function hamtaRader() {
   const { url, token, fil } = konfig()
@@ -195,7 +217,7 @@ async function repoSokvag(repo) {
 }
 
 async function scanThreads() {
-  const { rader, fardig } = await tavlan()
+  const [{ rader, fardig }, passPerTrad] = await Promise.all([tavlan(), hamtaPass()])
   if (!rader) return []
 
   /** En hink per tråd, i tidsordning. */
@@ -234,7 +256,12 @@ async function scanThreads() {
 
     // Hamrar bara på ett färskt "börjar" som ingen "klart" stängt. En tråd som glömt skriva
     // klart ska sluta hamra av sig själv, annars ljuger kolonin i en vecka.
-    const pagar = fardig && senaste.fas === 'borjar' && nu - senaste.nar < ARBETSFONSTER_MS
+    const passInfo = passPerTrad?.[trad] || null
+    // /api/pass ger tidigare signal än loggboken: syns direkt när cron startar, innan BÖRJAR postas.
+    const pagarEnligtPass = Boolean(passInfo?.pagarNu)
+    const pagar = pagarEnligtPass || (fardig && senaste.fas === 'borjar' && nu - senaste.nar < ARBETSFONSTER_MS)
+    // Rött bär i boet om senaste pass avslutades med fel.
+    const passError = Boolean(passInfo?.senaste?.exit && passInfo.senaste.exit !== '0')
 
     // "TILL FILIP" i en notisrubrik är tavlans sätt att vinka. Kolonin håller upp ett ? tills
     // du klickat Viewed; skriver tråden något nytt vinkar den igen. Den nyaste rubriken följer
@@ -277,6 +304,7 @@ async function scanThreads() {
       // Tavlan vet inte när du tittade — kolonin gör det själv (Viewed-knappen).
       lastFocusedAt: 0,
       running: pagar,
+      passError,
       unread: vinkar,
       notis: vinkar ? text(sista.rubrik, 160) : '',
       notisText: vinkar ? text(sista.text, 400) : '',

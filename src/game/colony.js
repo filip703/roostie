@@ -582,6 +582,7 @@ export class Colony {
         farg: this.plots.get(projekt)?.accent ?? 0xc4a678,
         rader: arbete ? arbete.rader : 0,
         running: Boolean(t.running),
+        passError: Boolean(t.passError),
         unread: Boolean(t.unread),
         notis: Boolean(t.notis),
         hasError: Boolean(t.hasError),

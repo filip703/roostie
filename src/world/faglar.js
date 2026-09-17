@@ -237,6 +237,15 @@ function byggBo(farg, r) {
    * värdefullt som tråden inte kan göra något åt själv. Den syns bara när något på tavlan är
    * ställt till Filip, och den glimtar en gång per väntande rad.
    */
+  // Rött bär vid boet: syns när senaste passet avslutades med exit ≠ 0.
+  const felbär = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.22, 0),
+    new THREE.MeshStandardMaterial({ color: TAL.crit, roughness: 0.5, flatShading: true, emissive: TAL.crit, emissiveIntensity: 0.35 })
+  )
+  felbär.position.set(0.95, 0.18, 0.65)
+  felbär.visible = false
+  g.add(felbär)
+
   const skatt = new THREE.Group()
   skatt.position.y = 0.06
   skatt.visible = false
@@ -258,7 +267,7 @@ function byggBo(farg, r) {
   g.add(skatt)
 
   g.scale.setScalar(BOSKALA)
-  return { grupp: g, lykta, ungarna, skatt, sten, glimt, varv }
+  return { grupp: g, lykta, ungarna, skatt, sten, glimt, varv, felbär }
 }
 
 /** Sångringarna. Tre ringar som växer ut och tonar bort — hörbart, fast man inte hör. */
@@ -441,6 +450,14 @@ export class Faglar {
       ut.huvud = 0.3
       return ut
     }
+    if (f.lage === 'hamrar') {
+      // Stannar på boet och hackar upprepat — huvud lungar ner i hack-rytm, kroppen vickar.
+      const hack = Math.pow(Math.max(0, Math.sin(u * Math.PI * 4)), 1.5)
+      ut.mal = V.copy(hem).setY(hem.y - 0.6 + hack * 0.4)
+      ut.huvud = -0.65 * hack
+      ut.vinge = 0.2 + hack * 0.15
+      return ut
+    }
 
     // Hämtrundorna: ut till grönskan eller grenen, tillbaka till boet.
     // En tom lista får aldrig nå fram hit: boet självt är den sista utvägen, och en fågel som
@@ -568,13 +585,15 @@ export class Faglar {
         bo.glimt.material.opacity = Math.pow(Math.max(0, 1 - Math.abs(fas - 0.12) * 9), 2)
       }
 
-      // Lyktan: lugn puls normalt, snabb och röd när tråden står still.
+      // Rött bär: syns när senaste passet för den här tråden avslutades med fel.
+      bo.felbär.visible = Boolean(f.trad.passError)
+
+      // Lyktan: lugn puls normalt, snabb och röd vid larm, stadig vit-guld när cron kör.
       const larm = f.lage === 'larmar'
-      bo.lykta.material.color.setHex(larm ? TAL.crit : f.trad.farg)
-      // Additivt ljus blåser ut i vitt på nära håll. Lyktan tonas därför ner när kameran är
-      // nära och upp när den är långt borta — den ska vara en prick på håll, inte en sol.
-      const bas = (larm ? 0.42 : f.lage === 'sover' ? 0.1 : 0.2) * THREE.MathUtils.clamp(camera ? camera.position.distanceTo(f.pos) / 70 : 1, 0.25, 1)
-      bo.lykta.material.opacity = bas + Math.sin(this.tid * (larm ? 7 : 1.5) + f.u * 4) * 0.1 + natt * 0.16
+      const cronIgang = f.lage === 'hamrar'
+      bo.lykta.material.color.setHex(larm ? TAL.crit : cronIgang ? TAL.honey : f.trad.farg)
+      const bas = (larm ? 0.42 : cronIgang ? 0.38 : f.lage === 'sover' ? 0.1 : 0.2) * THREE.MathUtils.clamp(camera ? camera.position.distanceTo(f.pos) / 70 : 1, 0.25, 1)
+      bo.lykta.material.opacity = bas + Math.sin(this.tid * (larm ? 7 : cronIgang ? 4.5 : 1.5) + f.u * 4) * 0.1 + natt * 0.16
 
       // ── sången ────────────────────────────────────────────────────────────────────────
       const sjunger = f.lage === 'sjunger'

@@ -70,11 +70,11 @@ export function syssla(trad, nu = Date.now()) {
   if (trad.hasError) return 'larmar'
   if (trad.notis || trad.unread) return 'sjunger'
   if (trad.archived) return 'sover'
+  // Pågående pass syns direkt — fågeln hamrar innan BÖRJAR-raden hinner postas.
+  if (trad.running) return 'hamrar'
 
   const sist = Number(trad.sist) || 0
-  // Ingen tidsstämpel alls är inte samma sak som tystnad. En tråd som säger sig arbeta får
-  // arbeta; annars faller den till det lugnaste läget i stället för att ljuga om att den är igång.
-  if (!sist) return trad.running ? 'matar' : skatter(trad) > 0 ? 'ruvar' : 'sover'
+  if (!sist) return skatter(trad) > 0 ? 'ruvar' : 'sover'
 
   const sedan = Math.max(0, nu - sist)
   if (sedan < MATAR_MS) return ungar(trad.rader) > 0 ? 'matar' : 'bygger'
@@ -87,6 +87,7 @@ export function syssla(trad, nu = Date.now()) {
 /** Sysslan i ord, för panelen. Samma ord som kommentaren ovan — en sanning, två ställen. */
 export const SYSSLA_ORD = {
   larmar: 'larmar',
+  hamrar: 'kör ett pass',
   ruvar: 'ruvar på ditt svar',
   sjunger: 'sjunger',
   matar: 'matar ungarna',
@@ -98,6 +99,7 @@ export const SYSSLA_ORD = {
 /** Hur ofta en syssla gör om sin rörelse, i sekunder. Kort loop = tråden ser jäktad ut. */
 export const SYSSLA_TAKT = {
   larmar: 2.2,
+  hamrar: 2.4,
   ruvar: 7.5,
   sjunger: 5.5,
   matar: 6.5,
