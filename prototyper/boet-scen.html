@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<title>Boet — konceptfilm 17 sep 2026</title>
+<style>
+html, body {
+  margin: 0; padding: 0;
+  background: #0C1830;
+  width: 1024px; height: 768px;
+  overflow: hidden;
+}
+canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1024" height="768"></canvas>
+<script>
+'use strict';
+
+const W = 1024, H = 768;
+const cv = document.getElementById('c');
+const g = cv.getContext('2d');
+
+// Palett (roostie/src/world/palett.js + nexus midnight-lake)
+const C = {
+  bg:          '#0C1830',
+  bgGlow:      '#1a3060',
+  branch:      '#2a4435',
+  branchHL:    '#3d6650',
+  nestDark:    '#4a2e18',
+  nestMid:     '#8a6640',
+  nestLight:   '#c4a678',
+  nestRim:     '#d7a85f',
+  cream:       '#f4ede1',
+  dimmed:      '#9aa79c',
+  fClay:       '#c9785e',
+  fCamel:      '#c4a678',
+  fHoney:      '#d7a85f',
+  fForest:     '#35584a',
+  eggShell:    '#ede0c4',
+  eggSpot:     '#c4a678',
+  eggCrack:    '#7a5830',
+  glow:        '#ffe8b0',
+  birdBody:    '#d7a85f',
+  birdWing:    '#c9785e',
+  birdBeak:    '#e8a060',
+  gold:        '#d7a85f',
+  petrol:      '#4e7f8a',
+};
+
+const TOTAL = 10500;
+let t0 = null;
+
+// ── Matte ─────────────────────────────────────────────
+const lerp  = (a, b, t) => a + (b - a) * t;
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const eo    = t => 1 - (1 - t) ** 3;      // ease-out cubic
+const eo2   = t => 1 - (1 - t) ** 2;      // ease-out quad
+const eio   = t => t < 0.5 ? 4*t*t*t : 1 - (-2*t+2)**3/2;
+
+// Deterministisk pseudo-slump — samma seed → samma bo varje frame
+const mkRng = seed => {
+  let s = (seed | 0) + 1;
+  return () => { s = Math.imul(s, 1664525) + 1013904223 | 0; return (s >>> 0) / 0xFFFFFFFF; };
+};
+
+// ── Gren ──────────────────────────────────────────────
+function drawBranch(alpha) {
+  if (alpha <= 0) return;
+  g.save(); g.globalAlpha = alpha;
+
+  // skugga
+  g.beginPath();
+  g.moveTo(80, 426); g.bezierCurveTo(420, 434, 620, 424, 880, 420);
+  g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 32; g.lineCap = 'round'; g.stroke();
+
+  // stam
+  g.beginPath();
+  g.moveTo(80, 422); g.bezierCurveTo(420, 428, 620, 418, 880, 415);
+  g.strokeStyle = C.branch; g.lineWidth = 26; g.stroke();
+
+  // highlight (ljusare topp)
+  g.beginPath();
+  g.moveTo(80, 417); g.bezierCurveTo(420, 421, 620, 412, 880, 409);
+  g.strokeStyle = C.branchHL; g.lineWidth = 8; g.globalAlpha = alpha * 0.4; g.stroke();
+
+  g.restore();
+}
+
+// ── Bo ────────────────────────────────────────────────
+const NX = 420, NY = 398, NR = 62;
+
+function drawNest(progress) {
+  if (progress <= 0) return;
+  g.save(); g.translate(NX, NY);
+
+  const rng = mkRng(17);
+  const TWIGS = 34;
+  const drawn = Math.ceil(TWIGS * progress);
+
+  for (let i = 0; i < drawn; i++) {
+    const ang   = rng() * Math.PI * 2;
+    const len   = NR * (0.75 + rng() * 0.5) * progress;
+    const cpAng = ang + (rng() - 0.5) * 1.4;
+    const cpLen = len * (0.4 + rng() * 0.3);
+    const cpX   = Math.cos(cpAng) * cpLen;
+    const cpY   = Math.sin(cpAng) * cpLen * 0.55;
+    const ex    = Math.cos(ang) * len;
+    const ey    = Math.sin(ang) * len * 0.52;
+    const col   = [C.nestDark, C.nestMid, C.nestLight][Math.floor(rng() * 3)];
+
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.quadraticCurveTo(cpX, cpY, ex, ey);
+    g.strokeStyle = col;
+    g.lineWidth = 1.2 + rng() * 2.4;
+    g.globalAlpha = 0.5 + rng() * 0.4;
+    g.stroke();
+  }
+
+  // inre skål (mörk botten)
+  g.globalAlpha = 0.55 * progress;
+  const inner = g.createRadialGradient(0, 6, 0, 0, 0, NR * 0.55);
+  inner.addColorStop(0, '#2a1a0a');
+  inner.addColorStop(1, 'rgba(42,26,10,0)');
+  g.fillStyle = inner;
+  g.beginPath();
+  g.ellipse(0, 4, NR * 0.55 * progress, NR * 0.3 * progress, 0, 0, Math.PI * 2);
+  g.fill();
+
+  // framkant (rim)
+  g.globalAlpha = progress;
+  g.beginPath();
+  g.ellipse(0, 6, NR * progress * 1.05, NR * 0.38 * progress, 0, Math.PI * 0.12, Math.PI * 0.88);
+  g.strokeStyle = C.nestRim;
+  g.lineWidth = 5.5 * progress;
+  g.stroke();
+
+  g.restore();
+}
+
+// ── Fjäder ────────────────────────────────────────────
+function drawFeather(cx, cy, angle, len, col, alpha) {
+  if (alpha <= 0) return;
+  g.save();
+  g.globalAlpha = alpha;
+  g.translate(cx, cy);
+  g.rotate(angle);
+
+  // spole
+  g.beginPath();
+  g.moveTo(0, -len * 0.52); g.lineTo(0, len * 0.48);
+  g.strokeStyle = col; g.lineWidth = 1.5; g.lineCap = 'round'; g.stroke();
+
+  // fann
+  for (let y = -len * 0.42; y < len * 0.38; y += 4.5) {
+    const bw = Math.max(0, (len * 0.3 - Math.abs(y) * 0.5) * 0.6);
+    if (bw < 0.5) continue;
+    g.lineWidth = 0.9;
+    g.beginPath(); g.moveTo(0, y); g.lineTo( bw, y - bw * 0.35); g.stroke();
+    g.beginPath(); g.moveTo(0, y); g.lineTo(-bw, y - bw * 0.35); g.stroke();
+  }
+  g.restore();
+}
+
+// Fjädrar som hamnar i boet (fasta platser)
+const inNestFjadrar = [
+  { tx: NX - 20, ty: NY + 6,  angle: -0.45, col: C.fClay,   len: 22 },
+  { tx: NX + 12, ty: NY + 2,  angle:  0.32, col: C.fHoney,  len: 19 },
+  { tx: NX - 6,  ty: NY - 8,  angle: -0.12, col: C.fCamel,  len: 24 },
+  { tx: NX + 24, ty: NY + 14, angle:  0.58, col: C.fForest, len: 17 },
+];
+
+// Starpositioner utanför canvas
+const fjaderFran = [
+  { sx: -40,    sy: 210 },
+  { sx: W + 40, sy: 175 },
+  { sx: -40,    sy: 490 },
+  { sx: W + 40, sy: 365 },
+];
+
+// ── Ägg ───────────────────────────────────────────────
+function drawEgg(cx, cy, scale, crack, glowAmt, wobbleRad) {
+  if (scale <= 0) return;
+  const ew = 30 * scale, eh = 38 * scale;
+
+  g.save(); g.translate(cx, cy); g.rotate(wobbleRad);
+
+  // yttre sken
+  if (glowAmt > 0) {
+    const gr = g.createRadialGradient(0, 0, 0, 0, 0, eh * 2.4);
+    gr.addColorStop(0, `rgba(255,218,120,${glowAmt * 0.55})`);
+    gr.addColorStop(1, 'rgba(255,218,120,0)');
+    g.fillStyle = gr; g.globalAlpha = 1;
+    g.beginPath(); g.ellipse(0, 0, eh * 2.4, eh * 2.4, 0, 0, Math.PI * 2); g.fill();
+  }
+
+  // äggkropp
+  g.globalAlpha = 1;
+  g.beginPath(); g.ellipse(0, 0, ew, eh, 0, 0, Math.PI * 2);
+  g.fillStyle = C.eggShell; g.fill();
+
+  // fläckar
+  const rng = mkRng(42);
+  for (let i = 0; i < 10; i++) {
+    const ex = (rng() - 0.5) * ew * 1.5;
+    const ey = (rng() - 0.5) * eh * 1.4;
+    if ((ex / ew) ** 2 + (ey / eh) ** 2 < 0.85) {
+      g.beginPath(); g.arc(ex, ey, rng() * 2.8 + 0.8, 0, Math.PI * 2);
+      g.fillStyle = C.eggSpot; g.globalAlpha = 0.42; g.fill();
+    }
+  }
+
+  // sprickor
+  if (crack > 0) {
+    const c1a = clamp(crack * 2.5, 0, 1);
+    g.globalAlpha = c1a;
+    g.strokeStyle = C.eggCrack; g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(-ew * 0.35, 0); g.lineTo(-ew * 0.05, -eh * 0.2);
+    g.lineTo( ew * 0.18, eh * 0.07); g.lineTo(ew * 0.38, -eh * 0.14);
+    g.stroke();
+
+    const c2a = clamp(crack * 2.5 - 0.7, 0, 1);
+    g.globalAlpha = c2a;
+    g.beginPath();
+    g.moveTo(-ew * 0.12, eh * 0.28); g.lineTo(ew * 0.1, eh * 0.12);
+    g.lineTo(ew * 0.32, eh * 0.38);
+    g.stroke();
+
+    // sken ur spricka
+    if (crack > 0.35) {
+      const cg = (crack - 0.35) / 0.65;
+      g.globalAlpha = cg * 0.95;
+      g.strokeStyle = C.glow; g.lineWidth = 3.5;
+      g.beginPath();
+      g.moveTo(-ew * 0.35, 0); g.lineTo(-ew * 0.05, -eh * 0.2);
+      g.lineTo( ew * 0.18, eh * 0.07); g.lineTo(ew * 0.38, -eh * 0.14);
+      g.stroke();
+    }
+  }
+  g.restore();
+}
+
+// ── Fågel ─────────────────────────────────────────────
+function drawBird(cx, cy, size, bobY, faceLeft) {
+  g.save(); g.translate(cx, cy + bobY);
+  if (faceLeft) g.scale(-1, 1);
+
+  // kropp
+  g.beginPath(); g.ellipse(0, 0, size * 0.68, size * 0.48, -0.08, 0, Math.PI * 2);
+  g.fillStyle = C.birdBody; g.fill();
+
+  // vinge
+  g.beginPath(); g.ellipse(size * 0.1, size * 0.09, size * 0.44, size * 0.24, 0.3, 0, Math.PI * 2);
+  g.fillStyle = C.birdWing; g.fill();
+
+  // huvud
+  g.beginPath(); g.arc(-size * 0.5, -size * 0.2, size * 0.33, 0, Math.PI * 2);
+  g.fillStyle = C.birdBody; g.fill();
+
+  // öga (ljust)
+  g.beginPath(); g.arc(-size * 0.56, -size * 0.29, size * 0.1, 0, Math.PI * 2);
+  g.fillStyle = '#1c2620'; g.fill();
+  g.beginPath(); g.arc(-size * 0.58, -size * 0.31, size * 0.04, 0, Math.PI * 2);
+  g.fillStyle = 'rgba(255,255,255,0.85)'; g.fill();
+
+  // näbb
+  g.beginPath();
+  g.moveTo(-size * 0.79, -size * 0.21);
+  g.lineTo(-size * 1.0,  -size * 0.14);
+  g.lineTo(-size * 0.79, -size * 0.07);
+  g.closePath();
+  g.fillStyle = C.birdBeak; g.fill();
+
+  // stjärt
+  g.beginPath();
+  g.moveTo(size * 0.6, 0);
+  g.lineTo(size * 0.92, -size * 0.2);
+  g.lineTo(size * 0.88, size * 0.12);
+  g.closePath();
+  g.fillStyle = C.birdWing; g.fill();
+
+  g.restore();
+}
+
+// ── Gåvobox ───────────────────────────────────────────
+function drawGift(cx, cy, sc) {
+  g.save(); g.translate(cx, cy);
+  // box
+  g.fillStyle = '#c9785e';
+  g.fillRect(-14 * sc, -12 * sc, 28 * sc, 24 * sc);
+  // band
+  g.fillStyle = C.gold;
+  g.fillRect(-2 * sc,  -12 * sc, 4 * sc, 24 * sc);
+  g.fillRect(-14 * sc, -2 * sc,  28 * sc, 4 * sc);
+  // rosett
+  g.beginPath();
+  g.moveTo(0, -12 * sc);
+  g.bezierCurveTo(-9 * sc, -23 * sc, -16 * sc, -13 * sc, 0, -12 * sc);
+  g.fillStyle = C.gold; g.fill();
+  g.beginPath();
+  g.moveTo(0, -12 * sc);
+  g.bezierCurveTo( 9 * sc, -23 * sc, 16 * sc, -13 * sc, 0, -12 * sc);
+  g.fill();
+  g.restore();
+}
+
+// ── Konfetti-fjädrar ──────────────────────────────────
+const rngConf = mkRng(99);
+const CONF = Array.from({ length: 24 }, (_, i) => ({
+  ox:    NX + (rngConf() - 0.5) * 60,
+  oy:    NY - 22,
+  vx:    (rngConf() - 0.5) * 240,
+  vy:   -148 - rngConf() * 110,
+  col:   [C.fClay, C.fCamel, C.fHoney, C.fForest][i % 4],
+  ang:   rngConf() * Math.PI * 2,
+  spin:  (rngConf() - 0.5) * 9,
+  len:   10 + rngConf() * 9,
+}));
+
+// ── Syskonbo ──────────────────────────────────────────
+const SX = 658, SY = 418, SR = 36;
+
+function drawSibBranch(alpha) {
+  if (alpha <= 0) return;
+  g.save(); g.globalAlpha = alpha;
+  g.beginPath();
+  g.moveTo(580, SY + 8); g.bezierCurveTo(620, SY + 10, 690, SY + 5, 780, SY + 2);
+  g.strokeStyle = C.branch; g.lineWidth = 18; g.lineCap = 'round'; g.stroke();
+  g.beginPath();
+  g.moveTo(580, SY + 4); g.bezierCurveTo(620, SY + 6, 690, SY + 1, 780, SY - 2);
+  g.strokeStyle = C.branchHL; g.lineWidth = 6; g.globalAlpha = alpha * 0.35; g.stroke();
+  g.restore();
+}
+
+function drawSibNest(sc) {
+  if (sc <= 0) return;
+  g.save(); g.translate(SX, SY);
+  const rng = mkRng(31);
+  for (let i = 0; i < 20; i++) {
+    const ang = rng() * Math.PI * 2;
+    const len = SR * (0.78 + rng() * 0.38) * sc;
+    const cpX = Math.cos(ang + 0.4) * len * 0.4;
+    const cpY = Math.sin(ang + 0.4) * len * 0.26;
+    const ex  = Math.cos(ang) * len;
+    const ey  = Math.sin(ang) * len * 0.52;
+    const col = [C.nestDark, C.nestMid, C.nestLight][Math.floor(rng() * 3)];
+    g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(cpX, cpY, ex, ey);
+    g.strokeStyle = col; g.lineWidth = 1.1 + rng() * 1.8;
+    g.globalAlpha = 0.5 + rng() * 0.38; g.stroke();
+  }
+  g.globalAlpha = sc;
+  g.beginPath();
+  g.ellipse(0, 4, SR * sc * 1.05, SR * 0.37 * sc, 0, Math.PI * 0.12, Math.PI * 0.88);
+  g.strokeStyle = C.nestRim; g.lineWidth = 4 * sc; g.stroke();
+  g.restore();
+}
+
+// ── UI-overlay ────────────────────────────────────────
+function drawUI(alpha) {
+  if (alpha <= 0) return;
+  g.save(); g.globalAlpha = alpha;
+
+  // Topplist
+  g.fillStyle = 'rgba(6,16,40,0.88)';
+  g.fillRect(0, 0, W, 54);
+
+  g.font = 'bold 20px Georgia, serif';
+  g.fillStyle = C.cream; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('Boet', W / 2, 27);
+
+  g.font = '13px Arial, sans-serif';
+  g.fillStyle = C.dimmed; g.textAlign = 'left';
+  g.fillText('Bill', 20, 27);
+
+  g.fillStyle = C.gold; g.textAlign = 'right';
+  g.fillText('45 min ⏱', W - 20, 27);
+
+  // Bottenlist
+  const bY = H - 58;
+  g.fillStyle = 'rgba(6,16,40,0.88)';
+  g.fillRect(0, bY, W, 58);
+
+  const tabs = ['⏱ Skärmtid', '✓ Uppdrag', '◉ Butik'];
+  tabs.forEach((lbl, i) => {
+    const x = W / 4 * (i + 1);
+    g.font = '13px Arial, sans-serif';
+    g.fillStyle = C.dimmed;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(lbl, x, bY + 29);
+  });
+
+  g.restore();
+}
+
+// ── Huvud-animation ───────────────────────────────────
+function frame(ts) {
+  if (!t0) t0 = ts;
+  const ms = ts - t0;
+  const tFull = clamp(ms / TOTAL, 0, 1);
+
+  // Scenfaser (ms-gränser)
+  const s_branch  = eo(clamp(ms / 700,       0, 1));   // 0–0.7s
+  const s_nest    = eo(clamp((ms-150) / 900,  0, 1));   // 0.15–1.05s
+  const s_fjad    = clamp((ms-500) / 1000,    0, 1);    // 0.5–1.5s
+  const s_lvlup   = clamp((ms-2000) / 800,    0, 1);    // 2.0–2.8s
+  const s_egg     = eo(clamp((ms-3000) / 500, 0, 1));   // 3.0–3.5s
+  const s_cd      = clamp((ms-3300) / 1600,   0, 1);    // 3.3–4.9s
+  const s_wobble  = clamp((ms-3400) / 1600,   0, 1);    // 3.4–5.0s
+  const s_crack   = clamp((ms-5000) / 900,    0, 1);    // 5.0–5.9s
+  const s_flash   = clamp((ms-5900) / 350,    0, 1);    // 5.9–6.25s
+  const s_bird    = eo(clamp((ms-6100) / 600, 0, 1));   // 6.1–6.7s
+  const s_gift    = eo(clamp((ms-7400) / 650, 0, 1));   // 7.4–8.05s
+  const s_sib     = eo(clamp((ms-8200) / 750, 0, 1));   // 8.2–8.95s
+  const s_ui      = eo(clamp((ms-8800) / 700, 0, 1));   // 8.8–9.5s
+
+  // ── Bakgrund ──
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+
+  // Ambient glöd vid kläckning
+  if (s_crack > 0.2 && s_flash < 0.85) {
+    const ga = (s_crack - 0.2) / 0.8 * (1 - s_flash);
+    const gr = g.createRadialGradient(NX, NY, 0, NX, NY, 340);
+    gr.addColorStop(0, `rgba(255,215,120,${ga * 0.18})`);
+    gr.addColorStop(1, 'rgba(255,215,120,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  }
+
+  // ── Grenar ──
+  drawBranch(s_branch);
+  if (s_sib > 0) drawSibBranch(s_sib);
+
+  // ── Syskonbo ──
+  if (s_sib > 0) {
+    drawSibNest(s_sib);
+    g.save(); g.globalAlpha = s_sib;
+    g.font = '13px Arial, sans-serif';
+    g.fillStyle = C.dimmed; g.textAlign = 'center';
+    g.fillText('Tods bo', SX, SY - SR - 14);
+    g.restore();
+  }
+
+  // ── Bo ──
+  drawNest(s_nest);
+
+  // ── Fjädrar flyger in ──
+  inNestFjadrar.forEach((fp, i) => {
+    const delay = i * 0.23;
+    const fT = clamp((s_fjad - delay) / (1 - delay), 0, 1);
+    if (fT <= 0) return;
+    const fe = eo(fT);
+    const cx = lerp(fjaderFran[i].sx, fp.tx, fe);
+    const cy = lerp(fjaderFran[i].sy, fp.ty, fe);
+    drawFeather(cx, cy, lerp(0, fp.angle, fe), fp.len, fp.col, fe);
+  });
+
+  // Fjädrar i vila i boet (efter flygning, tills kläckning)
+  if (s_fjad > 0.92 && s_crack < 0.5) {
+    const fa = Math.min((s_fjad - 0.92) / 0.08, 1) * (1 - s_crack / 0.5);
+    inNestFjadrar.forEach(fp => drawFeather(fp.tx, fp.ty, fp.angle, fp.len, fp.col, fa));
+  }
+
+  // ── Nivå-upp ──
+  if (s_lvlup > 0) {
+    const lf = s_lvlup > 0.72 ? 1 - (s_lvlup - 0.72) / 0.28 : 1;
+    const lp = eo(Math.min(s_lvlup * 3, 1));
+
+    // ring
+    g.save(); g.globalAlpha = lf * 0.65;
+    g.beginPath(); g.arc(NX, NY, NR * 0.25 + lp * NR * 3, 0, Math.PI * 2);
+    g.strokeStyle = C.gold; g.lineWidth = 2.5; g.stroke();
+    g.restore();
+
+    // text
+    g.save(); g.globalAlpha = lf;
+    const fontSize = Math.floor(lp * 56 + 6);
+    g.font = `bold ${fontSize}px Georgia, serif`;
+    g.fillStyle = C.gold; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('Nivå 2!', NX, NY - 82 - lp * 14);
+    g.restore();
+
+    // konfetti
+    CONF.forEach((p, i) => {
+      const ct = clamp(s_lvlup - i * 0.034, 0, 1);
+      if (ct <= 0) return;
+      const cx = p.ox + p.vx * ct * 0.8;
+      const cy = p.oy + p.vy * ct * 0.8 + 620 * ct * ct * 0.8;
+      const ca = Math.max(0, 1 - ct * 1.45);
+      drawFeather(cx, cy, p.ang + p.spin * ct, p.len, p.col, ca);
+    });
+  }
+
+  // ── Ägg ──
+  if (s_egg > 0 && s_flash < 0.78) {
+    const wobble = s_crack < 0.05
+      ? Math.sin(ms * 0.0065) * 2.5 * Math.min(s_wobble * 4, 1)
+      : Math.sin(ms * 0.028)  * 8   * Math.max(1 - s_crack * 1.4, 0);
+    const glowAmt = s_crack > 0.3 ? (s_crack - 0.3) / 0.7 : 0;
+    drawEgg(NX, NY - 20, s_egg, s_crack > 0.08 ? s_crack : 0, glowAmt, wobble * Math.PI / 180);
+
+    // nedräkning
+    if (s_cd > 0.08 && s_crack < 0.38) {
+      const minL = Math.max(1, Math.floor(58 - s_cd * 54));
+      const ca = s_crack > 0.2 ? 1 - (s_crack - 0.2) / 0.18 : 1;
+      g.save(); g.globalAlpha = ca;
+      g.font = '15px "Courier New", monospace';
+      g.fillStyle = C.dimmed; g.textAlign = 'center';
+      g.fillText(`${minL} min kvar`, NX, NY + 55);
+      g.restore();
+    }
+  }
+
+  // ── Kläckningsblixt ──
+  if (s_flash > 0 && s_flash < 1) {
+    const fa = Math.sin(s_flash * Math.PI) * 0.72;
+    g.fillStyle = `rgba(255,225,155,${fa})`;
+    g.fillRect(0, 0, W, H);
+  }
+
+  // ── Fågel ──
+  if (s_bird > 0) {
+    const bob  = Math.sin(ms * 0.0085) * 3.5;
+    const hop  = s_bird > 0.4 ? Math.abs(Math.sin(ms * 0.013)) * 5 : 0;
+    const sway = Math.sin(ms * 0.005) * 11;
+    const face = Math.sin(ms * 0.004) > 0;
+    drawBird(NX + sway, NY - 24, 23 * s_bird, bob + hop, face);
+
+    // Gåva
+    if (s_gift > 0) {
+      const gf = s_gift > 0.78 ? 1 - (s_gift - 0.78) / 0.22 : 1;
+      g.save(); g.globalAlpha = s_gift * gf;
+      drawGift(NX + 56, NY - 30, s_gift);
+      if (s_gift > 0.45) {
+        const xa = Math.min((s_gift - 0.45) / 0.2, 1) * gf;
+        g.globalAlpha = xa;
+        g.font = 'bold 13px Arial, sans-serif';
+        g.fillStyle = C.gold; g.textAlign = 'center';
+        g.fillText('+10 XP', NX + 56, NY + 14);
+      }
+      g.restore();
+    }
+  }
+
+  // ── Inledningstext ──
+  if (s_nest > 0.08 && s_lvlup < 0.25) {
+    const ta = Math.min((s_nest - 0.08) / 0.25, 1) * (1 - s_lvlup / 0.25);
+    g.save(); g.globalAlpha = ta;
+    g.font = 'bold 30px Georgia, serif';
+    g.fillStyle = C.cream; g.textAlign = 'center';
+    g.fillText('Boet', NX, 88);
+    g.font = '15px Arial, sans-serif';
+    g.fillStyle = C.dimmed;
+    g.fillText('Bills fågel bygger sitt bo', NX, 114);
+    g.restore();
+  }
+
+  // ── UI-overlay ──
+  drawUI(s_ui);
+
+  // ── Vattenstämpel ──
+  if (tFull > 0.93) {
+    const wa = (tFull - 0.93) / 0.07;
+    g.save(); g.globalAlpha = wa * 0.52;
+    g.font = '12px "Courier New", monospace';
+    g.fillStyle = C.dimmed; g.textAlign = 'center';
+    g.fillText('kolonin · konceptfilm · 17 sep 2026', W / 2, H - 9);
+    g.restore();
+  }
+
+  if (tFull < 1) requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

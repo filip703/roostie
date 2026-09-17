@@ -18,3 +18,9 @@ assets-src
 
 # Local capture output — not part of the project.
 recordings
+
+# Prototyper: genererade filer (video, screenshots, node_modules)
+prototyper/*.webm
+prototyper/*.png
+prototyper/node_modules
+prototyper/package-lock.json
