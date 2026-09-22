@@ -677,3 +677,61 @@ function bezier(a, b, c, t, ut) {
 }
 
 const damp = (a, b, lambda, dt) => THREE.MathUtils.lerp(a, b, 1 - Math.exp(-lambda * dt))
+
+/**
+ * Boet-fågeln — barnets kläckta fågel, för BoetScen och boet-riggen.
+ *
+ * Separat från tråd-fåglarna: inga sysslor, inga boplatser. Den bor i boet
+ * och animeras av den som importerar den. Exporteras så att rigg och produktion
+ * delar samma geometri; ingen extra beroende, bara en funktion.
+ *
+ * Returnerar { grupp, vingar, huvud, mat } — samma interface som tråd-fåglarna
+ * exponerar, så animationsloopen kan behandla dem lika om det behövs.
+ */
+export function byggBoetFagel(farg = 0x4e7f8a) {
+  const g = new THREE.Group()
+  const mat = new THREE.MeshStandardMaterial({ color: farg, roughness: 0.62, flatShading: true })
+  const horn = new THREE.MeshStandardMaterial({ color: 0xd7a85f, roughness: 0.4, flatShading: true })
+  const morkt = new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 0.3 })
+
+  const kroppGeo = new THREE.IcosahedronGeometry(0.95, 1)
+  kroppGeo.scale(1.15, 1, 1.35)
+  const kropp = new THREE.Mesh(kroppGeo, mat)
+  kropp.castShadow = true
+  g.add(kropp)
+
+  const huvud = new THREE.Mesh(new THREE.IcosahedronGeometry(0.62, 1), mat)
+  huvud.position.set(0, 0.78, 0.5)
+  huvud.castShadow = true
+  g.add(huvud)
+
+  const nabb = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.6, 4), horn)
+  nabb.rotation.x = Math.PI / 2
+  nabb.position.set(0, 0.7, 1.08)
+  g.add(nabb)
+
+  for (const sida of [-1, 1]) {
+    const oga = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), morkt)
+    oga.position.set(sida * 0.29, 0.88, 0.86)
+    g.add(oga)
+  }
+
+  const stjart = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.1, 4), mat)
+  stjart.rotation.x = -Math.PI / 2.4
+  stjart.position.set(0, 0.22, -1.1)
+  g.add(stjart)
+
+  const vingar = []
+  for (const sida of [-1, 1]) {
+    const vg = new THREE.ConeGeometry(0.42, 1.25, 4)
+    vg.scale(1, 1, 0.42)
+    const vinge = new THREE.Mesh(vg, mat)
+    vinge.position.set(sida * 0.85, 0.16, 0)
+    vinge.rotation.z = sida * 1.15
+    vinge.castShadow = true
+    g.add(vinge)
+    vingar.push(vinge)
+  }
+
+  return { grupp: g, vingar, huvud, mat }
+}
