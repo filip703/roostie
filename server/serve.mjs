@@ -30,9 +30,9 @@ function resolveInDist(pathname) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
 
-  // Kiosk: redirect bare root to tree world (rad 443)
+  // Kiosk: redirect bare root to astronauter world (rad 1099 — ändrat från trad, rad 443)
   if (url.pathname === '/' && !url.searchParams.has('varld')) {
-    res.writeHead(302, { Location: '/?varld=trad&kiosk=1', 'Cache-Control': 'no-cache' })
+    res.writeHead(302, { Location: '/?varld=astronauter&kiosk=1', 'Cache-Control': 'no-cache' })
     res.end()
     return
   }
