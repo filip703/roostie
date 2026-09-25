@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Boet PixiJS — motorprov</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  background: #0C1830;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+canvas { display: block; }
+#halla {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 88px);
+  left: 50%; transform: translateX(-50%);
+  background: rgba(53,88,74,.85);
+  border: 2px solid #d7a85f;
+  border-radius: 16px;
+  color: #f4ede1;
+  font: bold 18px Georgia, serif;
+  padding: 16px 40px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  z-index: 10;
+}
+#halla.aktiv { background: rgba(215,168,95,.30); }
+#perf {
+  position: fixed; top: 8px; right: 12px;
+  font: 12px/1.5 'Courier New', monospace;
+  color: #9aa79c; text-align: right;
+  pointer-events: none; z-index: 10;
+}
+#motor {
+  position: fixed; bottom: calc(env(safe-area-inset-bottom) + 6px);
+  left: 0; right: 0; text-align: center;
+  font: 11px 'Courier New', monospace; color: rgba(154,167,156,.6);
+  pointer-events: none; z-index: 10;
+}
+</style>
+</head>
+<body>
+<div id="perf">-- fps · -- MB</div>
+<button id="halla">Håll in</button>
+<div id="motor">kolonin · motorprov PixiJS · 25 sep 2026</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@7.3.3/dist/pixi.min.js"></script>
+<script>
+'use strict';
+
+// ── Palett ────────────────────────────────────────────
+const C = {
+  bg:       0x0C1830,
+  branch:   0x2a4435,
+  branchHL: 0x3d6650,
+  nestDark: 0x4a2e18,
+  nestMid:  0x8a6640,
+  nestLight:0xc4a678,
+  nestRim:  0xd7a85f,
+  fClay:    0xc9785e,
+  fCamel:   0xc4a678,
+  fHoney:   0xd7a85f,
+  fForest:  0x35584a,
+  eggShell: 0xede0c4,
+  eggSpot:  0xc4a678,
+  eggCrack: 0x7a5830,
+  glow:     0xffe8b0,
+  birdBody: 0xd7a85f,
+  birdWing: 0xc9785e,
+  birdBeak: 0xe8a060,
+  gold:     0xd7a85f,
+  cream:    0xf4ede1,
+  dimmed:   0x9aa79c,
+};
+const FEATHER_COLS = [C.fClay, C.fCamel, C.fHoney, C.fForest];
+
+// ── Pseudo-rng (samma seed = samma bo) ───────────────
+function mkRng(seed) {
+  let s = (seed | 0) + 1;
+  return () => { s = Math.imul(s, 1664525) + 1013904223 | 0; return (s >>> 0) / 0xFFFFFFFF; };
+}
+
+// ── PixiJS app ────────────────────────────────────────
+const app = new PIXI.Application({
+  width:  window.innerWidth,
+  height: window.innerHeight,
+  backgroundColor: C.bg,
+  antialias: true,
+  resolution: Math.min(window.devicePixelRatio || 1, 2),
+  autoDensity: true,
+  powerPreference: 'high-performance',
+});
+document.body.appendChild(app.view);
+
+// Skala ned scenen till 4:3 med letterboxing
+const BASE_W = 1024, BASE_H = 768;
+const sceneRoot = new PIXI.Container();
+app.stage.addChild(sceneRoot);
+
+function onResize() {
+  const sw = window.innerWidth, sh = window.innerHeight;
+  const scl = Math.min(sw / BASE_W, sh / BASE_H);
+  sceneRoot.scale.set(scl);
+  sceneRoot.x = (sw - BASE_W * scl) / 2;
+  sceneRoot.y = (sh - BASE_H * scl) / 2;
+}
+onResize();
+window.addEventListener('resize', onResize);
+
+// ── Scen-konstanter ───────────────────────────────────
+const NX = 420, NY = 398, NR = 62;   // bo-mitten
+const nestProgress = 0.75;            // bo nivå 3 = ~75% byggt
+
+// ── Scen-lager ────────────────────────────────────────
+const bgLayer    = new PIXI.Container();
+const nestLayer  = new PIXI.Container();
+const fjadLayer  = new PIXI.Container();
+const eggLayer   = new PIXI.Container();
+const birdLayer  = new PIXI.Container();
+const uiLayer    = new PIXI.Container();
+sceneRoot.addChild(bgLayer, nestLayer, fjadLayer, eggLayer, birdLayer, uiLayer);
+
+// ── Rita gren ─────────────────────────────────────────
+function buildBranch() {
+  const g = new PIXI.Graphics();
+
+  // skugga
+  g.lineStyle(32, 0x000000, 0.4, 0.5, true);
+  g.moveTo(80, 426); g.bezierCurveTo(420, 434, 620, 424, 880, 420);
+
+  // stam
+  g.lineStyle(26, C.branch, 1, 0.5, true);
+  g.moveTo(80, 422); g.bezierCurveTo(420, 428, 620, 418, 880, 415);
+
+  // highlight
+  g.lineStyle(8, C.branchHL, 0.4, 0.5, true);
+  g.moveTo(80, 417); g.bezierCurveTo(420, 421, 620, 412, 880, 409);
+
+  return g;
+}
+
+// ── Rita bo ───────────────────────────────────────────
+function buildNest(progress) {
+  const g = new PIXI.Graphics();
+  const rng = mkRng(17);
+  const TWIGS = 34;
+  const drawn = Math.ceil(TWIGS * progress);
+
+  for (let i = 0; i < drawn; i++) {
+    const ang   = rng() * Math.PI * 2;
+    const len   = NR * (0.75 + rng() * 0.5) * progress;
+    const cpAng = ang + (rng() - 0.5) * 1.4;
+    const cpLen = len * (0.4 + rng() * 0.3);
+    const cpX   = Math.cos(cpAng) * cpLen;
+    const cpY   = Math.sin(cpAng) * cpLen * 0.55;
+    const ex    = Math.cos(ang) * len;
+    const ey    = Math.sin(ang) * len * 0.52;
+    const col   = [C.nestDark, C.nestMid, C.nestLight][Math.floor(rng() * 3)];
+
+    const a = 0.5 + rng() * 0.4;
+    g.lineStyle(1.2 + rng() * 2.4, col, a, 0.5, true);
+    g.moveTo(NX + 0, NY + 0);
+    g.quadraticCurveTo(NX + cpX, NY + cpY, NX + ex, NY + ey);
+  }
+
+  // inre skål — radialGradient via Graphics trick (ellipse darker fill)
+  g.lineStyle(0);
+  g.beginFill(0x2a1a0a, 0.4 * progress);
+  g.drawEllipse(NX, NY + 4, NR * 0.55 * progress, NR * 0.30 * progress);
+  g.endFill();
+
+  // framkant (rim arc)
+  g.lineStyle(5.5 * progress, C.nestRim, progress, 0.5, true);
+  g.arc(NX, NY + 6, NR * progress, Math.PI * 0.12, Math.PI * 0.88);
+
+  return g;
+}
+
+// ── Rita fjäder (Graphics) ───────────────────────────
+function buildFeather(col, len) {
+  const g = new PIXI.Graphics();
+  g.lineStyle(1.5, col, 1, 0.5, true);
+  g.moveTo(0, -len * 0.52); g.lineTo(0, len * 0.48);
+
+  for (let y = -len * 0.42; y < len * 0.38; y += 4.5) {
+    const bw = Math.max(0, (len * 0.3 - Math.abs(y) * 0.5) * 0.6);
+    if (bw < 0.5) continue;
+    g.lineStyle(0.9, col, 1, 0.5, true);
+    g.moveTo(0, y); g.lineTo( bw, y - bw * 0.35);
+    g.moveTo(0, y); g.lineTo(-bw, y - bw * 0.35);
+  }
+  return g;
+}
+
+// ── Rita ägg ─────────────────────────────────────────
+function buildEgg() {
+  const g = new PIXI.Graphics();
+  return g;
+}
+
+function drawEgg(g, crack, wobble) {
+  g.clear();
+  const ew = 30, eh = 38;
+
+  // yttre sken vid kläckning
+  if (crack > 0.3) {
+    const glowA = (crack - 0.3) / 0.7 * 0.45;
+    g.lineStyle(0);
+    g.beginFill(C.glow, glowA * 0.3);
+    g.drawEllipse(0, 0, eh * 2.4, eh * 2.4);
+    g.endFill();
+  }
+
+  // kropp
+  g.lineStyle(0);
+  g.beginFill(C.eggShell, 1);
+  g.drawEllipse(0, 0, ew, eh);
+  g.endFill();
+
+  // fläckar
+  const rng = mkRng(42);
+  for (let i = 0; i < 10; i++) {
+    const ex = (rng() - 0.5) * ew * 1.5;
+    const ey = (rng() - 0.5) * eh * 1.4;
+    if ((ex / ew) ** 2 + (ey / eh) ** 2 < 0.85) {
+      g.beginFill(C.eggSpot, 0.42);
+      g.drawCircle(ex, ey, rng() * 2.8 + 0.8);
+      g.endFill();
+    }
+  }
+
+  // sprickor
+  if (crack > 0) {
+    const c1a = Math.min(crack * 2.5, 1);
+    g.lineStyle(2, C.eggCrack, c1a, 0.5, true);
+    g.moveTo(-ew * 0.35, 0); g.lineTo(-ew * 0.05, -eh * 0.2);
+    g.lineTo(ew * 0.18, eh * 0.07); g.lineTo(ew * 0.38, -eh * 0.14);
+
+    const c2a = Math.max(0, Math.min(crack * 2.5 - 0.7, 1));
+    g.lineStyle(2, C.eggCrack, c2a, 0.5, true);
+    g.moveTo(-ew * 0.12, eh * 0.28); g.lineTo(ew * 0.1, eh * 0.12);
+    g.lineTo(ew * 0.32, eh * 0.38);
+
+    if (crack > 0.35) {
+      const ga = (crack - 0.35) / 0.65;
+      g.lineStyle(3.5, C.glow, ga, 0.5, true);
+      g.moveTo(-ew * 0.35, 0); g.lineTo(-ew * 0.05, -eh * 0.2);
+      g.lineTo(ew * 0.18, eh * 0.07); g.lineTo(ew * 0.38, -eh * 0.14);
+    }
+  }
+
+  g.rotation = wobble * Math.PI / 180;
+}
+
+// ── Rita fågel ────────────────────────────────────────
+function buildBird() {
+  const g = new PIXI.Graphics();
+  return g;
+}
+
+function drawBird(g, size, faceLeft) {
+  g.clear();
+  const sc = faceLeft ? -1 : 1;
+
+  // kropp
+  g.lineStyle(0);
+  g.beginFill(C.birdBody);
+  g.drawEllipse(0, 0, size * 0.68, size * 0.48);
+  g.endFill();
+
+  // vinge
+  g.beginFill(C.birdWing);
+  g.drawEllipse(sc * size * 0.1, size * 0.09, size * 0.44, size * 0.24);
+  g.endFill();
+
+  // huvud
+  g.beginFill(C.birdBody);
+  g.drawCircle(-sc * size * 0.5, -size * 0.2, size * 0.33);
+  g.endFill();
+
+  // öga
+  g.beginFill(0x1c2620);
+  g.drawCircle(-sc * size * 0.56, -size * 0.29, size * 0.1);
+  g.endFill();
+  g.beginFill(0xffffff, 0.85);
+  g.drawCircle(-sc * size * 0.58, -size * 0.31, size * 0.04);
+  g.endFill();
+
+  // näbb
+  g.lineStyle(0);
+  g.beginFill(C.birdBeak);
+  g.moveTo(-sc * size * 0.79, -size * 0.21);
+  g.lineTo(-sc * size * 1.0,  -size * 0.14);
+  g.lineTo(-sc * size * 0.79, -size * 0.07);
+  g.closePath();
+  g.endFill();
+
+  // stjärt
+  g.beginFill(C.birdWing);
+  g.moveTo(sc * size * 0.6,  0);
+  g.lineTo(sc * size * 0.92, -size * 0.2);
+  g.lineTo(sc * size * 0.88,  size * 0.12);
+  g.closePath();
+  g.endFill();
+}
+
+// ── Tillstånd ─────────────────────────────────────────
+const state = {
+  fjadrar: 3,            // fjädrar redan i boet
+  maxFjadrar: 9,         // antal fjädrar innan ägg kläcks
+  niva: 3,
+  aggKlackt: false,
+  aggCrack: 0,
+  aggWobble: 0,
+  fagelVis: false,
+  fagelScale: 0,
+  fagelBob: 0,
+  fagelFaceLeft: false,
+  fagelHopT: 0,          // 0–1 — hop-animation
+  hallsIn: false,
+  lastFjaderTid: 0,
+  flyingFjadrar: [],     // { g, sx, sy, tx, ty, angle, col, len, t, started }
+  flashT: -1,
+  fjadSaldo: 7,          // fjädrar i plånboken
+};
+
+// ── Fasta fjäderpositioner i boet ────────────────────
+const nestFjadrar = [
+  { tx: NX - 20, ty: NY + 6,  angle: -0.45, col: C.fClay,   len: 22 },
+  { tx: NX + 12, ty: NY + 2,  angle:  0.32, col: C.fHoney,  len: 19 },
+  { tx: NX - 6,  ty: NY - 8,  angle: -0.12, col: C.fCamel,  len: 24 },
+  { tx: NX + 24, ty: NY + 14, angle:  0.58, col: C.fForest, len: 17 },
+  { tx: NX - 14, ty: NY + 16, angle: -0.28, col: C.fHoney,  len: 20 },
+  { tx: NX + 4,  ty: NY - 14, angle:  0.19, col: C.fClay,   len: 18 },
+  { tx: NX - 28, ty: NY - 4,  angle: -0.6,  col: C.fCamel,  len: 21 },
+  { tx: NX + 30, ty: NY + 4,  angle:  0.44, col: C.fForest, len: 16 },
+  { tx: NX - 4,  ty: NY + 12, angle: -0.05, col: C.fHoney,  len: 23 },
+];
+
+// ── Bygg grundscenen ──────────────────────────────────
+const branchGfx = buildBranch();
+bgLayer.addChild(branchGfx);
+
+const nestGfx = buildNest(nestProgress);
+nestLayer.addChild(nestGfx);
+
+// Fjädrar som redan sitter i boet (niv 3 = 3 st)
+const nestFjadGfx = nestFjadrar.map(fp => {
+  const g = buildFeather(fp.col, fp.len);
+  g.x = fp.tx; g.y = fp.ty; g.rotation = fp.angle;
+  return g;
+});
+nestFjadGfx.forEach((g, i) => {
+  g.visible = i < state.fjadrar;
+  fjadLayer.addChild(g);
+});
+
+// Ägg
+const eggCont = new PIXI.Container();
+eggCont.x = NX; eggCont.y = NY - 22;
+const eggGfx = buildEgg();
+eggCont.addChild(eggGfx);
+eggLayer.addChild(eggCont);
+drawEgg(eggGfx, 0, 0);
+
+// Fågel
+const birdCont = new PIXI.Container();
+birdCont.x = NX; birdCont.y = NY - 24;
+birdCont.alpha = 0;
+const birdGfx = buildBird();
+birdCont.addChild(birdGfx);
+birdLayer.addChild(birdCont);
+
+// UI: nivå och saldo
+const txtNiva = new PIXI.Text('Nivå 3', {
+  fill: 0xf4ede1, fontSize: 20, fontFamily: 'Georgia, serif', fontWeight: 'bold',
+});
+txtNiva.x = 20; txtNiva.y = 16;
+uiLayer.addChild(txtNiva);
+
+const txtSaldo = new PIXI.Text('7 fjädrar', {
+  fill: 0xd7a85f, fontSize: 15, fontFamily: 'Arial, sans-serif',
+});
+txtSaldo.anchor.x = 1;
+txtSaldo.x = BASE_W - 20; txtSaldo.y = 22;
+uiLayer.addChild(txtSaldo);
+
+const txtKlackt = new PIXI.Text('', {
+  fill: 0xd7a85f, fontSize: 38, fontFamily: 'Georgia, serif', fontWeight: 'bold',
+  align: 'center',
+});
+txtKlackt.anchor.set(0.5);
+txtKlackt.x = NX; txtKlackt.y = NY - 90;
+txtKlackt.alpha = 0;
+uiLayer.addChild(txtKlackt);
+
+// ── Prestanda-mätning ─────────────────────────────────
+let frameCount = 0, lastFpsTid = performance.now(), fpsVis = 0;
+const perfEl = document.getElementById('perf');
+
+// ── Interaktion: Håll in ──────────────────────────────
+const btn = document.getElementById('halla');
+btn.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (state.aggKlackt || state.fjadSaldo <= 0) return;
+  state.hallsIn = true;
+  btn.classList.add('aktiv');
+});
+const stopHall = () => { state.hallsIn = false; btn.classList.remove('aktiv'); };
+btn.addEventListener('pointerup',     stopHall);
+btn.addEventListener('pointerleave',  stopHall);
+btn.addEventListener('pointercancel', stopHall);
+
+// Tap på ägg → wobble
+app.view.addEventListener('pointerdown', e => {
+  const rect = app.view.getBoundingClientRect();
+  const scale = sceneRoot.scale.x;
+  const ox = sceneRoot.x;
+  const oy = sceneRoot.y;
+  const sx = (e.clientX - rect.left - ox) / scale;
+  const sy = (e.clientY - rect.top  - oy) / scale;
+  const dx = sx - NX, dy = sy - (NY - 22);
+  if (dx * dx + dy * dy < 40 * 40 && !state.aggKlackt) {
+    state.aggWobble = 18;
+  }
+  if (state.fagelVis) {
+    const bx = sx - NX, by = sy - (NY - 24);
+    if (bx * bx + by * by < 40 * 40) {
+      state.fagelHopT = 0.01;
+    }
+  }
+});
+
+// ── Lägg till flygande fjäder ─────────────────────────
+function addFlyingFjader() {
+  if (state.fjadrar >= state.maxFjadrar) return;
+  if (state.fjadSaldo <= 0) return;
+  const i = state.fjadrar;
+  const fp = nestFjadrar[i];
+  const sides = [{ sx: -40, sy: 200 }, { sx: BASE_W + 40, sy: 160 },
+                 { sx: -40, sy: 490 }, { sx: BASE_W + 40, sy: 350 }];
+  const from = sides[i % 4];
+  const g = buildFeather(fp.col, fp.len);
+  g.x = from.sx; g.y = from.sy;
+  fjadLayer.addChild(g);
+  state.flyingFjadrar.push({ g, sx: from.sx, sy: from.sy,
+    tx: fp.tx, ty: fp.ty, angle: fp.angle, t: 0 });
+  state.fjadrar++;
+  state.fjadSaldo--;
+  txtSaldo.text = `${state.fjadSaldo} fjädrar`;
+  if (state.fjadrar >= state.maxFjadrar) {
+    // Starta kläckning med fördröjning
+    setTimeout(startKlackning, 1200);
+  }
+}
+
+function startKlackning() {
+  state.aggKlackt = true;
+  btn.style.display = 'none';
+  // aggCrack animeras i ticker
+}
+
+// ── Ticker ────────────────────────────────────────────
+const eo = t => 1 - (1 - t) ** 3;
+
+app.ticker.add((delta) => {
+  const now = performance.now();
+  const dt = app.ticker.deltaMS / 1000;  // sekunder
+
+  // FPS
+  frameCount++;
+  if (now - lastFpsTid >= 1000) {
+    fpsVis = Math.round(frameCount * 1000 / (now - lastFpsTid));
+    frameCount = 0; lastFpsTid = now;
+    const mem = performance.memory
+      ? (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + ' MB'
+      : '-- MB';
+    perfEl.textContent = `${fpsVis} fps · ${mem}`;
+  }
+
+  // Håll-in: lägg till en fjäder var 1.2s
+  if (state.hallsIn && !state.aggKlackt) {
+    if (now - state.lastFjaderTid > 1200 && state.fjadrar < state.maxFjadrar && state.fjadSaldo > 0) {
+      addFlyingFjader();
+      state.lastFjaderTid = now;
+    }
+  }
+
+  // Animera flygande fjädrar
+  for (let i = state.flyingFjadrar.length - 1; i >= 0; i--) {
+    const f = state.flyingFjadrar[i];
+    f.t = Math.min(f.t + dt * 1.4, 1);
+    const fe = eo(f.t);
+    f.g.x = f.sx + (f.tx - f.sx) * fe;
+    f.g.y = f.sy + (f.ty - f.sy) * fe;
+    f.g.rotation = f.angle * fe;
+    f.g.alpha = fe;
+    if (f.t >= 1) {
+      // Fjädern är framme — visa fast fjäder istället
+      const idx = nestFjadrar.findIndex(fp => fp.tx === f.tx && fp.ty === f.ty);
+      if (idx >= 0) nestFjadGfx[idx].visible = true;
+      fjadLayer.removeChild(f.g);
+      state.flyingFjadrar.splice(i, 1);
+    }
+  }
+
+  // Ägg-wobble (avtagande)
+  if (state.aggWobble > 0.5) {
+    state.aggWobble *= 0.88;
+    const wRad = Math.sin(now * 0.025) * state.aggWobble;
+    drawEgg(eggGfx, state.aggCrack, wRad);
+  }
+
+  // Kläckning
+  if (state.aggKlackt && state.aggCrack < 1) {
+    state.aggCrack = Math.min(state.aggCrack + dt * 0.4, 1);
+    const wobble = state.aggCrack < 0.8
+      ? Math.sin(now * 0.03) * 12 * (1 - state.aggCrack)
+      : 0;
+    drawEgg(eggGfx, state.aggCrack, wobble);
+
+    // Flash vid full kläckning
+    if (state.aggCrack >= 1 && !state.fagelVis) {
+      state.fagelVis = true;
+      eggCont.alpha = 0;
+      txtKlackt.text = 'Kläckt!';
+      txtKlackt.alpha = 1;
+      setTimeout(() => {
+        let fadeOut = 1;
+        const fade = setInterval(() => {
+          fadeOut -= 0.04;
+          txtKlackt.alpha = Math.max(0, fadeOut);
+          if (fadeOut <= 0) clearInterval(fade);
+        }, 30);
+      }, 1400);
+    }
+  }
+
+  // Fågel tonar in + bob + hop
+  if (state.fagelVis) {
+    state.fagelScale = Math.min(state.fagelScale + dt * 1.2, 1);
+    const size = 24 * eo(state.fagelScale);
+
+    if (state.fagelHopT > 0) {
+      state.fagelHopT = Math.min(state.fagelHopT + dt * 4, 1);
+      if (state.fagelHopT >= 1) state.fagelHopT = 0;
+    }
+    const hop = state.fagelHopT > 0 ? Math.sin(state.fagelHopT * Math.PI) * -18 : 0;
+    const bob = Math.sin(now * 0.0085) * 3.5;
+
+    state.fagelFaceLeft = Math.sin(now * 0.004) > 0;
+    birdCont.y = (NY - 24) + bob + hop;
+    birdCont.alpha = eo(state.fagelScale);
+    drawBird(birdGfx, size, state.fagelFaceLeft);
+
+    if (size > 2) {
+      // Uppdatera nestGfx med lite mer färg vid nivå-upp
+      txtNiva.text = `Nivå ${state.fjadrar >= state.maxFjadrar ? 4 : 3}`;
+    }
+  }
+});
+</script>
+</body>
+</html>
