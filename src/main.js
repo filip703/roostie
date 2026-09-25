@@ -35,6 +35,7 @@ import { hideProject, hiddenCatalog, unhideProject } from './game/hidden-project
  */
 
 const POLL_MS = 15000
+const isKiosk = new URLSearchParams(location.search).get('kiosk') === '1'
 const app = document.getElementById('app')
 
 app.insertAdjacentHTML(
@@ -784,6 +785,8 @@ async function poll() {
           lista.map((x) => ({ ...x, jobb: JOBB[x.namn] || '' })),
           FALTLISTA
         )
+        // Köksskärmen visar kolonin 1.0 utan maskinparken (Filips beslut 25 sep, rad 1099).
+        if (isKiosk && colony.varld !== 'trad') colony.maskinpark.grupp.visible = false
       })
       .catch((e) => console.error('[roostie] maskiner:', e))
     fetchPuls()
