@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Boet Rive+PixiJS — motorprov</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  background: #0C1830;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* PixiJS binder sin canvas hit */
+#pixi-wrap {
+  position: fixed; inset: 0;
+}
+#pixi-wrap canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+/* Rive-duk ovanpå PixiJS — syns bara om Rive laddar */
+#rive-canvas {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+  display: block;
+  width: 100%; height: 100%;
+}
+#rive-canvas.aktiv { opacity: 1; }
+/* HUD */
+#halla {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 88px);
+  left: 50%; transform: translateX(-50%);
+  background: rgba(53,88,74,.85);
+  border: 2px solid #d7a85f;
+  border-radius: 16px;
+  color: #f4ede1;
+  font: bold 18px Georgia, serif;
+  padding: 16px 40px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  z-index: 10;
+}
+#halla.aktiv { background: rgba(215,168,95,.30); }
+#perf {
+  position: fixed; top: 8px; right: 12px;
+  font: 11px/1.75 'Courier New', monospace;
+  color: #9aa79c; text-align: right;
+  pointer-events: none; z-index: 10;
+  white-space: pre;
+}
+#motor {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 6px);
+  left: 0; right: 0; text-align: center;
+  font: 11px 'Courier New', monospace; color: rgba(154,167,156,.6);
+  pointer-events: none; z-index: 10;
+}
+#badge {
+  position: fixed; top: 8px; left: 12px;
+  font: 11px/1 'Courier New', monospace;
+  padding: 4px 9px; border-radius: 4px;
+  pointer-events: none; z-index: 10;
+  background: rgba(12,24,48,.75);
+  border: 1px solid;
+  transition: color .35s, border-color .35s;
+}
+#badge.pixi { color: #d7a85f; border-color: #d7a85f55; }
+#badge.rive { color: #7dd3a8; border-color: #7dd3a855; }
+#toggle-rive {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 46px);
+  right: 14px;
+  font: 11px 'Courier New', monospace;
+  color: #9aa79c;
+  background: rgba(12,24,48,.7);
+  border: 1px solid #9aa79c44;
+  border-radius: 4px;
+  padding: 5px 9px;
+  cursor: pointer;
+  z-index: 10;
+  display: none; /* visas bara om Rive laddas */
+}
+</style>
+</head>
+<body>
+<div id="pixi-wrap"></div>
+<canvas id="rive-canvas"></canvas>
+
+<div id="badge" class="pixi">FÅGEL · PIXI</div>
+<div id="perf">-- fps · -- MB<br>pixi · rive: väntar</div>
+<button id="halla">Håll in</button>
+<button id="toggle-rive">Rive: på</button>
+<div id="motor">kolonin · motorprov Rive+PixiJS · 27 sep 2026</div>
+
+<!-- PixiJS 7 (WebGL renderer) -->
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@7.3.3/dist/pixi.min.js"></script>
+<!-- Rive canvas runtime v2 — laddas async, inga konsekvenser om CDN missar -->
+<script src="https://unpkg.com/@rive-app/canvas@2/rive.js" async></script>
+
+<script>
+'use strict';
+
+// ── Palett ────────────────────────────────────────────
+const C = {
+  bg:       0x0C1830,
+  branch:   0x2a4435,
+  branchHL: 0x3d6650,
+  nestDark: 0x4a2e18,
+  nestMid:  0x8a6640,
+  nestLight:0xc4a678,
+  nestRim:  0xd7a85f,
+  fClay:    0xc9785e,
+  fCamel:   0xc4a678,
+  fHoney:   0xd7a85f,
+  fForest:  0x35584a,
+  eggShell: 0xede0c4,
+  eggSpot:  0xc4a678,
+  eggCrack: 0x7a5830,
+  glow:     0xffe8b0,
+  birdBody: 0xd7a85f,
+  birdWing: 0xc9785e,
+  birdBeak: 0xe8a060,
+  cream:    0xf4ede1,
+  dimmed:   0x9aa79c,
+};
+const FEATHER_COLS = [C.fClay, C.fCamel, C.fHoney, C.fForest];
+
+// ── Pseudo-rng ────────────────────────────────────────
+function mkRng(seed) {
+  let s = (seed | 0) + 1;
+  return () => {
+    s = Math.imul(s, 1664525) + 1013904223 | 0;
+    return (s >>> 0) / 0xFFFFFFFF;
+  };
+}
+
+// ── Rive-tillstånd (deklareras tidigt — refereras i onResize) ─
+let riveInst      = null;
+let riveSrc       = null;
+let riveLoaded    = false;
+let riveShowLayer = true;
+let riveFrameCount = 0;
+let riveLastSec   = performance.now();
+let riveFps       = 0;
+
+// ── PixiJS app → #pixi-wrap ───────────────────────────
+const wrap = document.getElementById('pixi-wrap');
+const app = new PIXI.Application({
+  width:  window.innerWidth,
+  height: window.innerHeight,
+  backgroundColor: C.bg,
+  antialias: true,
+  resolution: Math.min(window.devicePixelRatio || 1, 2),
+  autoDensity: true,
+  powerPreference: 'high-performance',
+});
+wrap.appendChild(app.view);
+
+// Skala scenen till 4:3 med letterboxing
+const BASE_W = 1024, BASE_H = 768;
+const sceneRoot = new PIXI.Container();
+app.stage.addChild(sceneRoot);
+
+function onResize() {
+  const sw = window.innerWidth, sh = window.innerHeight;
+  const scl = Math.min(sw / BASE_W, sh / BASE_H);
+  sceneRoot.scale.set(scl);
+  sceneRoot.x = (sw - BASE_W * scl) / 2;
+  sceneRoot.y = (sh - BASE_H * scl) / 2;
+  // Synk Rive-canvasstorleken
+  const rc = document.getElementById('rive-canvas');
+  rc.width  = sw * (window.devicePixelRatio || 1);
+  rc.height = sh * (window.devicePixelRatio || 1);
+  rc.style.width  = sw + 'px';
+  rc.style.height = sh + 'px';
+  if (riveInst) riveInst.resizeDrawingSurfaceToCanvas();
+}
+onResize();
+window.addEventListener('resize', onResize);
+
+// ── Scen-konstanter ───────────────────────────────────
+const NX = 420, NY = 398, NR = 62;
+const nestProgress = 0.75;
+
+// ── Scen-lager ────────────────────────────────────────
+const bgLayer   = new PIXI.Container();
+const nestLayer = new PIXI.Container();
+const fjadLayer = new PIXI.Container();
+const eggLayer  = new PIXI.Container();
+const birdLayer = new PIXI.Container();
+const uiLayer   = new PIXI.Container();
+sceneRoot.addChild(bgLayer, nestLayer, fjadLayer, eggLayer, birdLayer, uiLayer);
+
+// ── Rita gren ─────────────────────────────────────────
+function buildBranch() {
+  const g = new PIXI.Graphics();
+  g.lineStyle(32, 0x000000, 0.4, 0.5, true);
+  g.moveTo(80, 426); g.bezierCurveTo(420, 434, 620, 424, 880, 420);
+  g.lineStyle(26, C.branch, 1, 0.5, true);
+  g.moveTo(80, 422); g.bezierCurveTo(420, 428, 620, 418, 880, 415);
+  g.lineStyle(8, C.branchHL, 0.4, 0.5, true);
+  g.moveTo(80, 417); g.bezierCurveTo(420, 421, 620, 412, 880, 409);
+  return g;
+}
+
+// ── Rita bo ───────────────────────────────────────────
+function buildNest(progress) {
+  const g   = new PIXI.Graphics();
+  const rng = mkRng(17);
+  const TWIGS = 34;
+  const drawn = Math.ceil(TWIGS * progress);
+
+  for (let i = 0; i < drawn; i++) {
+    const ang   = rng() * Math.PI * 2;
+    const len   = NR * (0.75 + rng() * 0.5) * progress;
+    const cpAng = ang + (rng() - 0.5) * 1.4;
+    const cpLen = len * (0.4 + rng() * 0.3);
+    const cpX   = Math.cos(cpAng) * cpLen;
+    const cpY   = Math.sin(cpAng) * cpLen * 0.55;
+    const ex    = Math.cos(ang) * len;
+    const ey    = Math.sin(ang) * len * 0.52;
+    const col   = [C.nestDark, C.nestMid, C.nestLight][Math.floor(rng() * 3)];
+    const a     = 0.5 + rng() * 0.4;
+    g.lineStyle(1.2 + rng() * 2.4, col, a, 0.5, true);
+    g.moveTo(NX, NY);
+    g.quadraticCurveTo(NX + cpX, NY + cpY, NX + ex, NY + ey);
+  }
+
+  g.lineStyle(0);
+  g.beginFill(0x2a1a0a, 0.4 * progress);
+  g.drawEllipse(NX, NY + 4, NR * 0.55 * progress, NR * 0.30 * progress);
+  g.endFill();
+
+  g.lineStyle(5.5 * progress, C.nestRim, progress, 0.5, true);
+  g.arc(NX, NY + 6, NR * progress, Math.PI * 0.12, Math.PI * 0.88);
+  return g;
+}
+
+// ── Rita fjäder ──────────────────────────────────────
+function buildFeather(col, len) {
+  const g = new PIXI.Graphics();
+  g.lineStyle(1.5, col, 1, 0.5, true);
+  g.moveTo(0, -len * 0.52); g.lineTo(0, len * 0.48);
+  for (let y = -len * 0.42; y < len * 0.38; y += 4.5) {
+    const bw = Math.max(0, (len * 0.3 - Math.abs(y) * 0.5) * 0.6);
+    if (bw < 0.5) continue;
+    g.lineStyle(0.9, col, 1, 0.5, true);
+    g.moveTo(0, y); g.lineTo( bw, y - bw * 0.35);
+    g.moveTo(0, y); g.lineTo(-bw, y - bw * 0.35);
+  }
+  return g;
+}
+
+// ── Rita ägg ─────────────────────────────────────────
+function buildEgg() { return new PIXI.Graphics(); }
+
+function drawEgg(g, crack, wobble) {
+  g.clear();
+  const ew = 30, eh = 38;
+  if (crack > 0.3) {
+    g.lineStyle(0);
+    g.beginFill(C.glow, (crack - 0.3) / 0.7 * 0.14);
+    g.drawEllipse(0, 0, eh * 2.4, eh * 2.4);
+    g.endFill();
+  }
+  g.lineStyle(0);
+  g.beginFill(C.eggShell, 1);
+  g.drawEllipse(0, 0, ew, eh);
+  g.endFill();
+  const rng = mkRng(42);
+  for (let i = 0; i < 10; i++) {
+    const ex = (rng() - 0.5) * ew * 1.5;
+    const ey = (rng() - 0.5) * eh * 1.4;
+    if ((ex / ew) ** 2 + (ey / eh) ** 2 < 0.85) {
+      g.beginFill(C.eggSpot, 0.42);
+      g.drawCircle(ex, ey, rng() * 2.8 + 0.8);
+      g.endFill();
+    }
+  }
+  if (crack > 0) {
+    g.lineStyle(2, C.eggCrack, Math.min(crack * 2.5, 1), 0.5, true);
+    g.moveTo(-ew * 0.35, 0); g.lineTo(-ew * 0.05, -eh * 0.2);
+    g.lineTo(ew * 0.18, eh * 0.07); g.lineTo(ew * 0.38, -eh * 0.14);
+    const c2a = Math.max(0, Math.min(crack * 2.5 - 0.7, 1));
+    g.lineStyle(2, C.eggCrack, c2a, 0.5, true);
+    g.moveTo(-ew * 0.12, eh * 0.28); g.lineTo(ew * 0.1, eh * 0.12);
+    g.lineTo(ew * 0.32, eh * 0.38);
+    if (crack > 0.35) {
+      g.lineStyle(3.5, C.glow, (crack - 0.35) / 0.65, 0.5, true);
+      g.moveTo(-ew * 0.35, 0); g.lineTo(-ew * 0.05, -eh * 0.2);
+      g.lineTo(ew * 0.18, eh * 0.07); g.lineTo(ew * 0.38, -eh * 0.14);
+    }
+  }
+  g.rotation = wobble * Math.PI / 180;
+}
+
+// ── Rita fågel ────────────────────────────────────────
+function buildBird() { return new PIXI.Graphics(); }
+
+function drawBird(g, size, faceLeft) {
+  g.clear();
+  const sc = faceLeft ? -1 : 1;
+  g.lineStyle(0);
+  g.beginFill(C.birdBody);
+  g.drawEllipse(0, 0, size * 0.68, size * 0.48);
+  g.endFill();
+  g.beginFill(C.birdWing);
+  g.drawEllipse(sc * size * 0.1, size * 0.09, size * 0.44, size * 0.24);
+  g.endFill();
+  g.beginFill(C.birdBody);
+  g.drawCircle(-sc * size * 0.5, -size * 0.2, size * 0.33);
+  g.endFill();
+  g.beginFill(0x1c2620);
+  g.drawCircle(-sc * size * 0.56, -size * 0.29, size * 0.1);
+  g.endFill();
+  g.beginFill(0xffffff, 0.85);
+  g.drawCircle(-sc * size * 0.58, -size * 0.31, size * 0.04);
+  g.endFill();
+  g.beginFill(C.birdBeak);
+  g.moveTo(-sc * size * 0.79, -size * 0.21);
+  g.lineTo(-sc * size * 1.0,  -size * 0.14);
+  g.lineTo(-sc * size * 0.79, -size * 0.07);
+  g.closePath(); g.endFill();
+  g.beginFill(C.birdWing);
+  g.moveTo(sc * size * 0.6,  0);
+  g.lineTo(sc * size * 0.92, -size * 0.2);
+  g.lineTo(sc * size * 0.88,  size * 0.12);
+  g.closePath(); g.endFill();
+}
+
+// ── Tillstånd ─────────────────────────────────────────
+const state = {
+  fjadrar: 3,
+  maxFjadrar: 9,
+  niva: 3,
+  aggKlackt: false,
+  aggCrack: 0,
+  aggWobble: 0,
+  fagelVis: false,
+  fagelScale: 0,
+  fagelBob: 0,
+  fagelFaceLeft: false,
+  fagelHopT: 0,
+  hallsIn: false,
+  lastFjaderTid: 0,
+  flyingFjadrar: [],
+  fjadSaldo: 7,
+  // Rive-styrning
+  pixiBirdHidden: false,  // true när Rive visar fågeln
+  pixiEggHidden:  false,  // true när Rive visar ägget
+};
+
+// ── Fasta fjäderpositioner i boet ────────────────────
+const nestFjadrar = [
+  { tx: NX - 20, ty: NY + 6,  angle: -0.45, col: C.fClay,   len: 22 },
+  { tx: NX + 12, ty: NY + 2,  angle:  0.32, col: C.fHoney,  len: 19 },
+  { tx: NX - 6,  ty: NY - 8,  angle: -0.12, col: C.fCamel,  len: 24 },
+  { tx: NX + 24, ty: NY + 14, angle:  0.58, col: C.fForest, len: 17 },
+  { tx: NX - 14, ty: NY + 16, angle: -0.28, col: C.fHoney,  len: 20 },
+  { tx: NX + 4,  ty: NY - 14, angle:  0.19, col: C.fClay,   len: 18 },
+  { tx: NX - 28, ty: NY - 4,  angle: -0.6,  col: C.fCamel,  len: 21 },
+  { tx: NX + 30, ty: NY + 4,  angle:  0.44, col: C.fForest, len: 16 },
+  { tx: NX - 4,  ty: NY + 12, angle: -0.05, col: C.fHoney,  len: 23 },
+];
+
+// ── Bygg grundscenen ──────────────────────────────────
+bgLayer.addChild(buildBranch());
+nestLayer.addChild(buildNest(nestProgress));
+
+const nestFjadGfx = nestFjadrar.map(fp => {
+  const g = buildFeather(fp.col, fp.len);
+  g.x = fp.tx; g.y = fp.ty; g.rotation = fp.angle;
+  fjadLayer.addChild(g);
+  return g;
+});
+nestFjadGfx.forEach((g, i) => { g.visible = i < state.fjadrar; });
+
+const eggCont = new PIXI.Container();
+eggCont.x = NX; eggCont.y = NY - 22;
+const eggGfx = buildEgg();
+eggCont.addChild(eggGfx);
+eggLayer.addChild(eggCont);
+drawEgg(eggGfx, 0, 0);
+
+const birdCont = new PIXI.Container();
+birdCont.x = NX; birdCont.y = NY - 24;
+birdCont.alpha = 0;
+const birdGfx = buildBird();
+birdCont.addChild(birdGfx);
+birdLayer.addChild(birdCont);
+
+const txtNiva = new PIXI.Text('Nivå 3', {
+  fill: 0xf4ede1, fontSize: 20,
+  fontFamily: 'Georgia, serif', fontWeight: 'bold',
+});
+txtNiva.x = 20; txtNiva.y = 16;
+uiLayer.addChild(txtNiva);
+
+const txtSaldo = new PIXI.Text('7 fjädrar', {
+  fill: 0xd7a85f, fontSize: 15, fontFamily: 'Arial, sans-serif',
+});
+txtSaldo.anchor.x = 1;
+txtSaldo.x = BASE_W - 20; txtSaldo.y = 22;
+uiLayer.addChild(txtSaldo);
+
+const txtKlackt = new PIXI.Text('', {
+  fill: 0xd7a85f, fontSize: 38,
+  fontFamily: 'Georgia, serif', fontWeight: 'bold', align: 'center',
+});
+txtKlackt.anchor.set(0.5);
+txtKlackt.x = NX; txtKlackt.y = NY - 90;
+txtKlackt.alpha = 0;
+uiLayer.addChild(txtKlackt);
+
+// ── Prestanda-mätning ─────────────────────────────────
+let frameCount = 0, lastFpsTid = performance.now(), fpsVis = 0;
+const perfEl = document.getElementById('perf');
+
+// ── RIVE-lager ────────────────────────────────────────
+// Ansvarsområde: fågel + ägg (bildanimation).
+// Laddas asynkront — inget fel om det misslyckas.
+//
+// Att byta .riv-fil: ändra RIVE_SRC nedan.
+// Kräver ett Rive-artboard med State Machine "BirdMachine"
+// och triggers: "hatch" (startar kläckning), "hop" (studs).
+//
+// CDN-fallback: vehicles.riv visar att Rive+PixiJS kan
+// köra samtidigt med 60 fps — testa perf-panelen.
+const RIVE_SRC_LOCAL = './bird.riv';            // Boet-fågeln (skapas i Rive-editor)
+const RIVE_SRC_CDN   = 'https://cdn.rive.app/animations/vehicles.riv';  // CDN-test
+
+// (Rive-tillstånd deklareras i toppen — se ovan)
+
+const badgeEl     = document.getElementById('badge');
+const toggleBtn   = document.getElementById('toggle-rive');
+const riveCanvas  = document.getElementById('rive-canvas');
+
+function updateBadge() {
+  if (riveLoaded) {
+    badgeEl.textContent = `FÅGEL · RIVE (${riveSrc === RIVE_SRC_LOCAL ? 'bird.riv' : 'CDN'})`;
+    badgeEl.className = 'rive';
+  } else {
+    badgeEl.textContent = 'FÅGEL · PIXI';
+    badgeEl.className = 'pixi';
+  }
+}
+
+function tryToggleRive() {
+  riveShowLayer = !riveShowLayer;
+  toggleBtn.textContent = riveShowLayer ? 'Rive: på' : 'Rive: av';
+  riveCanvas.style.opacity = riveShowLayer ? '1' : '0';
+  // Dölj/visa PixiJS-fågeln och ägget vid toggle
+  if (riveLoaded) {
+    birdCont.alpha = (!riveShowLayer && state.fagelVis) ? 1 : 0;
+    eggCont.alpha  = (!riveShowLayer && !state.aggKlackt) ? 1 : 0;
+  }
+}
+
+toggleBtn.addEventListener('click', tryToggleRive);
+
+async function initRive(src) {
+  return new Promise((resolve, reject) => {
+    const R = window.rive;
+    if (!R || !R.Rive) { reject(new Error('rive runtime saknas')); return; }
+
+    const inst = new R.Rive({
+      src,
+      canvas: riveCanvas,
+      autoplay: true,
+      stateMachines: 'BirdMachine',
+      onLoad: () => {
+        riveInst = inst;
+        riveSrc  = src;
+        riveLoaded = true;
+        inst.resizeDrawingSurfaceToCanvas();
+        riveCanvas.classList.add('aktiv');
+        toggleBtn.style.display = 'block';
+        updateBadge();
+        // Dölj PixiJS-fågeln och ägget (Rive tar över)
+        state.pixiBirdHidden = true;
+        state.pixiEggHidden  = true;
+        birdCont.alpha = 0;
+        eggCont.alpha  = 0;
+        resolve(inst);
+      },
+      onLoadError: (e) => reject(e),
+      // Mät Rive-FPS via onAdvance
+      onAdvance: () => {
+        riveFrameCount++;
+        const now = performance.now();
+        if (now - riveLastSec >= 1000) {
+          riveFps = Math.round(riveFrameCount * 1000 / (now - riveLastSec));
+          riveFrameCount = 0;
+          riveLastSec = now;
+        }
+      },
+    });
+  });
+}
+
+// Försök lokal bird.riv → CDN-test → fail gracefully
+async function loadRive() {
+  // Vänta tills Rive-scriptet faktiskt är laddat (async)
+  let attempts = 0;
+  while (!(window.rive && window.rive.Rive) && attempts < 20) {
+    await new Promise(r => setTimeout(r, 300));
+    attempts++;
+  }
+  if (!(window.rive && window.rive.Rive)) {
+    console.info('[rive] runtime inte tillgängligt — kör PixiJS solo');
+    updateBadge();
+    return;
+  }
+
+  // Prova lokal bird.riv först
+  try {
+    await initRive(RIVE_SRC_LOCAL);
+    console.info('[rive] laddad: bird.riv');
+    return;
+  } catch (e) {
+    console.info('[rive] bird.riv saknas — provar CDN');
+  }
+
+  // CDN-test: vehicles.riv (visar att Rive+PixiJS kan samköra)
+  try {
+    await initRive(RIVE_SRC_CDN);
+    console.info('[rive] CDN-animation laddad:', RIVE_SRC_CDN);
+  } catch (e) {
+    console.info('[rive] CDN-test misslyckades — kör PixiJS solo');
+    updateBadge();
+  }
+}
+
+loadRive();
+
+// ── Signal till Rive-state machine ───────────────────
+function riveSignal(triggerName) {
+  if (!riveInst || !riveLoaded) return false;
+  try {
+    const inputs = riveInst.stateMachineInputs('BirdMachine');
+    if (!inputs) return false;
+    const t = inputs.find(i => i.name === triggerName);
+    if (t) { t.fire(); return true; }
+  } catch (_) {}
+  return false;
+}
+
+// ── Interaktion ───────────────────────────────────────
+const btn = document.getElementById('halla');
+btn.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  if (state.aggKlackt || state.fjadSaldo <= 0) return;
+  state.hallsIn = true;
+  btn.classList.add('aktiv');
+});
+const stopHall = () => { state.hallsIn = false; btn.classList.remove('aktiv'); };
+btn.addEventListener('pointerup',     stopHall);
+btn.addEventListener('pointerleave',  stopHall);
+btn.addEventListener('pointercancel', stopHall);
+
+app.view.addEventListener('pointerdown', e => {
+  const rect = app.view.getBoundingClientRect();
+  const scl  = sceneRoot.scale.x;
+  const sx   = (e.clientX - rect.left - sceneRoot.x) / scl;
+  const sy   = (e.clientY - rect.top  - sceneRoot.y) / scl;
+
+  // Tap på ägg
+  const dx = sx - NX, dy = sy - (NY - 22);
+  if (dx * dx + dy * dy < 40 * 40 && !state.aggKlackt) {
+    if (!state.pixiEggHidden) state.aggWobble = 18;
+    // Signalera Rive om vi har en BirdMachine
+    riveSignal('wobble');
+  }
+
+  // Tap på fågel
+  if (state.fagelVis) {
+    const bx = sx - NX, by = sy - (NY - 24);
+    if (bx * bx + by * by < 48 * 48) {
+      if (!state.pixiBirdHidden) state.fagelHopT = 0.01;
+      riveSignal('hop');
+    }
+  }
+});
+
+// ── Lägg till flygande fjäder ─────────────────────────
+function addFlyingFjader() {
+  if (state.fjadrar >= state.maxFjadrar || state.fjadSaldo <= 0) return;
+  const i  = state.fjadrar;
+  const fp = nestFjadrar[i];
+  const sides = [
+    { sx: -40, sy: 200 }, { sx: BASE_W + 40, sy: 160 },
+    { sx: -40, sy: 490 }, { sx: BASE_W + 40, sy: 350 },
+  ];
+  const from = sides[i % 4];
+  const g = buildFeather(fp.col, fp.len);
+  g.x = from.sx; g.y = from.sy;
+  fjadLayer.addChild(g);
+  state.flyingFjadrar.push({
+    g, sx: from.sx, sy: from.sy,
+    tx: fp.tx, ty: fp.ty, angle: fp.angle, t: 0,
+  });
+  state.fjadrar++;
+  state.fjadSaldo--;
+  txtSaldo.text = `${state.fjadSaldo} fjädrar`;
+  if (state.fjadrar >= state.maxFjadrar) {
+    setTimeout(startKlackning, 1200);
+  }
+}
+
+function startKlackning() {
+  state.aggKlackt = true;
+  btn.style.display = 'none';
+  // Trigga Rive-kläckning om Rive är aktiv
+  riveSignal('hatch');
+}
+
+// ── Ticker ────────────────────────────────────────────
+const eo = t => 1 - (1 - t) ** 3;
+
+app.ticker.add(() => {
+  const now = performance.now();
+  const dt  = app.ticker.deltaMS / 1000;
+
+  // FPS + mem
+  frameCount++;
+  if (now - lastFpsTid >= 1000) {
+    fpsVis = Math.round(frameCount * 1000 / (now - lastFpsTid));
+    frameCount = 0; lastFpsTid = now;
+    const mem = performance.memory
+      ? (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + ' MB'
+      : '-- MB';
+    const riveInfo = riveLoaded
+      ? `rive: ${riveFps} fps`
+      : (window.rive ? 'rive: laddar' : 'rive: ej laddat');
+    perfEl.textContent = `${fpsVis} fps · ${mem}\npixi · ${riveInfo}`;
+  }
+
+  // Håll-in: fjäder var 1.2s
+  if (state.hallsIn && !state.aggKlackt) {
+    if (now - state.lastFjaderTid > 1200
+        && state.fjadrar < state.maxFjadrar
+        && state.fjadSaldo > 0) {
+      addFlyingFjader();
+      state.lastFjaderTid = now;
+    }
+  }
+
+  // Animera flygande fjädrar
+  for (let i = state.flyingFjadrar.length - 1; i >= 0; i--) {
+    const f = state.flyingFjadrar[i];
+    f.t = Math.min(f.t + dt * 1.4, 1);
+    const fe = eo(f.t);
+    f.g.x = f.sx + (f.tx - f.sx) * fe;
+    f.g.y = f.sy + (f.ty - f.sy) * fe;
+    f.g.rotation = f.angle * fe;
+    f.g.alpha = fe;
+    if (f.t >= 1) {
+      const idx = nestFjadrar.findIndex(fp => fp.tx === f.tx && fp.ty === f.ty);
+      if (idx >= 0) nestFjadGfx[idx].visible = true;
+      fjadLayer.removeChild(f.g);
+      state.flyingFjadrar.splice(i, 1);
+    }
+  }
+
+  // Ägg-wobble
+  if (!state.pixiEggHidden && state.aggWobble > 0.5) {
+    state.aggWobble *= 0.88;
+    drawEgg(eggGfx, state.aggCrack, Math.sin(now * 0.025) * state.aggWobble);
+  }
+
+  // Kläckning (PixiJS-sida, körs om Rive EJ hanterar ägget)
+  if (!state.pixiEggHidden && state.aggKlackt && state.aggCrack < 1) {
+    state.aggCrack = Math.min(state.aggCrack + dt * 0.4, 1);
+    const wobble = state.aggCrack < 0.8
+      ? Math.sin(now * 0.03) * 12 * (1 - state.aggCrack) : 0;
+    drawEgg(eggGfx, state.aggCrack, wobble);
+
+    if (state.aggCrack >= 1 && !state.fagelVis) {
+      state.fagelVis = true;
+      eggCont.alpha = 0;
+      if (!state.pixiBirdHidden) {
+        txtKlackt.text = 'Kläckt!';
+        txtKlackt.alpha = 1;
+        setTimeout(() => {
+          let a = 1;
+          const fade = setInterval(() => {
+            a -= 0.04;
+            txtKlackt.alpha = Math.max(0, a);
+            if (a <= 0) clearInterval(fade);
+          }, 30);
+        }, 1400);
+      }
+    }
+  }
+
+  // Fågel (PixiJS-sida)
+  if (!state.pixiBirdHidden && state.fagelVis) {
+    state.fagelScale = Math.min(state.fagelScale + dt * 1.2, 1);
+    const size = 24 * eo(state.fagelScale);
+    if (state.fagelHopT > 0) {
+      state.fagelHopT = Math.min(state.fagelHopT + dt * 4, 1);
+      if (state.fagelHopT >= 1) state.fagelHopT = 0;
+    }
+    const hop = state.fagelHopT > 0 ? Math.sin(state.fagelHopT * Math.PI) * -18 : 0;
+    const bob = Math.sin(now * 0.0085) * 3.5;
+    state.fagelFaceLeft = Math.sin(now * 0.004) > 0;
+    birdCont.y   = (NY - 24) + bob + hop;
+    birdCont.alpha = eo(state.fagelScale);
+    drawBird(birdGfx, size, state.fagelFaceLeft);
+    if (size > 2) txtNiva.text = `Nivå ${state.fjadrar >= state.maxFjadrar ? 4 : 3}`;
+  }
+});
+
+updateBadge();
+</script>
+</body>
+</html>
