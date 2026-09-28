@@ -21,6 +21,7 @@ import {
   saveState,
   openThread,
   newSession,
+  sendSvar,
   revealFolder,
 } from './game/api.js'
 import { hideProject, hiddenCatalog, unhideProject } from './game/hidden-projects.js'
@@ -259,6 +260,20 @@ const actions = {
    * upp `nexus-screentime` för hand är inte rimligt. Finns inte maskinen i parken sägs det
    * rakt ut i stället för att kameran far till origo.
    */
+  /**
+   * Filips svar från kolonin (Lednings beslut rad 1382 — kolonin blir hans kommunikationsyta).
+   *
+   * Tavlan cachas i tjugo sekunder på servern, och skickaSvar nollar den cachen, så nästa
+   * poll visar raden. Vi pollar därför direkt i stället för att vänta ut intervallet: en
+   * skärm som inte visar det man just skrev känns trasig även när raden ligger rätt.
+   */
+  skickaSvar: async (trad, text) => {
+    const svar = await sendSvar(trad, text)
+    if (svar?.ok) poll()
+    else if (svar?.fel) hud.toast(svar.fel, 'err')
+    return svar
+  },
+
   pickMaskin: (namn) => {
     const punkt = colony.maskinPlats(namn)
     if (!punkt) {

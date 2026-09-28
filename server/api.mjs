@@ -11,7 +11,7 @@ import {
   openThread as harnessOpenThread,
   scanThreads,
 } from './scan.mjs'
-import { senasteRader } from './harnesses/roost-loggbok.mjs'
+import { senasteRader, skickaSvar as harnessSkickaSvar } from './harnesses/roost-loggbok.mjs'
 import { laesMaskiner } from './maskiner.mjs'
 import { laesRoostie } from './roostie.mjs'
 
@@ -295,6 +295,27 @@ for (const addrs of Object.values(os.networkInterfaces())) {
   }
 }
 
+/**
+ * KOLONIN UTANFÖR HEMMET (Lednings beslut rad 1394: kolonin.roost.love bakom Roostadmin).
+ *
+ * Vakten ovanför kräver att BÅDE Host och Origin är en av maskinens egna adresser. Bakom en
+ * proxy på ett riktigt domännamn är ingetdera det, så varje anrop — även GET — hade svarat
+ * 403 och sidan stått tom. Det är inte en bugg i vakten; det är vakten som gör sitt jobb på
+ * en förutsättning som ändrats.
+ *
+ * Därför en NAMNGIVEN värd ur miljön, aldrig ett avstängt skydd. Host och Origin måste
+ * fortfarande vara exakt det namnet, så DNS-rebinding och CSRF stoppas precis som förut —
+ * skillnaden är att listan över godkända namn nu kan innehålla ett som inte är en IP-adress.
+ * Sätts inget är läget oförändrat: bara hemnätet.
+ *
+ * Skyddet mot att FEL FOLK når sidan ligger inte här utan i Roostadmin-inloggningen framför
+ * proxyn (rad 1394). Kolonin har ingen egen användarkontroll och ska inte låtsas ha det.
+ */
+for (const namn of String(process.env.ROOSTIE_PUBLIK_VARD || '').split(',')) {
+  const rent = hostnameOf(namn.trim())
+  if (rent) LOCAL_HOSTS.add(rent)
+}
+
 /** Hostname out of a `Host:` or `Origin:` value, with the port and any brackets stripped. */
 function hostnameOf(value) {
   if (!value) return ''
@@ -424,6 +445,22 @@ export async function apiMiddleware(req, res, next) {
         if (base && current.updatedAt !== base) return send(res, 409, current)
         return send(res, 200, await writeState(body))
       })
+    }
+
+    /**
+     * FILIPS SVAR (Lednings beslut rad 1382 — kolonin blir hans kommunikationsyta).
+     *
+     * Webbläsaren postar hit, kolonin postar vidare till Loggboken med ADMIN_TOKEN ur miljön.
+     * Token går aldrig åt andra hållet: repot är publikt och skärmen står i ett kök (LAXOR 7).
+     *
+     * Vem som helst som når kolonin kan alltså skriva till trådarna. På hemnätet är det
+     * samma krets som redan kan läsa allt; utanför hemmet ligger kolonin bakom
+     * Roostadmin-inloggningen (rad 1394), och det är den som är spärren — inte det här.
+     */
+    if (url.pathname === '/api/svar' && req.method === 'POST') {
+      const body = await readJsonBody(req)
+      const svar = await harnessSkickaSvar(String(body?.trad || ''), String(body?.text || ''))
+      return send(res, svar.ok ? 200 : 400, svar)
     }
 
     if (url.pathname === '/api/open' && req.method === 'POST') {

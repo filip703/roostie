@@ -114,3 +114,28 @@ export const openThread = (thread) => {
 export const newSession = (folder, harness) => post('/api/new-session', { folder, harness })
 
 export const revealFolder = (folder) => post('/api/reveal', { folder })
+
+/**
+ * Filips svar till en tråd (Lednings beslut rad 1382).
+ *
+ * Servern gör resten: bygger raden, ställer den till rätt mottagare och postar den till
+ * Loggboken med token ur miljön. Webbläsaren får aldrig veta något om token — kolonin är
+ * publikt kod och skärmen står i ett kök.
+ *
+ * Kastar aldrig. Ett nät som glappar mitt i en mening ska ge ett meddelande i panelen, inte
+ * ett rött fel i konsolen som bara utvecklaren ser.
+ */
+export async function sendSvar(trad, text) {
+  try {
+    const res = await fetch('/api/svar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trad, text }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok || !body?.ok) return { ok: false, fel: body?.fel || `Servern svarade ${res.status}` }
+    return body
+  } catch (err) {
+    return { ok: false, fel: `Ingen kontakt med kolonin: ${err?.message || err}` }
+  }
+}

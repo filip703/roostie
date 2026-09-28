@@ -1730,3 +1730,58 @@ kbd {
 .side .trad-info .h.tom {
   opacity: 0.7;
 }
+
+/**
+ * FILIPS SVARSFÄLT I PANELEN (Lednings beslut rad 1382).
+ *
+ * Ligger under läsdelen och är medvetet lågmält: det ska synas när man tittar på en tråd och
+ * inte konkurrera med texten man kom för att läsa. Skicka-knappen bär accenten eftersom den
+ * är sidans enda handling som lämnar huset.
+ */
+.side .trad-info .las {
+  margin-bottom: 10px;
+}
+.side .trad-info .h.min .t {
+  color: var(--accent);
+}
+.side .trad-info .h.min .txt {
+  color: var(--muted);
+}
+.side .trad-info textarea.svar {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 46px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.side .trad-info textarea.svar:focus {
+  outline: none;
+  border-color: var(--line-strong);
+}
+.side .trad-info .skriv .rad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+.side .trad-info .skriv .hint {
+  font-size: 11px;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+.side .trad-info .skriv .skicka {
+  flex: 0 0 auto;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+}
+.side .trad-info .skriv .skicka:disabled {
+  opacity: 0.6;
+}

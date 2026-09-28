@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import fsp from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { byggSvar, garTill } from '../server/harnesses/roost-loggbok.mjs'
 
 const MIN = 60 * 1000
 const H = 60 * MIN
@@ -261,4 +262,47 @@ test('den flitigaste ligger först', () => {
 test('skräp i trad-fältet blir ingen stapel', () => {
   const ut = arbetsmangd([{ trad: '../../etc', rubrik: 'a', text: 'b', created_at: nar(1) }], NU)
   assert.ok(!ut.some((t) => t.trad.includes('..')))
+})
+
+/**
+ * FILIPS SVAR (Lednings beslut rad 1382). Reglerna testas, inte knappen: det som avgör om
+ * raden hamnar rätt är vem den ställs till och att rubriken ryms — båda går att prova utan
+ * tavla, utan token och utan webbläsare.
+ */
+test('byggSvar ställer raden till rätt tråd och skriver den i Filips namn', () => {
+  const { ok, rad } = byggSvar('produkt', 'Kör på react-three-fiber.')
+  assert.equal(ok, true)
+  assert.equal(rad.trad, 'filip', 'hans ord ska stå i hans namn, inte trådens')
+  assert.equal(rad.fas, 'notis')
+  assert.equal(rad.rubrik, 'TILL PRODUKT: Kör på react-three-fiber.')
+  assert.equal(rad.text, 'Kör på react-three-fiber.')
+})
+
+test('byggSvar vägrar en tråd som inte finns — en felstavning blir annars en ny astronaut', () => {
+  assert.equal(byggSvar('produktt', 'hej').ok, false)
+  assert.equal(byggSvar('', 'hej').ok, false)
+})
+
+test('byggSvar vägrar tomt och för långt', () => {
+  assert.equal(byggSvar('kolonin', '   ').ok, false)
+  assert.equal(byggSvar('kolonin', 'x'.repeat(1201)).ok, false)
+  assert.equal(byggSvar('kolonin', 'x'.repeat(1200)).ok, true)
+})
+
+test('rubriken kapas i en ordgräns och ryms i tavlans 160 tecken', () => {
+  const lang = 'Det här är ett långt svar som fortsätter och fortsätter förbi alla rimliga gränser '
+    + 'och måste kapas någonstans innan Loggboken gör det åt oss mitt inne i ett ord.'
+  const { rad } = byggSvar('design', lang)
+  assert.ok(rad.rubrik.length <= 160, `rubriken var ${rad.rubrik.length} tecken`)
+  assert.ok(rad.rubrik.endsWith('…'), 'en kapad rubrik ska säga att den är kapad')
+  assert.ok(!rad.rubrik.includes('  '), 'ingen halv ordlucka i slutet')
+  assert.equal(rad.text, lang.replace(/\s+/g, ' ').trim(), 'hela texten finns kvar i text')
+})
+
+test('garTill känner igen alla tre stavningar av en mottagare', () => {
+  assert.equal(garTill('TILL SAJT: fixa subdomänen', 'sajt-roostadmin'), true, 'förkortningen')
+  assert.equal(garTill('TILL SAJT & ROOSTADMIN: fixa', 'sajt-roostadmin'), true, 'visningsnamnet')
+  assert.equal(garTill('TILL BOX-MOLN: kolla', 'box-moln'), true, 'nyckeln')
+  assert.equal(garTill('TILL PRODUKT: kolla', 'box-moln'), false)
+  assert.equal(garTill('Klart: något helt annat', 'produkt'), false)
 })

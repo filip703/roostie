@@ -618,8 +618,24 @@ export class Hud {
     if (!thread) {
       ruta.hidden = true
       ruta.innerHTML = ''
+      this._skrivTrad = ''
       return
     }
+    const trad = String(thread.id || '').split(':').pop()
+
+    /**
+     * LÄSDELEN OCH SKRIVDELEN ÄR SKILDA MED FLIT.
+     *
+     * Panelen ritas om var femtonde sekund. Skrevs fältet om med resten skulle varje bokstav
+     * Filip hunnit skriva försvinna nästa gång en tråd rörde sig — samma fel som fick
+     * maskinrutan att slå igen, och värre här, för det han tappar är hans egna ord.
+     * Läsdelen byggs varje gång; skrivdelen byggs en gång per tråd och lämnas ifred.
+     */
+    if (!ruta.querySelector('.las')) {
+      ruta.innerHTML = '<div class="las"></div><div class="skriv"></div>'
+    }
+    const las = ruta.querySelector('.las')
+
     const nu = thread.notis
       ? `${thread.notis}${thread.notisText ? ` — ${thread.notisText}` : ''}`
       : thread.preview || ''
@@ -627,9 +643,18 @@ export class Hud {
     // Den nyaste raden står redan som "nu" när tråden inte vinkar — att visa den två gånger
     // gör listan en rad kortare utan att säga något nytt.
     const lista = thread.notis ? hist : hist.slice(1)
-    ruta.innerHTML =
-      (nu
-        ? `<div class="nu${thread.notis ? ' vantar' : ''}">${escapeHtml(nu)}</div>`
+    const mina = Array.isArray(thread.franFilip) ? thread.franFilip : []
+    las.innerHTML =
+      (nu ? `<div class="nu${thread.notis ? ' vantar' : ''}">${escapeHtml(nu)}</div>` : '') +
+      (mina.length
+        ? `<div class="hist-rubrik">Du skrev</div>` +
+          mina
+            .map(
+              (m) =>
+                `<div class="h min"><span class="t">${klockan(m.nar)}</span>` +
+                `<span class="txt">${escapeHtml((m.text || m.rubrik || '').slice(0, 220))}</span></div>`
+            )
+            .join('')
         : '') +
       (lista.length
         ? `<div class="hist-rubrik">Tidigare</div>` +
@@ -642,6 +667,44 @@ export class Hud {
             )
             .join('')
         : `<div class="h tom">Inget mer skrivet av den här tråden</div>`)
+
+    if (this._skrivTrad !== trad) {
+      this._skrivTrad = trad
+      const skriv = ruta.querySelector('.skriv')
+      skriv.innerHTML =
+        `<textarea class="svar" rows="2" maxlength="1200" ` +
+        `placeholder="Skriv till ${escapeHtml(thread.title || trad)} …"></textarea>` +
+        `<div class="rad"><span class="hint"></span>` +
+        `<button type="button" class="btn skicka">Skicka</button></div>`
+      const falt = skriv.querySelector('textarea')
+      const knapp = skriv.querySelector('.skicka')
+      const hint = skriv.querySelector('.hint')
+      const skicka = async () => {
+        const txt = falt.value.trim()
+        if (!txt) return
+        knapp.disabled = true
+        hint.textContent = 'Skickar …'
+        const svar = await this.actions.skickaSvar?.(trad, txt)
+        knapp.disabled = false
+        if (svar?.ok) {
+          falt.value = ''
+          // Raden hinner inte fram till nästa poll, så kvittot får komma från svaret.
+          hint.textContent = `Ligger på tavlan som rad ${svar.id || '—'}`
+        } else {
+          hint.textContent = svar?.fel || 'Kom inte fram'
+        }
+      }
+      knapp.addEventListener('click', skicka)
+      // Cmd/Ctrl+Enter skickar. Enter ensamt gör radbrytning — ett meddelande till en tråd är
+      // oftare två meningar än en, och en knapp som skickar halva tanken är värre än ett klick.
+      falt.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault()
+          skicka()
+        }
+        e.stopPropagation()
+      })
+    }
     ruta.hidden = false
   }
 

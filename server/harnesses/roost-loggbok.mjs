@@ -89,6 +89,85 @@ function mottagare(rubrik) {
 const ARTILLFILIP = (rubrik) => /TILL FILIP/i.test(String(rubrik || ''))
 
 /**
+ * Går raden till den här tråden?
+ *
+ * Tavlan skriver mottagaren i fri text och stavar den tre sätt: nyckeln (`box-moln`),
+ * visningsnamnet (`BOX & MOLN`) och förkortningen alla faktiskt använder (`SAJT` för Sajt &
+ * Roostadmin). En exakt jämförelse mot ett av dem missar de andra två — samma lärdom som
+ * `matchar()` i rundturen. Vi jämför mot alla tre och aldrig luddigare än så: att gissa att
+ * "SAJT" kanske betyder "Sajt & Roostadmin" är rätt, att gissa att "S" gör det är fel.
+ */
+export function garTill(rubrik, trad) {
+  const till = mottagare(rubrik)
+  if (!till) return false
+  const info = TRADAR[trad]
+  if (!info) return false
+  const namn = info.namn.toUpperCase()
+  return till === trad.toUpperCase() || till === namn || till === namn.split(' ')[0]
+}
+
+/** Så långt en rubrik får vara innan Loggboken kapar den (mätt: exakt 160 tecken, rad 1383). */
+const RUBRIK_MAX = 160
+/** Filips rad är ett meddelande, inte en uppsats. Längre än så hör hemma i en chatt. */
+const SVAR_MAX = 1200
+
+/**
+ * Bygger Filips rad av ett svar i kolonin. Ren funktion — den skriver ingenting, just för att
+ * den ska gå att prova utan tavla och utan token.
+ *
+ * Raden skrivs som `trad: 'filip'`, inte som tråden den går till: hans ord ska stå i hans
+ * namn i förstahand (Lednings beslut rad 1382), och mottagaren står i rubriken där alla
+ * trådar redan letar efter den.
+ *
+ * RUBRIKEN BYGGS FÖR ATT RYMMAS. Loggboken kapar vid 160 tecken rakt av, mitt i ett ord och
+ * mitt i en instruktion — Design mätte 193 drabbade rader, sex av dem utan instruktion kvar.
+ * Därför kapas den här i en ordgräns med ellips, och hela texten ligger i `text` oavsett.
+ */
+export function byggSvar(trad, text) {
+  const info = TRADAR[trad]
+  if (!info) return { ok: false, fel: `Okänd tråd: ${trad}` }
+  const kropp = String(text || '').replace(/\s+/g, ' ').trim()
+  if (!kropp) return { ok: false, fel: 'Skriv något först' }
+  if (kropp.length > SVAR_MAX) return { ok: false, fel: `För långt — max ${SVAR_MAX} tecken` }
+
+  const prefix = `TILL ${info.namn.toUpperCase()}: `
+  const plats = RUBRIK_MAX - prefix.length
+  let smak = kropp
+  if (smak.length > plats) {
+    smak = kropp.slice(0, plats - 1)
+    const lucka = smak.lastIndexOf(' ')
+    if (lucka > plats * 0.5) smak = smak.slice(0, lucka)
+    smak += '…'
+  }
+  return { ok: true, rad: { trad: 'filip', fas: 'notis', rubrik: prefix + smak, text: kropp } }
+}
+
+/**
+ * Skickar svaret till Loggboken. Token läses ur miljön och lämnar aldrig NUC:en åt andra
+ * hållet — webbläsaren postar till kolonin, kolonin postar till tavlan (LAXOR 7).
+ *
+ * Cachen nollas efteråt. Utan det stod raden osynlig i upp till tjugo sekunder och det ser
+ * ut som att skicka-knappen inte gjorde något.
+ */
+export async function skickaSvar(trad, text) {
+  const byggt = byggSvar(trad, text)
+  if (!byggt.ok) return byggt
+  const { url, token } = konfig()
+  if (!url || !token) return { ok: false, fel: 'Kolonin har ingen skrivväg till Loggboken' }
+  const svar = await fetch(`${url}?token=${encodeURIComponent(token)}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(byggt.rad),
+    signal: AbortSignal.timeout(HAMTA_TIMEOUT_MS),
+  })
+  if (!svar.ok) return { ok: false, fel: `Loggboken svarade ${svar.status}` }
+  const data = await svar.json().catch(() => null)
+  if (!data || data.ok !== true) return { ok: false, fel: 'Loggboken tog inte emot raden' }
+  cache = { at: 0, rader: cache.rader, fel: '' }
+  return { ok: true, id: data.rad?.id || 0, rubrik: byggt.rad.rubrik }
+}
+
+/**
  * När en fråga till Filip räknas som besvarad.
  *
  * Tavlan har ingen kvitteringskolumn, så regeln är Lednings (rad 132): en TILL FILIP-rad står
@@ -225,6 +304,15 @@ async function scanThreads() {
   for (const rad of rader) {
     const trad = String(rad?.trad || '').trim().toLowerCase()
     if (!TRAD_OK.test(trad)) continue
+    /**
+     * FILIP FÅR INGEN EGEN PLÄTT (än). Sedan Sajt lade in trad='filip' (rad 1393) skriver han
+     * på tavlan i eget namn, och en hink här hade gjort honom till en åttonde astronaut med
+     * mätare för "rader i dygnet" och "hamrar" — mått som betyder något för en tråd som
+     * arbetar och ingenting för en människa som svarar. Hans rader syns i stället på kortet
+     * hos tråden han skrev till (franFilip). Om han ska stå i kolonin som en egen gestalt är
+     * det Lednings beslut, inte en bieffekt av ett filter.
+     */
+    if (trad === 'filip') continue
     if (!hinkar.has(trad)) hinkar.set(trad, [])
     hinkar.get(trad).push({
       fas: String(rad.fas || ''),
@@ -309,6 +397,21 @@ async function scanThreads() {
        *
        * Nyast först, för att en lista man öppnar ska börja i nuet.
        */
+      /**
+       * VAD FILIP SAGT TILL JUST DEN HÄR TRÅDEN.
+       *
+       * Hans rader skrivs som trad:'filip', så de hamnar i hans egen historik och inte i
+       * trådens. Utan det här fältet skulle svaret han just skickat försvinna ur kortet han
+       * skickade det från — det syns på tavlan men inte där det hör hemma.
+       */
+      franFilip: rader
+        .filter(
+          (x) => String(x?.trad || '').trim().toLowerCase() === 'filip' && garTill(x?.rubrik, trad)
+        )
+        .map((x) => ({ nar: tid(x?.created_at), rubrik: text(x?.rubrik, 160), text: text(x?.text, 300) }))
+        .sort((a, b) => a.nar - b.nar)
+        .slice(-5)
+        .reverse(),
       historik: r
         .slice(-10)
         .reverse()
