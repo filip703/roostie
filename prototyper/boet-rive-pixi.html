@@ -215,35 +215,96 @@ function buildBranch() {
 }
 
 // ── Rita bo ───────────────────────────────────────────
+// Kvistar löper HORISONTELLT runt skålen i lager — inte ut från mitten.
+// Sju lager nedifrån/bak till uppåt/fram ger djup och organisk form.
 function buildNest(progress) {
   const g   = new PIXI.Graphics();
   const rng = mkRng(17);
-  const TWIGS = 34;
-  const drawn = Math.ceil(TWIGS * progress);
 
-  for (let i = 0; i < drawn; i++) {
-    const ang   = rng() * Math.PI * 2;
-    const len   = NR * (0.75 + rng() * 0.5) * progress;
-    const cpAng = ang + (rng() - 0.5) * 1.4;
-    const cpLen = len * (0.4 + rng() * 0.3);
-    const cpX   = Math.cos(cpAng) * cpLen;
-    const cpY   = Math.sin(cpAng) * cpLen * 0.55;
-    const ex    = Math.cos(ang) * len;
-    const ey    = Math.sin(ang) * len * 0.52;
-    const col   = [C.nestDark, C.nestMid, C.nestLight][Math.floor(rng() * 3)];
-    const a     = 0.5 + rng() * 0.4;
-    g.lineStyle(1.2 + rng() * 2.4, col, a, 0.5, true);
-    g.moveTo(NX, NY);
-    g.quadraticCurveTo(NX + cpX, NY + cpY, NX + ex, NY + ey);
-  }
-
+  // Markskugga under boet
   g.lineStyle(0);
-  g.beginFill(0x2a1a0a, 0.4 * progress);
-  g.drawEllipse(NX, NY + 4, NR * 0.55 * progress, NR * 0.30 * progress);
+  g.beginFill(0x050808, 0.32 * progress);
+  g.drawEllipse(NX + 6, NY + NR * 0.34 + 12, NR * 1.52 * progress, NR * 0.38 * progress);
   g.endFill();
 
-  g.lineStyle(5.5 * progress, C.nestRim, progress, 0.5, true);
-  g.arc(NX, NY + 6, NR * progress, Math.PI * 0.12, Math.PI * 0.88);
+  // Sju vägglager — botten (mörkt/bak) upp till topp (ljust/fram)
+  const LAYERS = 7;
+  for (let layer = 0; layer < LAYERS; layer++) {
+    if ((layer + 1) / LAYERS > progress * 1.25) break;
+    const yFrac  = layer / (LAYERS - 1);              // 0=botten 1=topp
+    const yOff   = NR * 0.28 - yFrac * NR * 0.50;    // y-offset: nedre → övre
+    const xHalf  = NR * (1.06 - yFrac * 0.06);       // ungefär lika bred i alla lager
+    const nTwigs = 5 + layer;
+    for (let t = 0; t < nTwigs; t++) {
+      const xS  = NX - xHalf - rng() * NR * 0.32 + rng() * NR * 0.08;
+      const xE  = NX + xHalf + rng() * NR * 0.08 - rng() * NR * 0.32;
+      const yB  = NY + yOff + (rng() - 0.5) * 11;
+      const cpX = NX + (rng() - 0.5) * NR * 0.45;
+      const cpY = yB - NR * (0.04 + rng() * 0.10);  // svag uppåtbåge
+      const col = layer < 3
+        ? [C.nestDark, C.nestDark, C.nestMid][Math.floor(rng() * 3)]
+        : [C.nestMid, C.nestLight, C.nestRim][Math.floor(rng() * 3)];
+      g.lineStyle(1.1 + rng() * 2.4, col, 0.42 + rng() * 0.46, 0.5, true);
+      g.moveTo(xS, yB + (rng() - 0.5) * 5);
+      g.quadraticCurveTo(cpX, cpY, xE, yB + (rng() - 0.5) * 5);
+    }
+  }
+
+  // Mörk ihålig innerskål
+  g.lineStyle(0);
+  g.beginFill(0x0d0604, 0.82 * progress);
+  g.drawEllipse(NX, NY + 4, NR * 0.67 * progress, NR * 0.30 * progress);
+  g.endFill();
+
+  // Korta korsande kvistar inuti skålen (horisontella, korta)
+  for (let i = 0; i < Math.ceil(9 * progress); i++) {
+    const ang  = Math.PI * (0.85 + rng() * 0.30);   // nära horisontellt (0.85–1.15π)
+    const dist = NR * (0.18 + rng() * 0.38);
+    const cx   = NX + (rng() - 0.5) * NR * 0.50;
+    const cy   = NY + (rng() - 0.5) * NR * 0.14;
+    g.lineStyle(0.6 + rng() * 1.2, [C.nestDark, C.nestMid][Math.floor(rng() * 2)],
+      0.28 + rng() * 0.32, 0.5, true);
+    g.moveTo(cx - Math.cos(ang) * dist, cy - Math.sin(ang) * dist * 0.30);
+    g.lineTo(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist * 0.30);
+  }
+
+  // Kvistar som sticker ut bortom randen (boets "slarv") — övre halvcirkeln
+  // Vinklar 1.05π–1.95π = clockwise genom toppen (UP i Y-ned-koordinatsystemet)
+  for (let i = 0; i < Math.ceil(11 * progress); i++) {
+    const ang  = Math.PI * (1.05 + rng() * 0.90);
+    const r0   = NR * (0.88 + rng() * 0.07);
+    const r1   = NR * (1.12 + rng() * 0.44);
+    const ang2 = ang + (rng() - 0.5) * 0.50;
+    const px0  = NX + Math.cos(ang) * r0;
+    const py0  = NY + Math.sin(ang) * r0 * 0.48;
+    const px1  = NX + Math.cos(ang2) * r1;
+    const py1  = NY + Math.sin(ang2) * r1 * 0.48;
+    const pxIn = NX + Math.cos(ang) * NR * (0.55 + rng() * 0.22);
+    const pyIn = NY + Math.sin(ang) * NR * (0.55 + rng() * 0.22) * 0.48;
+    const cpX  = (px0 + px1) / 2 + (rng() - 0.5) * 18;
+    const cpY  = (py0 + py1) / 2 - rng() * 12;
+    const col  = [C.nestMid, C.nestLight, C.nestRim][Math.floor(rng() * 3)];
+    g.lineStyle(1.2 + rng() * 2.2, col, 0.52 + rng() * 0.42, 0.5, true);
+    g.moveTo(pxIn, pyIn);
+    g.quadraticCurveTo(cpX, cpY, px1, py1);
+  }
+
+  // Yttre rand — 1.07π→1.93π clockwise = övre halvcirkeln (synlig framkant på skålen)
+  g.lineStyle(8.5 * progress, C.nestRim, 0.70 * progress, 0.5, true);
+  g.arc(NX, NY + 6, NR * progress, Math.PI * 1.07, Math.PI * 1.93);
+  g.lineStyle(4.5 * progress, C.nestMid, 0.50 * progress, 0.5, true);
+  g.arc(NX, NY + 4, NR * 0.90 * progress, Math.PI * 1.10, Math.PI * 1.90);
+
+  // Mossgröna fläckar (organsik textur, värmer tonen)
+  for (let i = 0; i < Math.ceil(7 * progress); i++) {
+    const ang = rng() * Math.PI * 2;
+    const r   = NR * (0.44 + rng() * 0.60);
+    g.lineStyle(0);
+    g.beginFill(0x4a7a50, 0.18 + rng() * 0.28);
+    g.drawCircle(NX + Math.cos(ang) * r, NY + Math.sin(ang) * r * 0.37, 1.8 + rng() * 3.8);
+    g.endFill();
+  }
+
   return g;
 }
 
