@@ -30,8 +30,15 @@ function resolveInDist(pathname) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
 
-  // Kiosk: redirect bare root to astronauter world (rad 1099 — ändrat från trad, rad 443)
-  if (url.pathname === '/' && !url.searchParams.has('varld')) {
+  /**
+   * Kiosk: bara den NAKNA roten skickas till köksskärmens läge.
+   *
+   * Villkoret var `!searchParams.has('varld')`, och då åt omdirigeringen upp varje annan
+   * parameter: `?vy=maskinparken` och `?debug=1` hamnade i kiosk UTAN sin parameter, och i
+   * kiosk är HUD:en och sidopanelen släckta. Filip 28 sep: "kunde inte kolla vad de gör där."
+   * Det var inte scenen som saknade panelen — det var URL:en som aldrig kom fram.
+   */
+  if (url.pathname === '/' && url.search === '') {
     res.writeHead(302, { Location: '/?varld=astronauter&kiosk=1', 'Cache-Control': 'no-cache' })
     res.end()
     return
