@@ -60,6 +60,10 @@ export class Hud {
     this.actions = actions
     this.visible = true
     this._last = {}
+    /** namn → { knapp, ruta } för maskinernas panelrader; nollas vid varje omritning. */
+    this._maskinrutor = new Map()
+    /** Vilken maskins ruta som står öppen. Överlever en omritning via _aterstallMaskin(). */
+    this._oppenMaskin = ''
     this.hiddenOpen = false
 
     this.el = document.createElement('div')
@@ -491,12 +495,18 @@ export class Hud {
    */
   setMaskiner(lista, falt) {
     const rader = Array.isArray(lista) ? lista : []
-    const signatur = rader.map((m) => `${m.namn}:${m.status}:${Math.round((m.sistaLogg || 0) / 60000)}`).join('|')
+    // Signaturen avgör om panelen ritas om. Den bar förut bara minuten för sista loggraden,
+    // och då syntes aldrig en ny rad som kom inom samma minut. Nyaste radens tidsstämpel och
+    // antalet rader ligger med nu.
+    const signatur = rader
+      .map((m) => `${m.namn}:${m.status}:${m.sistaLogg || 0}:${(m.logg || []).length}`)
+      .join('|')
     if (this._last.maskiner === signatur) return
     this._last.maskiner = signatur
 
     const block = this.$('.agent-block')
     block.hidden = rader.length === 0
+    this._maskinrutor = new Map()
     if (!rader.length) return
 
     const nu = Date.now()
@@ -532,10 +542,97 @@ export class Hud {
           `<span class="jobb">${escapeHtml(m.jobb || statusOrd(m.status))}</span>` +
           `</span>` +
           `<span class="count">${m.status === 'ok' ? agentSedan(m.sistaLogg) : statusOrd(m.status)}</span>`
-        b.addEventListener('click', () => this.actions.pickMaskin?.(m.namn))
         wrap.appendChild(b)
+
+        /**
+         * MASKINENS EGEN RUTA I PANELEN (Filip 28 sep: "denna infon skulle man vilja se i
+         * raden till höger samt kunna se att som boten har skrivit innan").
+         *
+         * Raden säger vem agenten är; den utfällda rutan säger vad den sagt. Läget (uppe
+         * sedan, startar om, avslutade med kod) stod förut bara i webbläsarens tooltip, och
+         * en uppgift som kräver att man håller musen still i en sekund är i praktiken osynlig
+         * på en skärm i ett kök.
+         *
+         * TOM ÄR INTE SAMMA SAK SOM TYST. Saknas loggrader kan det bero på att agenten inte
+         * skrivit något, att mätningen är gammal (då nollar servern listan med flit) eller
+         * att den inte kör. Rutan säger vilket av dem det är i stället för att visa ingenting.
+         */
+        const ruta = document.createElement('div')
+        ruta.className = 'agent-logg'
+        ruta.hidden = true
+        const rader = Array.isArray(m.logg) ? m.logg : []
+        const huvud = `<div class="lage">${escapeHtml(m.detalj || statusOrd(m.status))}</div>`
+        ruta.innerHTML =
+          huvud +
+          (rader.length
+            ? rader
+                .map(
+                  (r) =>
+                    `<div class="rad"><span class="t">${klockan(r.t)}</span>` +
+                    `<span class="txt">${escapeHtml(r.rad)}</span></div>`
+                )
+                .join('')
+            : `<div class="rad tom">${
+                m.status === 'okand'
+                  ? 'Ingen färsk mätning — kolonin vet inte vad den skrivit'
+                  : m.status === 'ok'
+                    ? 'Inget i loggen de senaste raderna'
+                    : 'Kör inte, så det finns inget nytt att läsa'
+              }</div>`)
+        wrap.appendChild(ruta)
+
+        this._maskinrutor.set(m.namn, { knapp: b, ruta })
+        // Ett klick gör två saker med flit: flyger dit OCH fäller ut vad den sagt. Att behöva
+        // två klick för "visa mig den här agenten" är ett klick för mycket.
+        b.addEventListener('click', () => {
+          this.actions.pickMaskin?.(m.namn)
+          this.valjMaskin(m.namn, { flyg: false })
+        })
       }
     }
+
+    // Panelen ritas om var femtonde sekund. Utan det här stängdes den ruta Filip just öppnat
+    // så fort en agent skrev en rad — en lista som slår igen av sig själv är obrukbar.
+    if (this._oppenMaskin) {
+      const igen = this._oppenMaskin
+      this._oppenMaskin = ''
+      this.valjMaskin(igen, { flyg: false })
+    }
+  }
+
+  /**
+   * Öppna en maskins ruta i panelen, och stäng den som var öppen.
+   *
+   * Finns för att scenen ska kunna peka på samma rad som panelen: klickar man en robot ute i
+   * parken ska raden till höger fällas ut, inte bara kameran flytta sig. Anropet tål ett namn
+   * som inte finns i listan (en container kan ha försvunnit mellan två mätningar) — då händer
+   * ingenting, hellre än att panelen scrollar till ett tomrum.
+   */
+  valjMaskin(namn, { flyg = true } = {}) {
+    const post = this._maskinrutor?.get(namn)
+    if (!post) return false
+    const redanOppen = this._oppenMaskin === namn && !post.ruta.hidden
+    for (const [n, p] of this._maskinrutor) {
+      p.ruta.hidden = true
+      p.knapp.classList.toggle('vald', false)
+      void n
+    }
+    if (redanOppen) {
+      this._oppenMaskin = ''
+      return true
+    }
+    // Agentsektionen är hopfälld som förval; en rad som öppnas bakom en fälld rubrik är en
+    // rad ingen ser.
+    const block = this.$('.agent-block')
+    if (block?.classList.contains('fald')) block.classList.remove('fald')
+    const detaljer = block?.querySelector('details')
+    if (detaljer) detaljer.open = true
+    post.ruta.hidden = false
+    post.knapp.classList.add('vald')
+    this._oppenMaskin = namn
+    post.knapp.scrollIntoView({ block: 'nearest' })
+    if (flyg) this.actions.pickMaskin?.(namn)
+    return true
   }
 
   /**
@@ -1040,6 +1137,13 @@ function lageOrd(lage) {
 }
 
 /** Statusen på svenska — samma ord som resten av kolonin använder. */
+/** Klockslag utan datum: loggrader läses i förhållande till nu, inte till en kalender. */
+function klockan(ts) {
+  if (!ts) return '--:--'
+  const d = new Date(ts)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 function statusOrd(status) {
   if (status === 'fel') return 'fel'
   if (status === 'nere') return 'nere'

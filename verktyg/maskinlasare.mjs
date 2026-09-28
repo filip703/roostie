@@ -129,19 +129,56 @@ function avframa(buf) {
 }
 
 /**
- * När skrev containern sist något i loggen? Det är den enda aktivitetssignal som går att få
- * ur docker utan att fråga någon annans databas — och den är trubbig: en agent som loggar
- * bara vid fel ser tyst ut fast den arbetar (containervakten har samma erfarenhet med
- * wifi-watch). Därför betyder tystnad i kolonin "på tomgång", aldrig "trasig".
+ * Vad har containern skrivit senast? Det är den enda aktivitetssignal som går att få ur
+ * docker utan att fråga någon annans databas — och den är trubbig: en agent som loggar bara
+ * vid fel ser tyst ut fast den arbetar (containervakten har samma erfarenhet med wifi-watch).
+ * Därför betyder tystnad i kolonin "på tomgång", aldrig "trasig".
+ *
+ * TEXTEN SPARAS NU, INTE BARA KLOCKAN. Filip 28 sep: han vill kunna läsa vad en robot skrivit
+ * tidigare, inte bara se att den skrev något. Tolv rader räcker för att förstå vad en agent
+ * håller på med; fler gör filen till ett arkiv, och arkivet är dockers, inte kolonins.
+ *
+ * MASKNINGEN ÄR INTE VALFRI. Containerloggar innehåller ibland nycklar, tokens och adresser,
+ * och det här går från dockersocketen ut på en webbsida på hemnätet. Maskningen är
+ * best-effort och inget skydd att lita på: den täcker de former vi själva använder
+ * (roost-<hex>, Bearer, token=, key=, långa hex/base64-klumpar). En logg som läcker något
+ * annat läcker det fortfarande. Läs LAXOR 7 som "hemligheter hör inte hemma i en vy heller".
  */
-async function sistaLoggrad(namn) {
+const HEMLIGT = [
+  [/\broost-[0-9a-f]{16,}/gi, 'roost-***'],
+  [/\b(bearer)\s+\S+/gi, '$1 ***'],
+  [/\b(token|key|secret|password|passwd|pass|apikey|api_key|authorization)\b(\s*[=:]\s*)\S+/gi, '$1$2***'],
+  [/\b[0-9a-f]{32,}\b/gi, '***'],
+  [/\b[A-Za-z0-9+/]{40,}={0,2}\b/g, '***'],
+]
+
+function maska(rad) {
+  let ut = rad
+  for (const [re, med] of HEMLIGT) ut = ut.replace(re, med)
+  return ut
+}
+
+const LOGGRADER = 12
+
+async function loggen(namn) {
   try {
-    const rad = avframa(await ra(`/containers/${encodeURIComponent(namn)}/logs?stdout=1&stderr=1&tail=1&timestamps=1`, true))
-    const m = /(\d{4}-\d{2}-\d{2}T[\d:.]+Z)/.exec(rad)
-    const t = m ? Date.parse(m[1]) : NaN
-    return Number.isNaN(t) ? 0 : t
+    const rat = avframa(
+      await ra(`/containers/${encodeURIComponent(namn)}/logs?stdout=1&stderr=1&tail=${LOGGRADER}&timestamps=1`, true)
+    )
+    const rader = []
+    for (const r of rat.split('\n')) {
+      const m = /^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\s?([\s\S]*)$/.exec(r.trim())
+      if (!m) continue
+      const t = Date.parse(m[1])
+      if (Number.isNaN(t)) continue
+      const text = maska(m[2]).replace(/\s+/g, ' ').trim().slice(0, 200)
+      if (text) rader.push({ t, rad: text })
+    }
+    // Nyast först: en panelrad som fälls ut ska börja med det som gäller nu.
+    rader.reverse()
+    return { sista: rader.length ? rader[0].t : 0, logg: rader.slice(0, LOGGRADER) }
   } catch {
-    return 0
+    return { sista: 0, logg: [] }
   }
 }
 
@@ -176,8 +213,8 @@ for (const rad of lista) {
     continue
   }
   const { status, detalj } = las(detaljer)
-  const sistaLogg = status === 'ok' ? await sistaLoggrad(namn) : 0
-  maskiner.push({ namn, status, detalj, sistaLogg, grupp: GRUPP.get(namn) || 'hem' })
+  const { sista: sistaLogg, logg } = status === 'ok' ? await loggen(namn) : { sista: 0, logg: [] }
+  maskiner.push({ namn, status, detalj, sistaLogg, logg, grupp: GRUPP.get(namn) || 'hem' })
 }
 
 maskiner.sort((a, b) => a.namn.localeCompare(b.namn))

@@ -1631,3 +1631,44 @@ kbd {
 .side .trad-bon .lage.flyger { color: #d7a85f; }
 .side .trad-bon .lage.sjunger { color: #c9785e; }
 .side .trad-bon .lage.stoppat { color: #b65c57; }
+
+/**
+ * MASKINENS RUTA I PANELEN.
+ *
+ * Fälls ut under raden och säger vad agenten skrivit, nyast först. Monospace för att en
+ * loggrad är maskintext och inte prosa; dämpad färg för att raden ovanför är det man letar
+ * efter och rutan det man läser när man hittat den. Ingen egen scroll: tolv rader ryms, och
+ * en scroll inne i en scroll är just det bot-crossings egen CSS varnar för.
+ */
+.side .agent.vald {
+  background: rgba(255, 255, 255, 0.06);
+}
+.side .agent-logg {
+  margin: 0 0 6px 26px;
+  padding: 6px 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--txt-dim, #9aa);
+}
+.side .agent-logg .lage {
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--txt, #dde);
+}
+.side .agent-logg .rad {
+  display: flex;
+  gap: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.side .agent-logg .rad .t {
+  flex: 0 0 auto;
+  opacity: 0.6;
+}
+.side .agent-logg .rad .txt {
+  overflow-wrap: anywhere;
+}
+.side .agent-logg .rad.tom {
+  font-family: inherit;
+  opacity: 0.7;
+}

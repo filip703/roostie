@@ -11,12 +11,15 @@
  *
  * Filens form: { skriven: <epoch ms>, maskiner: [ { namn, status, grupp, detalj } ] }
  *   status: ok | nere | fel | okand      grupp: roost | nexus
+ *   logg: [ { t: <epoch ms>, rad: <maskad text> } ]  — nyast först, max tolv
  */
 import fsp from 'node:fs/promises'
 
 /** Äldre mätning än så här är inte en mätning längre. */
 const FARSK_MS = 10 * 60 * 1000
 const MAX = 80
+/** Så många loggrader per maskin släpps vidare till bilden. Resten är dockers arkiv. */
+const LOGG_MAX = 12
 const NAMN_OK = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/
 const STATUS = new Set(['ok', 'nere', 'fel', 'okand'])
 const GRUPPER = new Set(['roost', 'nat', 'hem', 'data'])
@@ -48,6 +51,19 @@ export async function laesMaskiner() {
       // Sista loggraden = enda aktivitetssignalen. Gammal fil betyder att vi inte vet något
       // om arbetet heller, inte att maskinen står stilla.
       sistaLogg: gammal ? 0 : Number(m?.sistaLogg) || 0,
+      /**
+       * Loggraderna släpps igenom, men servern litar inte på filen: gammal fil ger ingen
+       * logg alls (samma regel som statusen — att visa gårdagens rader som om de vore nu är
+       * precis det LAXOR 23 förbjuder), och varje rad kapas här igen. Läsaren maskar redan
+       * hemligheter; den här kapningen handlar om att en enda rad inte ska kunna spränga
+       * panelen eller svaret.
+       */
+      logg: gammal
+        ? []
+        : (Array.isArray(m?.logg) ? m.logg : [])
+            .slice(0, LOGG_MAX)
+            .map((r) => ({ t: Number(r?.t) || 0, rad: String(r?.rad || '').slice(0, 200) }))
+            .filter((r) => r.t && r.rad),
     })
     if (maskiner.length >= MAX) break
   }
