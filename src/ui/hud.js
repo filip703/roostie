@@ -601,6 +601,51 @@ export class Hud {
   }
 
   /**
+   * Trådens text i panelen, inte bara i rutan över astronauten.
+   *
+   * Filip 28 sep, med en pil i skärmdumpen: kortet över astronauten säger vad Ledning vill,
+   * men högerpanelen sa bara namn och klockslag. Man fick alltså klicka fram en ruta mitt i
+   * scenen för att läsa det panelen hade plats för, och rutan ligger över kolonin och skymmer
+   * just det man tittar på.
+   *
+   * Två delar: det som gäller nu (frågan om tråden vinkar, annars senaste rubriken), och vad
+   * tråden skrivit förut. Faserna färgas som på tavlan, så att en rad går att läsa som
+   * "började", "klart" eller "stoppat" utan att man läser ordet.
+   */
+  tradInfo(thread) {
+    const ruta = this.$('.side .trad-info')
+    if (!ruta) return
+    if (!thread) {
+      ruta.hidden = true
+      ruta.innerHTML = ''
+      return
+    }
+    const nu = thread.notis
+      ? `${thread.notis}${thread.notisText ? ` — ${thread.notisText}` : ''}`
+      : thread.preview || ''
+    const hist = Array.isArray(thread.historik) ? thread.historik : []
+    // Den nyaste raden står redan som "nu" när tråden inte vinkar — att visa den två gånger
+    // gör listan en rad kortare utan att säga något nytt.
+    const lista = thread.notis ? hist : hist.slice(1)
+    ruta.innerHTML =
+      (nu
+        ? `<div class="nu${thread.notis ? ' vantar' : ''}">${escapeHtml(nu)}</div>`
+        : '') +
+      (lista.length
+        ? `<div class="hist-rubrik">Tidigare</div>` +
+          lista
+            .map(
+              (h) =>
+                `<div class="h ${escapeHtml(h.fas || '')}">` +
+                `<span class="t">${klockan(h.nar)}</span>` +
+                `<span class="txt">${escapeHtml(h.rubrik || '')}</span></div>`
+            )
+            .join('')
+        : `<div class="h tom">Inget mer skrivet av den här tråden</div>`)
+    ruta.hidden = false
+  }
+
+  /**
    * Öppna en maskins ruta i panelen, och stäng den som var öppen.
    *
    * Finns för att scenen ska kunna peka på samma rad som panelen: klickar man en robot ute i
@@ -791,12 +836,14 @@ export class Hud {
     this.$('#btn-new-session').classList.toggle('primary', !agent || !thread)
     if (!agent || !thread) {
       card.classList.remove('on')
+      this.tradInfo(null)
       this.selected = null
       return
     }
     this.selected = { agent, thread }
     card.classList.add('on')
 
+    this.tradInfo(thread)
     this.$('.thread-pop .title').textContent = thread.title || 'Namnlös tråd'
     const status = STATUS_LABEL[agent.status] || agent.status
     const meta = this.$('.thread-pop .meta')
@@ -1227,6 +1274,7 @@ const TEMPLATE = `
       </div>
       <div class="threads-head"></div>
       <div class="threads"></div>
+      <div class="trad-info" hidden></div>
     </div>
   </div>
 </aside>

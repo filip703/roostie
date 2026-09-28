@@ -1649,12 +1649,12 @@ kbd {
   border-left: 1px solid rgba(255, 255, 255, 0.12);
   font-size: 11px;
   line-height: 1.5;
-  color: var(--txt-dim, #9aa);
+  color: var(--dim);
 }
 .side .agent-logg .lage {
   margin-bottom: 4px;
   font-weight: 600;
-  color: var(--txt, #dde);
+  color: var(--text);
 }
 .side .agent-logg .rad {
   display: flex;
@@ -1670,5 +1670,63 @@ kbd {
 }
 .side .agent-logg .rad.tom {
   font-family: inherit;
+  opacity: 0.7;
+}
+
+/**
+ * TRÅDENS TEXT I PANELEN.
+ *
+ * Ligger under trådlistan i sidopanelen och säger samma sak som rutan över astronauten, plus
+ * vad tråden skrivit förut. Poängen är att slippa öppna en ruta mitt i scenen för att läsa
+ * något panelen har plats för — rutan skymmer just den plätt man tittar på.
+ *
+ * Egen scroll med tak, inte fri höjd: tio rader under en trådlista som redan scrollar skulle
+ * annars trycka ut listan ur bild.
+ */
+.side .trad-info {
+  flex: 0 0 auto;
+  max-height: 34vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.side .trad-info .nu {
+  color: var(--text);
+  margin-bottom: 10px;
+}
+/* Väntar tråden på någon är texten en fråga, inte en notering — den bär accentkanten. */
+.side .trad-info .nu.vantar {
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+}
+.side .trad-info .hist-rubrik {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.side .trad-info .h {
+  display: flex;
+  gap: 7px;
+  padding: 2px 0;
+  color: var(--dim);
+}
+.side .trad-info .h .t {
+  flex: 0 0 auto;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+.side .trad-info .h .txt {
+  overflow-wrap: anywhere;
+}
+/* Faserna läses på färgen, som på tavlan: pågår, levererat, stoppat, sagt. */
+.side .trad-info .h.borjar .t { color: var(--amber); }
+.side .trad-info .h.klart .t { color: var(--green); }
+.side .trad-info .h.stoppat .t { color: var(--red); }
+.side .trad-info .h.tom {
   opacity: 0.7;
 }

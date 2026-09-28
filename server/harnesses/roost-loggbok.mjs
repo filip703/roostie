@@ -299,6 +299,20 @@ async function scanThreads() {
       gitBranch: projectPath ? 'main' : '',
       model: senaste.commit ? senaste.commit.slice(0, 7) : '',
       effort: `${r.length} rader`,
+      /**
+       * VAD TRÅDEN SKRIVIT FÖRUT (Filip 28 sep: "kunna se att som boten har skrivit innan").
+       *
+       * Kortet över astronauten visar en sak: frågan som väntar, eller det senaste den gjorde.
+       * Det räcker för att veta att någon vill något, men inte för att veta vad den hållit på
+       * med. Tio rader är ungefär ett arbetspass fram och tillbaka — fler gör panelen till en
+       * andra Loggbok, och Loggboken finns redan, både på tavlan i kolonin och på roost.love.
+       *
+       * Nyast först, för att en lista man öppnar ska börja i nuet.
+       */
+      historik: r
+        .slice(-10)
+        .reverse()
+        .map((x) => ({ nar: x.nar, fas: x.fas, rubrik: text(x.rubrik, 160), text: text(x.text, 220) })),
       createdAt: r[0].nar,
       lastActivityAt: senaste.nar,
       // Tavlan vet inte när du tittade — kolonin gör det själv (Viewed-knappen).
