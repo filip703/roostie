@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Godot-prov kompositionsrigg — rad 1361</title>
+<style>
+html,body{margin:0;padding:0;background:#0C182F;width:1024px;height:768px;overflow:hidden;}
+canvas{display:block;}
+#mått{position:absolute;top:8px;left:8px;color:#f4ede1;font:12px/1.6 monospace;background:rgba(0,0,0,.55);padding:6px 10px;border-radius:4px;}
+</style>
+</head>
+<body>
+<canvas id="c" width="1024" height="768"></canvas>
+<div id="mått">mäter…</div>
+<script>
+'use strict';
+const W = 1024, H = 768;
+const cv = document.getElementById('c');
+const g  = cv.getContext('2d');
+
+// Konstanter — identiska med main.gd (rad 1361-fix)
+const NX = 512, NY = 340, NR = 316;
+const NEST_PROGRESS = 0.75;
+
+// Palett
+const P = {
+  bg:'#0C182F', branch:'#2a4435', branchHL:'#3d6650',
+  nestDark:'#4a2e18', nestMid:'#8a6640', nestLight:'#c4a678', nestRim:'#d7a85f',
+  eggShell:'#ede0c4', eggSpot:'#c4a678', glow:'#ffe8b0',
+  birdBody:'#d7a85f', birdWing:'#c9785e',
+};
+
+// Pseudo-RNG — identisk med _mk_rng/_rng_next i main.gd
+function mkRng(seed) {
+  let s = (seed | 0) + 1;
+  return () => { s = (s * 1664525 + 1013904223) & 0x7FFFFFFF; return s / 0x7FFFFFFF; };
+}
+
+// Bezier (kubisk)
+function bezier(p0,p1,p2,p3,t) {
+  const mt=1-t;
+  return {
+    x: mt*mt*mt*p0.x + 3*mt*mt*t*p1.x + 3*mt*t*t*p2.x + t*t*t*p3.x,
+    y: mt*mt*mt*p0.y + 3*mt*mt*t*p1.y + 3*mt*t*t*p2.y + t*t*t*p3.y,
+  };
+}
+
+// Kvadratisk bezier-poly
+function quadraticPts(p0,ctrl,p1,n=16) {
+  const pts=[];
+  for(let i=0;i<=n;i++){const t=i/n,mt=1-t;pts.push({x:mt*mt*p0.x+2*mt*t*ctrl.x+t*t*p1.x,y:mt*mt*p0.y+2*mt*t*ctrl.y+t*t*p1.y});}
+  return pts;
+}
+
+function ellipsePath(cx,cy,rx,ry) {
+  g.beginPath(); g.ellipse(cx,cy,rx,ry,0,0,Math.PI*2); g.closePath();
+}
+
+// Gren — identisk med _draw_branch i main.gd
+function drawBranch() {
+  const by = NY + NR * 0.46;
+  const pts = [];
+  for(let i=0;i<60;i++){const t=i/59;pts.push(bezier({x:0,y:by+4},{x:256,y:by+10},{x:512,y:by-4},{x:1024,y:by+1},t));}
+  function polyline(col,lw,alpha=1) {
+    g.save(); g.globalAlpha=alpha; g.strokeStyle=col; g.lineWidth=lw; g.lineCap='round'; g.lineJoin='round';
+    g.beginPath(); g.moveTo(pts[0].x,pts[0].y);
+    pts.forEach(p=>g.lineTo(p.x,p.y)); g.stroke(); g.restore();
+  }
+  polyline('rgba(0,0,0,0.4)',164);
+  polyline(P.branch,133);
+  polyline(P.branchHL,41,0.4);
+}
+
+// Bo — horisontella kvistlager, identisk med _draw_nest i main.gd
+function drawNest(progress) {
+  const rng = mkRng(17);
+  const LAYERS = 7;
+  for(let layer=0;layer<LAYERS;layer++){
+    if((layer+1)/LAYERS > progress*1.25) break;
+    const y_frac = layer/(LAYERS-1);
+    const y_off  = NR*0.28 - y_frac*NR*0.50;
+    const x_half = NR*(1.06 - y_frac*0.06);
+    const n_twigs = 5+layer;
+    for(let _t=0;_t<n_twigs;_t++){
+      const x_s = NX - x_half - rng()*NR*0.32 + rng()*NR*0.08;
+      const x_e = NX + x_half + rng()*NR*0.08 - rng()*NR*0.32;
+      const y_b = NY + y_off + (rng()-0.5)*11;
+      const cp_x= NX + (rng()-0.5)*NR*0.45;
+      const cp_y= y_b - NR*(0.04 + rng()*0.10);
+      const ri  = Math.floor(rng()*3);
+      const cols_lo = [P.nestDark, P.nestDark, P.nestMid];
+      const cols_hi = [P.nestMid, P.nestLight, P.nestRim];
+      const col = layer<3 ? cols_lo[ri] : cols_hi[ri];
+      const alpha = 0.42 + rng()*0.46;
+      const width = 1.1 + rng()*2.4;
+      const y1 = y_b+(rng()-0.5)*5, y2=y_b+(rng()-0.5)*5;
+      const pts = quadraticPts({x:x_s,y:y1},{x:cp_x,y:cp_y},{x:x_e,y:y2});
+      g.save(); g.globalAlpha=alpha; g.strokeStyle=col; g.lineWidth=width; g.lineCap='round';
+      g.beginPath(); g.moveTo(pts[0].x,pts[0].y); pts.forEach(p=>g.lineTo(p.x,p.y)); g.stroke(); g.restore();
+    }
+  }
+  // Boets inre skugga (cup)
+  g.save(); g.globalAlpha=0.82*progress;
+  ellipsePath(NX, NY+4, NR*0.67*progress, NR*0.30*progress);
+  g.fillStyle='rgba(13,6,4,0.82)'; g.fill(); g.restore();
+  // Rim
+  g.save(); g.globalAlpha=0.70*progress; g.strokeStyle=P.nestRim; g.lineWidth=8.5*progress; g.lineCap='round';
+  g.beginPath();
+  for(let ri3=0;ri3<50;ri3++){
+    const ang3=Math.PI*1.07+(Math.PI*1.93-Math.PI*1.07)*ri3/49;
+    const x=NX+Math.cos(ang3)*NR*progress, y=NY+6+Math.sin(ang3)*NR*progress*0.6;
+    if(ri3===0)g.moveTo(x,y); else g.lineTo(x,y);
+  }
+  g.stroke(); g.restore();
+}
+
+// Ägg
+function drawEgg() {
+  const egg_rx = NR*0.484, egg_ry = NR*0.613;
+  const ex = NX, ey = NY - NR*0.355;
+  ellipsePath(ex,ey,egg_rx,egg_ry);
+  g.fillStyle=P.eggShell; g.fill();
+  const rng=mkRng(42);
+  for(let i=0;i<10;i++){
+    const fx=(rng()-0.5)*egg_rx*2*1.5, fy=(rng()-0.5)*egg_ry*2*1.4;
+    if((fx/egg_rx)**2+(fy/egg_ry)**2<0.85){
+      g.beginPath();g.arc(ex+fx,ey+fy,rng()*2.8+0.8,0,Math.PI*2);
+      g.fillStyle=P.eggSpot; g.globalAlpha=0.42; g.fill(); g.globalAlpha=1;
+    }
+  }
+}
+
+// Mät nest-bredd (bredaste lagret, y_frac=0)
+function mätNestBredd() {
+  const x_half = NR * 1.06;  // layer 0, y_frac=0
+  const nestWidth = 2 * x_half;
+  return {nestWidth, pct: (nestWidth/W*100).toFixed(1)};
+}
+
+// Rita allt
+g.fillStyle = P.bg;
+g.fillRect(0,0,W,H);
+drawBranch();
+drawNest(NEST_PROGRESS);
+drawEgg();
+
+// Mätning
+const {nestWidth,pct} = mätNestBredd();
+const m = document.getElementById('mått');
+m.textContent = `NR=${NR}  nx=${NX}  ny=${NY}\nNestBredd=${Math.round(nestWidth)}px / ${W}px = ${pct}% (krav ≥65%)\nNY/H=${(NY/H*100).toFixed(1)}% från toppen (krav ≈45%)`;
+
+// Rita mätlinjer
+g.save();
+g.strokeStyle='rgba(255,255,100,0.6)'; g.lineWidth=1; g.setLineDash([4,4]);
+// Horisontell linje på NY
+g.beginPath(); g.moveTo(0,NY); g.lineTo(W,NY); g.stroke();
+// Vertikala linjer: nest-kanter
+const x_half = NR*1.06;
+g.strokeStyle='rgba(100,255,100,0.6)';
+g.beginPath(); g.moveTo(NX-x_half,0); g.lineTo(NX-x_half,H); g.stroke();
+g.beginPath(); g.moveTo(NX+x_half,0); g.lineTo(NX+x_half,H); g.stroke();
+g.restore();
+</script>
+</body>
+</html>

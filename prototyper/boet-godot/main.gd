@@ -29,9 +29,13 @@ const C_DIMMED     := Color(0.604, 0.655, 0.612)
 var FEATHER_COLS: Array[Color] = []
 
 # ── Scen-konstanter ───────────────────────────────────
-const NX: float = 420.0
-const NY: float = 398.0
-const NR: float = 62.0
+# NX/NY = boets centrum i canvas-koordinater.
+# NR = boets radie — styr all proportionell skalning.
+# Rad 1361 fix: NR 62→316 (×5.1), NX centrerat, NY ≈44 % från toppen.
+# Resultat: boet fyller ≈65 % av canvas-bredden (krav: ≥65 %).
+const NX: float = 512.0
+const NY: float = 340.0
+const NR: float = 316.0
 const NEST_PROGRESS: float = 0.75
 const BASE_W: float = 1024.0
 const BASE_H: float = 768.0
@@ -69,16 +73,17 @@ var klackt_fade_start: float = -1.0
 func _ready() -> void:
 	FEATHER_COLS = [C_F_CLAY, C_F_CAMEL, C_F_HONEY, C_F_FOREST]
 
+	# Fjäderpositioner skalade ×5.1 från original (NR 62→316).
 	nest_fjadrar = [
-		{"tx": NX - 20, "ty": NY + 6,  "angle": -0.45, "col": 0, "len": 22.0},
-		{"tx": NX + 12, "ty": NY + 2,  "angle":  0.32, "col": 2, "len": 19.0},
-		{"tx": NX - 6,  "ty": NY - 8,  "angle": -0.12, "col": 1, "len": 24.0},
-		{"tx": NX + 24, "ty": NY + 14, "angle":  0.58, "col": 3, "len": 17.0},
-		{"tx": NX - 14, "ty": NY + 16, "angle": -0.28, "col": 2, "len": 20.0},
-		{"tx": NX + 4,  "ty": NY - 14, "angle":  0.19, "col": 0, "len": 18.0},
-		{"tx": NX - 28, "ty": NY - 4,  "angle": -0.6,  "col": 1, "len": 21.0},
-		{"tx": NX + 30, "ty": NY + 4,  "angle":  0.44, "col": 3, "len": 16.0},
-		{"tx": NX - 4,  "ty": NY + 12, "angle": -0.05, "col": 2, "len": 23.0},
+		{"tx": NX - 102, "ty": NY + 31,  "angle": -0.45, "col": 0, "len": 112.0},
+		{"tx": NX + 61,  "ty": NY + 10,  "angle":  0.32, "col": 2, "len": 97.0},
+		{"tx": NX - 31,  "ty": NY - 41,  "angle": -0.12, "col": 1, "len": 122.0},
+		{"tx": NX + 122, "ty": NY + 71,  "angle":  0.58, "col": 3, "len": 87.0},
+		{"tx": NX - 71,  "ty": NY + 82,  "angle": -0.28, "col": 2, "len": 102.0},
+		{"tx": NX + 20,  "ty": NY - 71,  "angle":  0.19, "col": 0, "len": 92.0},
+		{"tx": NX - 143, "ty": NY - 20,  "angle": -0.6,  "col": 1, "len": 107.0},
+		{"tx": NX + 153, "ty": NY + 20,  "angle":  0.44, "col": 3, "len": 82.0},
+		{"tx": NX - 20,  "ty": NY + 61,  "angle": -0.05, "col": 2, "len": 117.0},
 	]
 
 	RenderingServer.set_default_clear_color(C_BG)
@@ -99,7 +104,7 @@ func _ready() -> void:
 
 	lbl_klackt = Label.new()
 	lbl_klackt.text = "Kläckt!"
-	lbl_klackt.position = Vector2(NX - 60, NY - 90)
+	lbl_klackt.position = Vector2(NX - 80, 80)
 	lbl_klackt.add_theme_color_override("font_color", C_NEST_RIM)
 	lbl_klackt.add_theme_font_size_override("font_size", 38)
 	lbl_klackt.modulate.a = 0.0
@@ -114,7 +119,7 @@ func _ready() -> void:
 	add_child(btn_hall)
 
 	lbl_motor = Label.new()
-	lbl_motor.text = "kolonin · motorprov Godot 4 · 28 sep 2026"
+	lbl_motor.text = "kolonin · motorprov Godot 4 · rad 1361"
 	lbl_motor.position = Vector2(BASE_W / 2 - 180, BASE_H - 20)
 	lbl_motor.add_theme_color_override("font_color", Color(0.6, 0.65, 0.61, 0.6))
 	lbl_motor.add_theme_font_size_override("font_size", 11)
@@ -140,13 +145,13 @@ func _input(event: InputEvent) -> void:
 		if mbe.pressed:
 			var pos := mbe.position
 			var dx := pos.x - NX
-			var dy := pos.y - (NY - 22)
-			if dx * dx + dy * dy < 40 * 40 and not st_agg_klackt:
+			var dy := pos.y - (NY - NR * 0.355)
+			if dx * dx + dy * dy < (NR * 0.65) * (NR * 0.65) and not st_agg_klackt:
 				st_agg_wobble = 18.0
 			if st_fagel_vis:
 				var bx := pos.x - NX
-				var by_ := pos.y - (NY - 24)
-				if bx * bx + by_ * by_ < 48 * 48:
+				var by_ := pos.y - (NY - NR * 0.355)
+				if bx * bx + by_ * by_ < (NR * 0.78) * (NR * 0.78):
 					st_fagel_hop_t = 0.01
 
 func _process(delta: float) -> void:
@@ -213,13 +218,20 @@ func _draw() -> void:
 
 # ── Rita gren ─────────────────────────────────────────
 func _draw_branch() -> void:
+	# Grenen sträcker sig över hela canvas-bredden, sitter under boets centrum.
+	var branch_y: float = NY + NR * 0.46
 	var pts := PackedVector2Array()
 	for i: int in range(60):
 		var t := float(i) / 59.0
-		pts.append(_bezier(Vector2(80, 422), Vector2(420, 428), Vector2(620, 418), Vector2(880, 415), t))
-	draw_polyline(pts, Color(0, 0, 0, 0.4), 32.0, true)
-	draw_polyline(pts, C_BRANCH, 26.0, true)
-	draw_polyline(pts, Color(C_BRANCH_HL, 0.4), 8.0, true)
+		pts.append(_bezier(
+			Vector2(0, branch_y + 4),
+			Vector2(256, branch_y + 10),
+			Vector2(512, branch_y - 4),
+			Vector2(1024, branch_y + 1),
+			t))
+	draw_polyline(pts, Color(0, 0, 0, 0.4), 164.0, true)
+	draw_polyline(pts, C_BRANCH, 133.0, true)
+	draw_polyline(pts, Color(C_BRANCH_HL, 0.4), 41.0, true)
 
 # ── Pseudo-rng ────────────────────────────────────────
 func _mk_rng(seed_val: int) -> Array[int]:
@@ -332,43 +344,46 @@ func _draw_agg() -> void:
 	if st_agg_wobble > 0.5:
 		wobble = sin(elapsed * 25.0) * st_agg_wobble
 
-	var ex := Vector2(NX, NY - 22)
+	# Ägg-dimensioner NR-proportionella (rad 1361).
+	var egg_rx: float = NR * 0.484
+	var egg_ry: float = NR * 0.613
+	var ex := Vector2(NX, NY - NR * 0.355)
 	if crack > 0.3:
 		var ga: float = (crack - 0.3) / 0.7 * 0.14
-		draw_circle(ex, 38.0 * 2.4, Color(C_GLOW, ga))
+		draw_circle(ex, egg_ry * 2.4, Color(C_GLOW, ga))
 
-	_draw_ellipse_fill(ex + Vector2(0, wobble * 0.3), 30.0, 38.0, C_EGG_SHELL)
+	_draw_ellipse_fill(ex + Vector2(0, wobble * 1.5), egg_rx, egg_ry, C_EGG_SHELL)
 
 	var rng := _mk_rng(42)
 	for _i: int in range(10):
-		var fx: float = (_rng_next(rng) - 0.5) * 30 * 1.5
-		var fy: float = (_rng_next(rng) - 0.5) * 38 * 1.4
-		if (fx / 30.0) * (fx / 30.0) + (fy / 38.0) * (fy / 38.0) < 0.85:
-			draw_circle(Vector2(NX + fx, NY - 22 + fy), _rng_next(rng) * 2.8 + 0.8,
+		var fx: float = (_rng_next(rng) - 0.5) * egg_rx * 2.0 * 1.5
+		var fy: float = (_rng_next(rng) - 0.5) * egg_ry * 2.0 * 1.4
+		if (fx / egg_rx) * (fx / egg_rx) + (fy / egg_ry) * (fy / egg_ry) < 0.85:
+			draw_circle(Vector2(ex.x + fx, ex.y + fy), _rng_next(rng) * 2.8 + 0.8,
 				Color(C_EGG_SPOT, 0.42))
 
 	if crack > 0:
 		var alpha2: float = minf(crack * 2.5, 1.0)
 		var crack_col := Color(C_EGG_CRACK, alpha2)
-		var ew: float = 30.0
-		var eh: float = 38.0
-		draw_line(Vector2(NX - ew * 0.35, NY - 22), Vector2(NX - ew * 0.05, NY - 22 - eh * 0.2), crack_col, 2.0)
-		draw_line(Vector2(NX - ew * 0.05, NY - 22 - eh * 0.2), Vector2(NX + ew * 0.18, NY - 22 + eh * 0.07), crack_col, 2.0)
-		draw_line(Vector2(NX + ew * 0.18, NY - 22 + eh * 0.07), Vector2(NX + ew * 0.38, NY - 22 - eh * 0.14), crack_col, 2.0)
+		var ew: float = egg_rx
+		var eh: float = egg_ry
+		draw_line(Vector2(ex.x - ew * 0.35, ex.y), Vector2(ex.x - ew * 0.05, ex.y - eh * 0.2), crack_col, 2.0)
+		draw_line(Vector2(ex.x - ew * 0.05, ex.y - eh * 0.2), Vector2(ex.x + ew * 0.18, ex.y + eh * 0.07), crack_col, 2.0)
+		draw_line(Vector2(ex.x + ew * 0.18, ex.y + eh * 0.07), Vector2(ex.x + ew * 0.38, ex.y - eh * 0.14), crack_col, 2.0)
 		if crack > 0.35:
 			var glow_alpha: float = (crack - 0.35) / 0.65
-			draw_line(Vector2(NX - ew * 0.35, NY - 22), Vector2(NX - ew * 0.05, NY - 22 - eh * 0.2),
+			draw_line(Vector2(ex.x - ew * 0.35, ex.y), Vector2(ex.x - ew * 0.05, ex.y - eh * 0.2),
 				Color(C_GLOW, glow_alpha), 3.5)
 
 # ── Rita fågel ────────────────────────────────────────
 func _draw_fagel() -> void:
 	var eo: float = _ease_out_cubic(st_fagel_scale)
-	var size: float = 24.0 * eo
+	var size: float = NR * 0.387 * eo
 	var hop: float = 0.0
 	if st_fagel_hop_t > 0:
-		hop = sin(st_fagel_hop_t * PI) * -18.0
-	var bob: float = sin(elapsed * 0.0085) * 3.5
-	var pos := Vector2(NX, NY - 24 + bob + hop)
+		hop = sin(st_fagel_hop_t * PI) * -NR * 0.29
+	var bob: float = sin(elapsed * 0.0085) * NR * 0.056
+	var pos := Vector2(NX, NY - NR * 0.355 + bob + hop)
 	var alpha: float = eo
 	if size < 2.0:
 		return
