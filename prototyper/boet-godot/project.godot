@@ -1,0 +1,35 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all documented.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Boet Godot-prov"
+config/description="Kolonin motorprov — Godot 4 vs Rive+PixiJS"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7", "Web")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1024
+window/size/viewport_height=768
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+renderer/rendering_method="mobile"
+
+[gdscript]
+
+warnings/inferred_declaration=0
+warnings/untyped_declaration=0
+warnings/return_value_discarded=0
+
