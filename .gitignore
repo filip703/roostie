@@ -24,3 +24,4 @@ prototyper/*.webm
 prototyper/*.png
 prototyper/node_modules
 prototyper/package-lock.json
+.vercel

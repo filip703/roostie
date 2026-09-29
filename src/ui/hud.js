@@ -1,4 +1,5 @@
 import { PRESETS, PLANETS_ORDER } from './hud-data.js'
+import { byggFlode } from './flode.js'
 import { PLANETS } from '../world/planet.js'
 import { TIMES, systemTimeOfDay } from '../world/sky.js'
 import { STATUS_LABEL } from '../game/colony.js'
@@ -367,9 +368,6 @@ export class Hud {
     on('#btn-viewed', 'click', () => this.actions.markViewed?.())
     on('#btn-archive', 'click', () => this.actions.archiveThread?.())
     on('#btn-deselect', 'click', () => this.actions.select?.(null))
-    on('#btn-new-session', 'click', () => this.actions.newConversation?.())
-    on('#btn-reveal', 'click', () => this.actions.revealProject?.())
-    on('#btn-copy-path', 'click', () => this.actions.copyProjectPath?.())
     on('#btn-hide-project', 'click', () => this.actions.hideProject?.())
     on('#btn-hidden-toggle', 'click', () => this.toggleHiddenList())
     on('#btn-agents-toggle', 'click', () => this.toggleAgentList())
@@ -624,52 +622,48 @@ export class Hud {
     const trad = String(thread.id || '').split(':').pop()
 
     /**
-     * LÄSDELEN OCH SKRIVDELEN ÄR SKILDA MED FLIT.
+     * ETT FLÖDE, INTE TRE LÅDOR (Filip 29 sep: "få in all text i flödet", och högerytan ska
+     * vara till för att SE och KOMMUNICERA).
      *
-     * Panelen ritas om var femtonde sekund. Skrevs fältet om med resten skulle varje bokstav
-     * Filip hunnit skriva försvinna nästa gång en tråd rörde sig — samma fel som fick
-     * maskinrutan att slå igen, och värre här, för det han tappar är hans egna ord.
-     * Läsdelen byggs varje gång; skrivdelen byggs en gång per tråd och lämnas ifred.
+     * Förut stod samma samtal i tre delar: det som gäller nu överst, "Du skrev" i mitten och
+     * "Tidigare" under. Tre listor av samma sak i tidsordning är inte tre saker — det är ett
+     * samtal som klippts isär. Nu ligger trådens rader och Filips svar i EN kronologisk
+     * ström, äldst överst och nyast närmast skrivfältet, som i vilken chatt som helst. Det
+     * som gäller nu behöver ingen egen ruta: det är sista repliken.
+     *
+     * Och rubriken räcker inte. Kortet ute i kolonin visade texten medan panelen bara visade
+     * rubriken, så man klickade fram en ruta mitt i scenen för att läsa det panelen hade
+     * plats för. Varje replik bär nu sin text.
      */
-    if (!ruta.querySelector('.las')) {
-      ruta.innerHTML = '<div class="las"></div><div class="skriv"></div>'
+    if (!ruta.querySelector('.flode')) {
+      ruta.innerHTML = '<div class="flode"></div><div class="skriv"></div>'
     }
-    const las = ruta.querySelector('.las')
+    const flode = ruta.querySelector('.flode')
 
-    const nu = thread.notis
-      ? `${thread.notis}${thread.notisText ? ` — ${thread.notisText}` : ''}`
-      : thread.preview || ''
-    const hist = Array.isArray(thread.historik) ? thread.historik : []
-    // Den nyaste raden står redan som "nu" när tråden inte vinkar — att visa den två gånger
-    // gör listan en rad kortare utan att säga något nytt.
-    const lista = thread.notis ? hist : hist.slice(1)
-    const mina = Array.isArray(thread.franFilip) ? thread.franFilip : []
-    las.innerHTML =
-      (nu ? `<div class="nu${thread.notis ? ' vantar' : ''}">${escapeHtml(nu)}</div>` : '') +
-      (mina.length
-        ? `<div class="hist-rubrik">Du skrev</div>` +
-          mina
-            .map(
-              (m) =>
-                `<div class="h min"><span class="t">${klockan(m.nar)}</span>` +
-                `<span class="txt">${escapeHtml((m.text || m.rubrik || '').slice(0, 220))}</span></div>`
-            )
-            .join('')
-        : '') +
-      (lista.length
-        ? `<div class="hist-rubrik">Tidigare</div>` +
-          lista
-            .map(
-              (h) =>
-                `<div class="h ${escapeHtml(h.fas || '')}">` +
-                `<span class="t">${klockan(h.nar)}</span>` +
-                `<span class="txt">${escapeHtml(h.rubrik || '')}</span></div>`
-            )
-            .join('')
-        : `<div class="h tom">Inget mer skrivet av den här tråden</div>`)
+    const repliker = byggFlode(thread.historik, thread.franFilip)
+
+    // Nederst i listan står det senaste. Skrivs en ny rad ska strömmen följa med dit, men
+    // bara om man redan stod längst ner — annars rycks man ur det man håller på att läsa.
+    const vidBotten = flode.scrollHeight - flode.scrollTop - flode.clientHeight < 40
+    flode.innerHTML = repliker.length
+      ? repliker
+          .map((r) => {
+            if (r.avdelare) return `<div class="dag">${escapeHtml(r.avdelare)}</div>`
+            const kropp = r.text && r.text !== r.rubrik ? `<div class="txt">${escapeHtml(r.text)}</div>` : ''
+            const rub = r.rubrik ? `<div class="rub">${escapeHtml(r.rubrik)}</div>` : ''
+            const meta = [r.min ? 'Du' : thread.title || trad, klockan(r.nar), r.langd, LAGE[r.fas] || '']
+              .filter(Boolean)
+              .map((x) => `<span>${escapeHtml(x)}</span>`)
+              .join('')
+            return `<div class="replik ${r.min ? 'min' : escapeHtml(r.fas)}"><div class="topp">${meta}</div>${rub}${kropp}</div>`
+          })
+          .join('')
+      : `<div class="replik tom"><div class="txt">Inget skrivet än</div></div>`
+    if (vidBotten) flode.scrollTop = flode.scrollHeight
 
     if (this._skrivTrad !== trad) {
       this._skrivTrad = trad
+      flode.scrollTop = flode.scrollHeight
       const skriv = ruta.querySelector('.skriv')
       skriv.innerHTML =
         `<textarea class="svar" rows="2" maxlength="1200" ` +
@@ -839,15 +833,24 @@ export class Hud {
     swatch.style.color = hex(project.accent) // the halo is `currentColor`
     this.$('.side .name').textContent = project.name
     const path = this.$('.side .path')
-    path.textContent = project.path ? shortPath(project.path) : 'okänd mapp'
-    path.title = project.path || ''
-    // Nothing to open a new thread in, and nothing to reveal, without a folder on disk.
-    this.$('#btn-new-session').disabled = !project.path
-    this.$('#btn-reveal').disabled = !project.path
-    this.$('#btn-copy-path').disabled = !project.path
+    // "okänd mapp" stod under varje trådnamn och var sant men meningslöst: en Roost-tråd ÄR
+    // inget på en disk. Repot säger var den arbetar, och det är det enda som betyder något.
+    const repo = project.worktree || project.threads?.[0]?.worktree || ''
+    path.textContent = repo
+    path.hidden = !repo
+    path.title = ''
 
     const n = project.threads.length
     const waiting = project.threads.filter((t) => t.status === 'waiting' || t.status === 'blocked').length
+    /**
+     * EN PLÄTT MED EN TRÅD BEHÖVER INGEN LISTA. Roost har en tomt per tråd (beslutet 15 sep),
+     * så listan innehöll nästan alltid exakt en rad — med samma namn och samma klockslag som
+     * rubriken tre rader ovanför. Den åt en tredjedel av panelen för att upprepa sig själv.
+     * Finns det flera trådar på plätten är listan fortfarande det som skiljer dem åt.
+     */
+    const ensam = n <= 1
+    this.$('.side .threads-head').hidden = ensam
+    this.$('.side .threads').hidden = ensam
     this.$('.side .threads-head').innerHTML =
       `<span>${n} ${n === 1 ? 'tråd' : 'trådar'}</span>` + (waiting ? `<span class="want">${waiting} vill dig</span>` : '')
 
@@ -895,8 +898,6 @@ export class Hud {
    */
   setSelection(agent, thread) {
     const card = this.$('.thread-pop')
-    // Only ever one accent button in the panel: whichever action is the immediate one.
-    this.$('#btn-new-session').classList.toggle('primary', !agent || !thread)
     if (!agent || !thread) {
       card.classList.remove('on')
       this.tradInfo(null)
@@ -1254,6 +1255,9 @@ function klockan(ts) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+/** Vad en fas heter i ett samtal. "borjar" och "klart" är tavlans ord, inte svenska. */
+const LAGE = { pagar: 'pågår', klart: 'klart', stoppat: 'stoppat', notis: '' }
+
 function statusOrd(status) {
   if (status === 'fel') return 'fel'
   if (status === 'nere') return 'nere'
@@ -1327,13 +1331,23 @@ const TEMPLATE = `
         </div>
         <button class="btn icon ghost" id="btn-locate" title="Flyg hit">${ICON.locate}</button>
       </div>
+      <!--
+        DE FYRA KNAPPARNA ÄR BORTA (Filip 29 sep: "ta bort"), och tre av dem kunde aldrig
+        göra något här. Mätt, inte tyckt:
+          Nytt samtal   — vår harness svarar alltid { ok:false, "Roost-trådar startas i
+                          claude.ai, inte i kolonin" }. Knappen var en garanterad felruta.
+          Finder        — projectPath är tom för ALLA åtta trådar. Det finns ingen mapp.
+          Kopiera sökväg— samma tomma sträng. Den kopierade ingenting.
+          Göm i kolonin — den enda som fungerade, men den är en inställning man rör en gång
+                          i halvåret, inte en av fyra knappar högst upp i en kommunikationsyta.
+
+        De kommer från bot-crossing, där en tråd ÄR en CLI-session i en mapp på samma maskin.
+        Våra trådar är samtal i molnet. Att låta knapparna stå kvar var att lova något
+        gränssnittet inte kan hålla. Att öppna samtalet finns kvar där det hör hemma: på
+        kortet ute i kolonin, och som ikonen bredvid namnet här.
+      -->
       <div class="project-actions">
-        <button class="btn primary" id="btn-new-session" title="Starta ett nytt samtal i tråden (C)">${ICON.plus} Nytt samtal</button>
-        <div class="pair">
-          <button class="btn" id="btn-reveal" title="Visa mappen i ${FILE_MANAGER}">${ICON.folder} ${FILE_MANAGER}</button>
-          <button class="btn" id="btn-copy-path" title="Kopiera sökvägen">${ICON.copy} Kopiera sökväg</button>
-        </div>
-        <button class="btn" id="btn-hide-project" title="Göm plätten i kolonin — arkiverar inga trådar">${ICON.eyeOff} Göm i kolonin</button>
+        <button class="btn icon ghost" id="btn-hide-project" title="Göm plätten i kolonin — arkiverar inga trådar">${ICON.eyeOff}</button>
       </div>
       <div class="threads-head"></div>
       <div class="threads"></div>

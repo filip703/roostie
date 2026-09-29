@@ -408,14 +408,14 @@ async function scanThreads() {
         .filter(
           (x) => String(x?.trad || '').trim().toLowerCase() === 'filip' && garTill(x?.rubrik, trad)
         )
-        .map((x) => ({ nar: tid(x?.created_at), rubrik: text(x?.rubrik, 160), text: text(x?.text, 300) }))
+        .map((x) => ({ nar: tid(x?.created_at), rubrik: text(x?.rubrik, 160), text: text(x?.text, 700) }))
         .sort((a, b) => a.nar - b.nar)
         .slice(-5)
         .reverse(),
       historik: r
-        .slice(-10)
+        .slice(-18)
         .reverse()
-        .map((x) => ({ nar: x.nar, fas: x.fas, rubrik: text(x.rubrik, 160), text: text(x.text, 220) })),
+        .map((x) => ({ nar: x.nar, fas: x.fas, rubrik: text(x.rubrik, 160), text: text(x.text, 700) })),
       createdAt: r[0].nar,
       lastActivityAt: senaste.nar,
       // Tavlan vet inte när du tittade — kolonin gör det själv (Viewed-knappen).

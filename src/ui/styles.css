@@ -1674,78 +1674,86 @@ kbd {
 }
 
 /**
- * TRÅDENS TEXT I PANELEN.
+ * TRÅDENS FLÖDE I PANELEN.
  *
- * Ligger under trådlistan i sidopanelen och säger samma sak som rutan över astronauten, plus
- * vad tråden skrivit förut. Poängen är att slippa öppna en ruta mitt i scenen för att läsa
- * något panelen har plats för — rutan skymmer just den plätt man tittar på.
- *
- * Egen scroll med tak, inte fri höjd: tio rader under en trådlista som redan scrollar skulle
- * annars trycka ut listan ur bild.
+ * Högerytan är till för att SE och KOMMUNICERA (Filip 29 sep). Därför är den ett samtal:
+ * repliker i tidsordning som fyller det som blir över, och skrivfältet fastnaglat under dem.
+ * Listan scrollar, fältet gör det aldrig — man ska kunna svara utan att först leta rätt på
+ * rutan man svarar i.
  */
 .side .trad-info {
-  flex: 0 0 auto;
-  max-height: 34vh;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+.side .trad-info .flode {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 10px 12px 12px;
-  border-top: 1px solid var(--line);
+  padding: 10px 12px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.side .trad-info .replik {
   font-size: 12px;
   line-height: 1.5;
+  padding-left: 9px;
+  border-left: 2px solid var(--line);
 }
-.side .trad-info .nu {
+/* Faserna läses på kanten, som på tavlan: pågår, levererat, stoppat. */
+.side .trad-info .replik.borjar { border-left-color: var(--amber); }
+.side .trad-info .replik.klart { border-left-color: var(--green); }
+.side .trad-info .replik.stoppat { border-left-color: var(--red); }
+/* Filips egna repliker bär accenten och står ljusare — de är svaren i samtalet. */
+.side .trad-info .replik.min {
+  border-left-color: var(--accent);
+}
+.side .trad-info .replik.min .txt {
   color: var(--text);
-  margin-bottom: 10px;
 }
-/* Väntar tråden på någon är texten en fråga, inte en notering — den bär accentkanten. */
-.side .trad-info .nu.vantar {
-  padding-left: 8px;
-  border-left: 2px solid var(--accent);
-}
-.side .trad-info .hist-rubrik {
+.side .trad-info .dag {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 4px 0 -2px;
+  padding: 3px 0;
   font-size: 10px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--dim);
-  margin-bottom: 6px;
+  background: linear-gradient(var(--panel-solid) 70%, transparent);
 }
-.side .trad-info .h {
+.side .trad-info .replik.pagar { border-left-color: var(--amber); }
+.side .trad-info .replik .topp {
   display: flex;
-  gap: 7px;
-  padding: 2px 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--dim);
+  margin-bottom: 3px;
 }
-.side .trad-info .h .t {
-  flex: 0 0 auto;
-  opacity: 0.75;
-  font-variant-numeric: tabular-nums;
-}
-.side .trad-info .h .txt {
+.side .trad-info .replik .rub {
+  color: var(--text);
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
-/* Faserna läses på färgen, som på tavlan: pågår, levererat, stoppat, sagt. */
-.side .trad-info .h.borjar .t { color: var(--amber); }
-.side .trad-info .h.klart .t { color: var(--green); }
-.side .trad-info .h.stoppat .t { color: var(--red); }
-.side .trad-info .h.tom {
+.side .trad-info .replik .txt {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.side .trad-info .replik.tom .txt {
   opacity: 0.7;
 }
-
-/**
- * FILIPS SVARSFÄLT I PANELEN (Lednings beslut rad 1382).
- *
- * Ligger under läsdelen och är medvetet lågmält: det ska synas när man tittar på en tråd och
- * inte konkurrera med texten man kom för att läsa. Skicka-knappen bär accenten eftersom den
- * är sidans enda handling som lämnar huset.
- */
-.side .trad-info .las {
-  margin-bottom: 10px;
-}
-.side .trad-info .h.min .t {
-  color: var(--accent);
-}
-.side .trad-info .h.min .txt {
-  color: var(--muted);
+.side .trad-info .skriv {
+  flex: 0 0 auto;
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--line);
 }
 .side .trad-info textarea.svar {
   width: 100%;
@@ -1784,4 +1792,15 @@ kbd {
 }
 .side .trad-info .skriv .skicka:disabled {
   opacity: 0.6;
+}
+/* Trådlistan var huvudsaken förut och är nu en biroll — den får bara plats den behöver. */
+.side .threads {
+  flex: 0 0 auto;
+  max-height: 22vh;
+}
+/* Kvar av de fyra knapparna: en ikon, längst ut, för det enda som fungerade. */
+.side .project-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 9px 6px;
 }
