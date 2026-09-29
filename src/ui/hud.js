@@ -655,11 +655,24 @@ export class Hud {
               .filter(Boolean)
               .map((x) => `<span>${escapeHtml(x)}</span>`)
               .join('')
-            return `<div class="replik ${r.min ? 'min' : escapeHtml(r.fas)}"><div class="topp">${meta}</div>${rub}${kropp}</div>`
+            const mer = kropp && (r.text || '').length > 150 ? `<div class="mer">Visa mer</div>` : ''
+            return `<div class="replik ${r.min ? 'min' : escapeHtml(r.fas)}"><div class="topp">${meta}</div>${rub}${kropp}${mer}</div>`
           })
           .join('')
       : `<div class="replik tom"><div class="txt">Inget skrivet än</div></div>`
     if (vidBotten) flode.scrollTop = flode.scrollHeight
+    // Klick fäller ut en replik. Lyssnaren sitter på listan och inte på varje rad, för listan
+    // ritas om var femtonde sekund och femtio lyssnare per omritning läcker tills fliken dör.
+    if (!flode.dataset.klick) {
+      flode.dataset.klick = '1'
+      flode.addEventListener('click', (e) => {
+        const r = e.target.closest('.replik')
+        if (!r) return
+        const ut = r.classList.toggle('oppen')
+        const mer = r.querySelector('.mer')
+        if (mer) mer.textContent = ut ? 'Visa mindre' : 'Visa mer'
+      })
+    }
 
     if (this._skrivTrad !== trad) {
       this._skrivTrad = trad
