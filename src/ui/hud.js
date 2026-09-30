@@ -357,7 +357,7 @@ export class Hud {
     on('#btn-settings', 'click', () => this.toggleSettings())
     on('#btn-close-settings', 'click', () => this.toggleSettings(false))
     on('#btn-hide', 'click', () => this.toggleUi())
-    on('#btn-help', 'click', () => this.toggleHelp())
+    on('#btn-help', 'click', () => (this.actions.visaRundtur ? this.actions.visaRundtur() : this.toggleHelp()))
     on('#btn-shot', 'click', () => this.actions.screenshot?.())
     on('#btn-home', 'click', () => this.actions.resetView?.())
     on('#btn-next', 'click', () => this.actions.focusStatus?.('waiting'))
@@ -1302,7 +1302,7 @@ const TEMPLATE = `
   <header class="brandbar">
     <div class="brand"><i class="dot"></i>Roostie</div>
     <button class="btn icon ghost" id="btn-shot" title="Skärmbild (P)">${ICON.camera}</button>
-    <button class="btn icon ghost" id="btn-help" title="Hjälp (?)">${ICON.help}</button>
+    <button class="btn icon ghost" id="btn-help" title="Visa rundturen igen" aria-label="Visa rundturen igen">${ICON.help}</button>
     <button class="btn icon ghost" id="btn-hide" title="Göm allt (H)">${ICON.eye}</button>
     <button class="btn icon ghost" id="btn-settings" title="Inställningar (S)" aria-pressed="false">${ICON.settings}</button>
   </header>

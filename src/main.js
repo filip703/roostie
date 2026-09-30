@@ -10,6 +10,7 @@ import { loadKit } from './world/kit.js'
 import { FALTLISTA, JOBB } from './world/maskinpark.js'
 import { TRADHOJD } from './world/tradet.js'
 import { halltid } from './world/rundtur.js'
+import { Forklaring } from './ui/forklaring.js'
 import { crewRig, loadCrew } from './agents/crew.js'
 import { TIMES } from './world/sky.js'
 import {
@@ -388,6 +389,11 @@ const actions = {
 }
 
 const hud = new Hud(app, settings, actions)
+// Rundtur första gången + teckenförklaring (rad 1813). Köksskärmen startar ingen rundtur själv.
+const forklaring = new Forklaring(app, globalThis.localStorage, {
+  kiosk: new URLSearchParams(location.search).get('kiosk') === '1',
+})
+hud.actions.visaRundtur = () => forklaring.starta()
 // The sidebar is permanent, so the card beside an astronaut has a wall to stay clear of.
 const sideWidth = () => (window.innerWidth <= 820 ? 0 : 334)
 hud.setSideWidth(sideWidth())

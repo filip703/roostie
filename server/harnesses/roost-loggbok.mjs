@@ -33,14 +33,14 @@ const ARBETSFONSTER_MS = 2 * 60 * 60 * 1000
 const CACHE_MS = 20 * 1000
 const HAMTA_TIMEOUT_MS = 8000
 
-/** Trådar vi känner till: visningsnamn och vilken mark de bygger på. */
+/** Trådar vi känner till: namn (det tavlan adresseras med: TILL PRODUKT) och visas (klarspråket en människa läser, rad 1813) samt vilken mark de bygger på. */
 const TRADAR = {
   ledning: { namn: 'Ledning', zon: 'landningsplattan', repo: '' },
-  produkt: { namn: 'Produkt', zon: 'nexus', repo: 'nexus' },
-  'box-moln': { namn: 'Box & moln', zon: 'nexus', repo: 'nexus' },
-  nexus: { namn: 'Nexus', zon: 'nexus', repo: 'nexus' },
+  produkt: { namn: 'Produkt', visas: 'Appen', zon: 'nexus', repo: 'nexus' },
+  'box-moln': { namn: 'Box & moln', visas: 'Boxen och nätet', zon: 'nexus', repo: 'nexus' },
+  nexus: { namn: 'Nexus', visas: 'Huset', zon: 'nexus', repo: 'nexus' },
   design: { namn: 'Design', zon: 'nexus', repo: 'nexus' },
-  'sajt-roostadmin': { namn: 'Sajt & Roostadmin', zon: 'roost-site', repo: 'roost-site' },
+  'sajt-roostadmin': { namn: 'Sajt & Roostadmin', visas: 'Sajten', zon: 'roost-site', repo: 'roost-site' },
   kolonin: { namn: 'Kolonin', zon: 'roostie', repo: 'roostie' },
 }
 
@@ -368,7 +368,7 @@ async function scanThreads() {
     const projectPath = await repoSokvag(info.repo)
     tradar.push({
       id: ID(trad),
-      title: info.namn,
+      title: info.visas || info.namn,
       // Håller tråden upp handen är det frågan som ska stå på kortet, inte det senaste den
       // gjorde: ett `?` man måste öppna chatten för att förstå är bara en prick.
       preview: vinkar ? text(`${sista.rubrik} — ${sista.text}`, 240) : text(senaste.rubrik, 240),
@@ -380,7 +380,7 @@ async function scanThreads() {
        * olika saker med flit. Fyra astronauter på samma plätt döljer just den gränsen. Repot
        * följer med som worktree, så kortet fortfarande säger var tråden arbetar.
        */
-      project: info.namn,
+      project: info.visas || info.namn,
       projectPath,
       worktree: info.repo || info.zon,
       cwd: projectPath,

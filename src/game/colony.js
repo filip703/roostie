@@ -71,14 +71,14 @@ export const STATUS_ORDER = ['blocked', 'waiting', 'working', 'celebrating', 'id
  * ROOSTIE.md.
  */
 export const STATUS_LABEL = {
-  working: 'Arbetar',
+  working: 'Jobbar',
   waiting: 'Väntar på dig',
-  blocked: 'Stoppad',
-  celebrating: 'Levererat',
+  blocked: 'Har stannat',
+  celebrating: 'Klart',
   idle: 'Vilar',
   sleeping: 'Sover',
-  spawning: 'Kommer',
-  leaving: 'På väg hem',
+  spawning: 'Startar',
+  leaving: 'Går hem',
 }
 
 /** Thread → behaviour. First match wins, exactly like the board's auto-sort. */
