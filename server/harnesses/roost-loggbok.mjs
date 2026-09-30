@@ -48,7 +48,7 @@ const TRADAR = {
 const TRAD_OK = /^[a-z0-9][a-z0-9-]{0,39}$/
 
 const konfig = () => ({
-  url: process.env.ROOST_LOGGBOK_URL || '',
+  url: process.env.ROOST_LOGGBOK_URL || 'https://roost.love/api/loggbok',
   token: process.env.ROOST_ADMIN_TOKEN || '',
   fil: process.env.ROOST_LOGGBOK_FIL || '',
   repoDir: process.env.ROOST_REPO_DIR || path.join(os.homedir(), 'Developer'),

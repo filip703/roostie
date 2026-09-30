@@ -1,8 +1,14 @@
+import roostLoggbok from '../server/harnesses/roost-loggbok.mjs'
+
 /**
- * GET /api/threads — kolonin.roost.love kör på Vercel, inte på NUC:en.
- * Lokala trådar (Claude Code-sessioner) finns inte i en serverless-miljö.
- * Returnerar en tom lista så kolonikartan ritas men förblir tom utanför hemmet.
+ * GET /api/threads — returnerar Roost Loggbok-trådarna som kolonin ritar på kartan.
+ * Lokala Claude Code-sessioner finns inte i Vercel-miljön; loggboken är sanningen.
  */
-export default function handler(req, res) {
-  res.status(200).json({ threads: [], scannedAt: Date.now(), warnings: ['Kolonin körs utanför hemmet — lokala trådar visas inte.'] })
+export default async function handler(req, res) {
+  try {
+    const threads = await roostLoggbok.scanThreads()
+    res.status(200).json({ threads, scannedAt: Date.now() })
+  } catch (err) {
+    res.status(200).json({ threads: [], scannedAt: Date.now(), warnings: [String(err?.message || err)] })
+  }
 }
