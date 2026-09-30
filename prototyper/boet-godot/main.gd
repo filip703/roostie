@@ -34,8 +34,10 @@ var FEATHER_COLS: Array[Color] = []
 # Rad 1361 fix: NR 62→316 (×5.1), NX centrerat, NY ≈44 % från toppen.
 # Resultat: boet fyller ≈65 % av canvas-bredden (krav: ≥65 %).
 const NX: float = 512.0
-const NY: float = 340.0
+const NY: float = 440.0
 const NR: float = 316.0
+# Linjebredd-skalfaktor (NR/62 * 0.45) — samma formel som Pixi-provet
+const SC_L: float = NR / 62.0 * 0.45
 const NEST_PROGRESS: float = 0.75
 const BASE_W: float = 1024.0
 const BASE_H: float = 768.0
@@ -261,7 +263,7 @@ func _draw_nest(progress: float) -> void:
 		for _t: int in range(n_twigs):
 			var x_s: float = NX - x_half - _rng_next(rng) * NR * 0.32 + _rng_next(rng) * NR * 0.08
 			var x_e: float = NX + x_half + _rng_next(rng) * NR * 0.08 - _rng_next(rng) * NR * 0.32
-			var y_b: float = NY + y_off + (_rng_next(rng) - 0.5) * 11.0
+			var y_b: float = NY + y_off + (_rng_next(rng) - 0.5) * 26.0
 			var cp_x: float = NX + (_rng_next(rng) - 0.5) * NR * 0.45
 			var cp_y: float = y_b - NR * (0.04 + _rng_next(rng) * 0.10)
 			var ri: int = int(_rng_next(rng) * 3)
@@ -271,7 +273,7 @@ func _draw_nest(progress: float) -> void:
 			else:
 				col = [C_NEST_MID, C_NEST_LIGHT, C_NEST_RIM][ri]
 			col.a = 0.42 + _rng_next(rng) * 0.46
-			var width: float = 1.1 + _rng_next(rng) * 2.4
+			var width: float = (1.1 + _rng_next(rng) * 2.4) * SC_L
 			var y1: float = y_b + (_rng_next(rng) - 0.5) * 5
 			var y2: float = y_b + (_rng_next(rng) - 0.5) * 5
 			var pts := _quadratic_pts(Vector2(x_s, y1), Vector2(cp_x, cp_y), Vector2(x_e, y2))
@@ -292,7 +294,7 @@ func _draw_nest(progress: float) -> void:
 		var ri2: int = int(_rng_next(rng2) * 2)
 		var col2: Color = [C_NEST_DARK, C_NEST_MID][ri2]
 		col2.a = 0.28 + _rng_next(rng2) * 0.32
-		var w2: float = 0.6 + _rng_next(rng2) * 1.2
+		var w2: float = (0.6 + _rng_next(rng2) * 1.2) * SC_L
 		draw_line(Vector2(cx - cos(ang2) * dist, cy - sin(ang2) * dist * 0.30),
 			Vector2(cx + cos(ang2) * dist, cy + sin(ang2) * dist * 0.30), col2, w2, true)
 
@@ -300,7 +302,7 @@ func _draw_nest(progress: float) -> void:
 	for ri3: int in range(50):
 		var ang3: float = PI * 1.07 + (PI * 1.93 - PI * 1.07) * float(ri3) / 49.0
 		rim_pts.append(Vector2(NX + cos(ang3) * NR * progress, NY + 6 + sin(ang3) * NR * progress * 0.6))
-	draw_polyline(rim_pts, Color(C_NEST_RIM, 0.70 * progress), 8.5 * progress, true)
+	draw_polyline(rim_pts, Color(C_NEST_RIM, 0.70 * progress), 8.5 * progress * SC_L, true)
 
 	var rng3 := _mk_rng(17)
 	for _dummy3: int in range(30):
@@ -308,7 +310,7 @@ func _draw_nest(progress: float) -> void:
 	for _mi: int in range(int(ceil(7.0 * progress))):
 		var ang4: float = _rng_next(rng3) * PI * 2.0
 		var r: float = NR * (0.44 + _rng_next(rng3) * 0.60)
-		var rad: float = 1.8 + _rng_next(rng3) * 3.8
+		var rad: float = (1.8 + _rng_next(rng3) * 3.8) * 2.2
 		draw_circle(Vector2(NX + cos(ang4) * r, NY + sin(ang4) * r * 0.37), rad,
 			Color(0.290, 0.478, 0.314, 0.18 + _rng_next(rng3) * 0.28))
 
@@ -359,7 +361,7 @@ func _draw_agg() -> void:
 		var fx: float = (_rng_next(rng) - 0.5) * egg_rx * 2.0 * 1.5
 		var fy: float = (_rng_next(rng) - 0.5) * egg_ry * 2.0 * 1.4
 		if (fx / egg_rx) * (fx / egg_rx) + (fy / egg_ry) * (fy / egg_ry) < 0.85:
-			draw_circle(Vector2(ex.x + fx, ex.y + fy), _rng_next(rng) * 2.8 + 0.8,
+			draw_circle(Vector2(ex.x + fx, ex.y + fy), _rng_next(rng) * 6.4 + 1.8,
 				Color(C_EGG_SPOT, 0.42))
 
 	if crack > 0:
@@ -416,10 +418,10 @@ func _add_flying_fjader() -> void:
 	var i: int = st_fjadrar
 	var fp: Dictionary = nest_fjadrar[i]
 	var sides: Array[Dictionary] = [
-		{"sx": -40.0, "sy": 200.0},
-		{"sx": BASE_W + 40.0, "sy": 160.0},
-		{"sx": -40.0, "sy": 490.0},
-		{"sx": BASE_W + 40.0, "sy": 350.0},
+		{"sx": -60.0, "sy": NY - 80.0},
+		{"sx": BASE_W + 60.0, "sy": NY - 120.0},
+		{"sx": -60.0, "sy": NY + 60.0},
+		{"sx": BASE_W + 60.0, "sy": NY - 20.0},
 	]
 	var from_: Dictionary = sides[i % 4]
 	st_flying_fjadrar.append({

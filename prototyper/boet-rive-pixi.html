@@ -190,8 +190,10 @@ onResize();
 window.addEventListener('resize', onResize);
 
 // ── Scen-konstanter ───────────────────────────────────
-const NX = 420, NY = 398, NR = 62;
+const NX = 512, NY = 440, NR = 340;
 const nestProgress = 0.75;
+// Linjebredd-skalfaktor — NR/62 för full prop, 0.45 för naturlig kvistbredd
+const SC_L = NR / 62 * 0.45;
 
 // ── Scen-lager ────────────────────────────────────────
 const bgLayer   = new PIXI.Container();
@@ -205,12 +207,12 @@ sceneRoot.addChild(bgLayer, nestLayer, fjadLayer, eggLayer, birdLayer, uiLayer);
 // ── Rita gren ─────────────────────────────────────────
 function buildBranch() {
   const g = new PIXI.Graphics();
-  g.lineStyle(32, 0x000000, 0.4, 0.5, true);
-  g.moveTo(80, 426); g.bezierCurveTo(420, 434, 620, 424, 880, 420);
-  g.lineStyle(26, C.branch, 1, 0.5, true);
-  g.moveTo(80, 422); g.bezierCurveTo(420, 428, 620, 418, 880, 415);
-  g.lineStyle(8, C.branchHL, 0.4, 0.5, true);
-  g.moveTo(80, 417); g.bezierCurveTo(420, 421, 620, 412, 880, 409);
+  g.lineStyle(54, 0x000000, 0.4, 0.5, true);
+  g.moveTo(20, 578); g.bezierCurveTo(512, 588, 720, 574, 1010, 570);
+  g.lineStyle(44, C.branch, 1, 0.5, true);
+  g.moveTo(20, 574); g.bezierCurveTo(512, 582, 720, 568, 1010, 565);
+  g.lineStyle(13, C.branchHL, 0.4, 0.5, true);
+  g.moveTo(20, 568); g.bezierCurveTo(512, 574, 720, 562, 1010, 559);
   return g;
 }
 
@@ -238,13 +240,13 @@ function buildNest(progress) {
     for (let t = 0; t < nTwigs; t++) {
       const xS  = NX - xHalf - rng() * NR * 0.32 + rng() * NR * 0.08;
       const xE  = NX + xHalf + rng() * NR * 0.08 - rng() * NR * 0.32;
-      const yB  = NY + yOff + (rng() - 0.5) * 11;
+      const yB  = NY + yOff + (rng() - 0.5) * 28;
       const cpX = NX + (rng() - 0.5) * NR * 0.45;
       const cpY = yB - NR * (0.04 + rng() * 0.10);  // svag uppåtbåge
       const col = layer < 3
         ? [C.nestDark, C.nestDark, C.nestMid][Math.floor(rng() * 3)]
         : [C.nestMid, C.nestLight, C.nestRim][Math.floor(rng() * 3)];
-      g.lineStyle(1.1 + rng() * 2.4, col, 0.42 + rng() * 0.46, 0.5, true);
+      g.lineStyle((1.1 + rng() * 2.4) * SC_L, col, 0.42 + rng() * 0.46, 0.5, true);
       g.moveTo(xS, yB + (rng() - 0.5) * 5);
       g.quadraticCurveTo(cpX, cpY, xE, yB + (rng() - 0.5) * 5);
     }
@@ -262,7 +264,7 @@ function buildNest(progress) {
     const dist = NR * (0.18 + rng() * 0.38);
     const cx   = NX + (rng() - 0.5) * NR * 0.50;
     const cy   = NY + (rng() - 0.5) * NR * 0.14;
-    g.lineStyle(0.6 + rng() * 1.2, [C.nestDark, C.nestMid][Math.floor(rng() * 2)],
+    g.lineStyle((0.6 + rng() * 1.2) * SC_L, [C.nestDark, C.nestMid][Math.floor(rng() * 2)],
       0.28 + rng() * 0.32, 0.5, true);
     g.moveTo(cx - Math.cos(ang) * dist, cy - Math.sin(ang) * dist * 0.30);
     g.lineTo(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist * 0.30);
@@ -281,18 +283,18 @@ function buildNest(progress) {
     const py1  = NY + Math.sin(ang2) * r1 * 0.48;
     const pxIn = NX + Math.cos(ang) * NR * (0.55 + rng() * 0.22);
     const pyIn = NY + Math.sin(ang) * NR * (0.55 + rng() * 0.22) * 0.48;
-    const cpX  = (px0 + px1) / 2 + (rng() - 0.5) * 18;
-    const cpY  = (py0 + py1) / 2 - rng() * 12;
+    const cpX  = (px0 + px1) / 2 + (rng() - 0.5) * 55;
+    const cpY  = (py0 + py1) / 2 - rng() * 38;
     const col  = [C.nestMid, C.nestLight, C.nestRim][Math.floor(rng() * 3)];
-    g.lineStyle(1.2 + rng() * 2.2, col, 0.52 + rng() * 0.42, 0.5, true);
+    g.lineStyle((1.2 + rng() * 2.2) * SC_L, col, 0.52 + rng() * 0.42, 0.5, true);
     g.moveTo(pxIn, pyIn);
     g.quadraticCurveTo(cpX, cpY, px1, py1);
   }
 
   // Yttre rand — 1.07π→1.93π clockwise = övre halvcirkeln (synlig framkant på skålen)
-  g.lineStyle(8.5 * progress, C.nestRim, 0.70 * progress, 0.5, true);
+  g.lineStyle(8.5 * progress * SC_L, C.nestRim, 0.70 * progress, 0.5, true);
   g.arc(NX, NY + 6, NR * progress, Math.PI * 1.07, Math.PI * 1.93);
-  g.lineStyle(4.5 * progress, C.nestMid, 0.50 * progress, 0.5, true);
+  g.lineStyle(4.5 * progress * SC_L, C.nestMid, 0.50 * progress, 0.5, true);
   g.arc(NX, NY + 4, NR * 0.90 * progress, Math.PI * 1.10, Math.PI * 1.90);
 
   // Mossgröna fläckar (organsik textur, värmer tonen)
@@ -301,7 +303,7 @@ function buildNest(progress) {
     const r   = NR * (0.44 + rng() * 0.60);
     g.lineStyle(0);
     g.beginFill(0x4a7a50, 0.18 + rng() * 0.28);
-    g.drawCircle(NX + Math.cos(ang) * r, NY + Math.sin(ang) * r * 0.37, 1.8 + rng() * 3.8);
+    g.drawCircle(NX + Math.cos(ang) * r, NY + Math.sin(ang) * r * 0.37, (1.8 + rng() * 3.8) * 2.2);
     g.endFill();
   }
 
@@ -328,7 +330,7 @@ function buildEgg() { return new PIXI.Graphics(); }
 
 function drawEgg(g, crack, wobble) {
   g.clear();
-  const ew = 30, eh = 38;
+  const ew = 62, eh = 78;
   if (crack > 0.3) {
     g.lineStyle(0);
     g.beginFill(C.glow, (crack - 0.3) / 0.7 * 0.14);
@@ -345,20 +347,20 @@ function drawEgg(g, crack, wobble) {
     const ey = (rng() - 0.5) * eh * 1.4;
     if ((ex / ew) ** 2 + (ey / eh) ** 2 < 0.85) {
       g.beginFill(C.eggSpot, 0.42);
-      g.drawCircle(ex, ey, rng() * 2.8 + 0.8);
+      g.drawCircle(ex, ey, rng() * 6.0 + 1.8);
       g.endFill();
     }
   }
   if (crack > 0) {
-    g.lineStyle(2, C.eggCrack, Math.min(crack * 2.5, 1), 0.5, true);
+    g.lineStyle(4, C.eggCrack, Math.min(crack * 2.5, 1), 0.5, true);
     g.moveTo(-ew * 0.35, 0); g.lineTo(-ew * 0.05, -eh * 0.2);
     g.lineTo(ew * 0.18, eh * 0.07); g.lineTo(ew * 0.38, -eh * 0.14);
     const c2a = Math.max(0, Math.min(crack * 2.5 - 0.7, 1));
-    g.lineStyle(2, C.eggCrack, c2a, 0.5, true);
+    g.lineStyle(4, C.eggCrack, c2a, 0.5, true);
     g.moveTo(-ew * 0.12, eh * 0.28); g.lineTo(ew * 0.1, eh * 0.12);
     g.lineTo(ew * 0.32, eh * 0.38);
     if (crack > 0.35) {
-      g.lineStyle(3.5, C.glow, (crack - 0.35) / 0.65, 0.5, true);
+      g.lineStyle(7, C.glow, (crack - 0.35) / 0.65, 0.5, true);
       g.moveTo(-ew * 0.35, 0); g.lineTo(-ew * 0.05, -eh * 0.2);
       g.lineTo(ew * 0.18, eh * 0.07); g.lineTo(ew * 0.38, -eh * 0.14);
     }
@@ -424,15 +426,15 @@ const state = {
 
 // ── Fasta fjäderpositioner i boet ────────────────────
 const nestFjadrar = [
-  { tx: NX - 20, ty: NY + 6,  angle: -0.45, col: C.fClay,   len: 22 },
-  { tx: NX + 12, ty: NY + 2,  angle:  0.32, col: C.fHoney,  len: 19 },
-  { tx: NX - 6,  ty: NY - 8,  angle: -0.12, col: C.fCamel,  len: 24 },
-  { tx: NX + 24, ty: NY + 14, angle:  0.58, col: C.fForest, len: 17 },
-  { tx: NX - 14, ty: NY + 16, angle: -0.28, col: C.fHoney,  len: 20 },
-  { tx: NX + 4,  ty: NY - 14, angle:  0.19, col: C.fClay,   len: 18 },
-  { tx: NX - 28, ty: NY - 4,  angle: -0.6,  col: C.fCamel,  len: 21 },
-  { tx: NX + 30, ty: NY + 4,  angle:  0.44, col: C.fForest, len: 16 },
-  { tx: NX - 4,  ty: NY + 12, angle: -0.05, col: C.fHoney,  len: 23 },
+  { tx: NX - 75, ty: NY + 22, angle: -0.45, col: C.fClay,   len: 72 },
+  { tx: NX + 45, ty: NY + 8,  angle:  0.32, col: C.fHoney,  len: 62 },
+  { tx: NX - 22, ty: NY - 30, angle: -0.12, col: C.fCamel,  len: 80 },
+  { tx: NX + 88, ty: NY + 46, angle:  0.58, col: C.fForest, len: 56 },
+  { tx: NX - 52, ty: NY + 54, angle: -0.28, col: C.fHoney,  len: 66 },
+  { tx: NX + 14, ty: NY - 52, angle:  0.19, col: C.fClay,   len: 59 },
+  { tx: NX - 98, ty: NY - 14, angle: -0.6,  col: C.fCamel,  len: 69 },
+  { tx: NX + 102,ty: NY + 14, angle:  0.44, col: C.fForest, len: 53 },
+  { tx: NX - 14, ty: NY + 42, angle: -0.05, col: C.fHoney,  len: 76 },
 ];
 
 // ── Bygg grundscenen ──────────────────────────────────
@@ -448,14 +450,14 @@ const nestFjadGfx = nestFjadrar.map(fp => {
 nestFjadGfx.forEach((g, i) => { g.visible = i < state.fjadrar; });
 
 const eggCont = new PIXI.Container();
-eggCont.x = NX; eggCont.y = NY - 22;
+eggCont.x = NX; eggCont.y = NY - 25;
 const eggGfx = buildEgg();
 eggCont.addChild(eggGfx);
 eggLayer.addChild(eggCont);
 drawEgg(eggGfx, 0, 0);
 
 const birdCont = new PIXI.Container();
-birdCont.x = NX; birdCont.y = NY - 24;
+birdCont.x = NX; birdCont.y = NY - 28;
 birdCont.alpha = 0;
 const birdGfx = buildBird();
 birdCont.addChild(birdGfx);
@@ -480,7 +482,7 @@ const txtKlackt = new PIXI.Text('', {
   fontFamily: 'Georgia, serif', fontWeight: 'bold', align: 'center',
 });
 txtKlackt.anchor.set(0.5);
-txtKlackt.x = NX; txtKlackt.y = NY - 90;
+txtKlackt.x = NX; txtKlackt.y = NY - 280;
 txtKlackt.alpha = 0;
 uiLayer.addChild(txtKlackt);
 
@@ -637,8 +639,8 @@ app.view.addEventListener('pointerdown', e => {
   const sy   = (e.clientY - rect.top  - sceneRoot.y) / scl;
 
   // Tap på ägg
-  const dx = sx - NX, dy = sy - (NY - 22);
-  if (dx * dx + dy * dy < 40 * 40 && !state.aggKlackt) {
+  const dx = sx - NX, dy = sy - (NY - 25);
+  if (dx * dx + dy * dy < 90 * 90 && !state.aggKlackt) {
     if (!state.pixiEggHidden) state.aggWobble = 18;
     // Signalera Rive om vi har en BirdMachine
     riveSignal('wobble');
@@ -646,8 +648,8 @@ app.view.addEventListener('pointerdown', e => {
 
   // Tap på fågel
   if (state.fagelVis) {
-    const bx = sx - NX, by = sy - (NY - 24);
-    if (bx * bx + by * by < 48 * 48) {
+    const bx = sx - NX, by = sy - (NY - 28);
+    if (bx * bx + by * by < 110 * 110) {
       if (!state.pixiBirdHidden) state.fagelHopT = 0.01;
       riveSignal('hop');
     }
@@ -660,8 +662,8 @@ function addFlyingFjader() {
   const i  = state.fjadrar;
   const fp = nestFjadrar[i];
   const sides = [
-    { sx: -40, sy: 200 }, { sx: BASE_W + 40, sy: 160 },
-    { sx: -40, sy: 490 }, { sx: BASE_W + 40, sy: 350 },
+    { sx: -60, sy: NY - 80 }, { sx: BASE_W + 60, sy: NY - 120 },
+    { sx: -60, sy: NY + 60 }, { sx: BASE_W + 60, sy: NY - 20  },
   ];
   const from = sides[i % 4];
   const g = buildFeather(fp.col, fp.len);
@@ -768,15 +770,15 @@ app.ticker.add(() => {
   // Fågel (PixiJS-sida)
   if (!state.pixiBirdHidden && state.fagelVis) {
     state.fagelScale = Math.min(state.fagelScale + dt * 1.2, 1);
-    const size = 24 * eo(state.fagelScale);
+    const size = 80 * eo(state.fagelScale);
     if (state.fagelHopT > 0) {
       state.fagelHopT = Math.min(state.fagelHopT + dt * 4, 1);
       if (state.fagelHopT >= 1) state.fagelHopT = 0;
     }
-    const hop = state.fagelHopT > 0 ? Math.sin(state.fagelHopT * Math.PI) * -18 : 0;
-    const bob = Math.sin(now * 0.0085) * 3.5;
+    const hop = state.fagelHopT > 0 ? Math.sin(state.fagelHopT * Math.PI) * -45 : 0;
+    const bob = Math.sin(now * 0.0085) * 8;
     state.fagelFaceLeft = Math.sin(now * 0.004) > 0;
-    birdCont.y   = (NY - 24) + bob + hop;
+    birdCont.y   = (NY - 28) + bob + hop;
     birdCont.alpha = eo(state.fagelScale);
     drawBird(birdGfx, size, state.fagelFaceLeft);
     if (size > 2) txtNiva.text = `Nivå ${state.fjadrar >= state.maxFjadrar ? 4 : 3}`;
