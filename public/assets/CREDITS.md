@@ -16,3 +16,12 @@ CC0 requires nothing of you. Crediting Kay costs nothing either.
 
 See the repository README under "Where the art comes from" for how these are packed, and
 "Rebuilding them" if you want to regenerate them from the original packs.
+
+## Bird base model
+
+| File | Source | Licence |
+| --- | --- | --- |
+| `hussvala.glb` | [Cliff Swallow](https://poly.pizza/m/5dl4UWhvuTW) by Poly by Google, via poly.pizza | CC0 1.0 |
+
+Long, slim silhouette chosen by Bill (30 Sep, row 1685). One mesh (`CliffSwallow_Mesh`), no animations
+in the file — idle/fly/alert are still to be authored.
