@@ -10,6 +10,7 @@ them in the public domain.
 | `spacebase.glb` | [KayKit : Space Base Bits](https://kaylousberg.itch.io/space-base-bits) | CC0 1.0 |
 | `crew.glb` | [KayKit : Character Animations](https://kaylousberg.itch.io/kaykit-character-animations) | CC0 1.0 |
 | `forest.glb` | [KayKit : Forest Nature Pack](https://kaylousberg.itch.io/kaykit-forest) | CC0 1.0 |
+| `hussvala.glb` | [Cliff Swallow by Poly by Google](https://poly.pizza/m/5dl4UWhvuTW) | CC0 1.0 |
 
 CC0 requires nothing of you. Crediting Kay costs nothing either.
 

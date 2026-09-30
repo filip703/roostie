@@ -259,54 +259,74 @@ function drawEgg(g, crack, wobble) {
   g.rotation = wobble * Math.PI / 180;
 }
 
-// ── Rita fågel ────────────────────────────────────────
+// ── Rita fågel (Hussvala — lång form, Bills val 30 sep) ───────
 function buildBird() {
   const g = new PIXI.Graphics();
   return g;
 }
 
-function drawBird(g, size, faceLeft) {
+// wingT: 0=vingar upp, 0.5=vila, 1=vingar ned  (fly_loop oscillerar 0→1)
+// alertT: 0=normal, 1=uppmärksam (huvud drejar mot kameran)
+function drawBird(g, size, faceLeft, wingT, alertT) {
   g.clear();
-  const sc = faceLeft ? -1 : 1;
+  const sc  = faceLeft ? -1 : 1;
+  const wt  = wingT  === undefined ? 0.5 : wingT;
+  const at  = alertT === undefined ? 0   : alertT;
 
-  // kropp
+  // kropp — elongerad (ca 3:1, svala-silhuett)
   g.lineStyle(0);
   g.beginFill(C.birdBody);
-  g.drawEllipse(0, 0, size * 0.68, size * 0.48);
+  g.drawEllipse(0, 0, size * 1.05, size * 0.34);
   g.endFill();
 
-  // vinge
-  g.beginFill(C.birdWing);
-  g.drawEllipse(sc * size * 0.1, size * 0.09, size * 0.44, size * 0.24);
-  g.endFill();
-
-  // huvud
+  // hals — synlig (Bills krav variant B)
   g.beginFill(C.birdBody);
-  g.drawCircle(-sc * size * 0.5, -size * 0.2, size * 0.33);
+  g.drawEllipse(-sc * size * 0.62, -size * 0.16, size * 0.26, size * 0.20);
+  g.endFill();
+
+  // huvud — vid alert dras det något mot mitten (vänds mot kameran)
+  const headX = -sc * size * (0.76 - at * 0.06);
+  const headY = -size * 0.22;
+  g.beginFill(C.birdBody);
+  g.drawCircle(headX, headY, size * 0.25);
   g.endFill();
 
   // öga
   g.beginFill(0x1c2620);
-  g.drawCircle(-sc * size * 0.56, -size * 0.29, size * 0.1);
+  g.drawCircle(headX - sc * size * 0.05, headY - size * 0.08, size * 0.08);
   g.endFill();
-  g.beginFill(0xffffff, 0.85);
-  g.drawCircle(-sc * size * 0.58, -size * 0.31, size * 0.04);
+  g.beginFill(0xffffff, 0.88);
+  g.drawCircle(headX - sc * size * 0.06, headY - size * 0.10, size * 0.033);
   g.endFill();
 
   // näbb
   g.lineStyle(0);
   g.beginFill(C.birdBeak);
-  g.moveTo(-sc * size * 0.79, -size * 0.21);
-  g.lineTo(-sc * size * 1.0,  -size * 0.14);
-  g.lineTo(-sc * size * 0.79, -size * 0.07);
+  g.moveTo(headX - sc * size * 0.24, headY - size * 0.04);
+  g.lineTo(headX - sc * size * 0.46, headY);
+  g.lineTo(headX - sc * size * 0.24, headY + size * 0.04);
   g.closePath();
   g.endFill();
 
-  // stjärt
+  // vinge — lång, bakåtsvepad; höjd varierar med wingT
+  const wingY = (wt - 0.5) * size * 0.28;
+  const wingH = size * (0.14 + Math.abs(wt - 0.5) * 0.10);
   g.beginFill(C.birdWing);
-  g.moveTo(sc * size * 0.6,  0);
-  g.lineTo(sc * size * 0.92, -size * 0.2);
-  g.lineTo(sc * size * 0.88,  size * 0.12);
+  g.drawEllipse(sc * size * 0.02, -size * 0.06 + wingY, size * 0.64, wingH);
+  g.endFill();
+
+  // stjärt — kluven (hussvala-karakteristisk)
+  g.beginFill(C.birdWing);
+  g.moveTo(sc * size * 0.82, -size * 0.02);
+  g.lineTo(sc * size * 1.22, -size * 0.30);
+  g.lineTo(sc * size * 0.95, -size * 0.06);
+  g.closePath();
+  g.endFill();
+
+  g.beginFill(C.birdWing);
+  g.moveTo(sc * size * 0.82,  size * 0.04);
+  g.lineTo(sc * size * 1.22,  size * 0.26);
+  g.lineTo(sc * size * 0.95,  size * 0.08);
   g.closePath();
   g.endFill();
 }
@@ -324,6 +344,11 @@ const state = {
   fagelBob: 0,
   fagelFaceLeft: false,
   fagelHopT: 0,          // 0–1 — hop-animation
+  fagelTillstand: 'idle',// 'idle' | 'fly' | 'alert'
+  fagelVingT: 0.5,       // 0=upp 0.5=vila 1=ned (fly_loop)
+  fagelAlertT: 0,        // 0–1 alert-pose (alert_in+out)
+  fagelAlertDir: 1,      // +1 in, -1 ut
+  fagelFlyTimer: 0,      // sekunder kvar i fly-tillståndet
   hallsIn: false,
   lastFjaderTid: 0,
   flyingFjadrar: [],     // { g, sx, sy, tx, ty, angle, col, len, t, started }
@@ -432,8 +457,12 @@ app.view.addEventListener('pointerdown', e => {
   }
   if (state.fagelVis) {
     const bx = sx - NX, by = sy - (NY - 24);
-    if (bx * bx + by * by < 40 * 40) {
-      state.fagelHopT = 0.01;
+    if (bx * bx + by * by < 50 * 50) {
+      // alert_in+out: snabb vändning mot kameran (150 ms in, 500 ms ut)
+      state.fagelTillstand = 'alert';
+      state.fagelAlertT    = 0;
+      state.fagelAlertDir  = 1;
+      state.fagelHopT      = 0.01;
     }
   }
 });
@@ -526,9 +555,11 @@ app.ticker.add((delta) => {
       : 0;
     drawEgg(eggGfx, state.aggCrack, wobble);
 
-    // Flash vid full kläckning
+    // Flash vid full kläckning — fågeln dyker upp i fly-tillstånd
     if (state.aggCrack >= 1 && !state.fagelVis) {
       state.fagelVis = true;
+      state.fagelTillstand = 'fly';
+      state.fagelFlyTimer  = 1.8;  // fly_loop i 1.8 s, sedan idle
       eggCont.alpha = 0;
       txtKlackt.text = 'Kläckt!';
       txtKlackt.alpha = 1;
@@ -543,25 +574,60 @@ app.ticker.add((delta) => {
     }
   }
 
-  // Fågel tonar in + bob + hop
+  // Fågel tonar in + tre animationstillstånd
   if (state.fagelVis) {
     state.fagelScale = Math.min(state.fagelScale + dt * 1.2, 1);
     const size = 24 * eo(state.fagelScale);
 
+    // hop (vid klick)
     if (state.fagelHopT > 0) {
       state.fagelHopT = Math.min(state.fagelHopT + dt * 4, 1);
       if (state.fagelHopT >= 1) state.fagelHopT = 0;
     }
     const hop = state.fagelHopT > 0 ? Math.sin(state.fagelHopT * Math.PI) * -18 : 0;
-    const bob = Math.sin(now * 0.0085) * 3.5;
 
-    state.fagelFaceLeft = Math.sin(now * 0.004) > 0;
-    birdCont.y = (NY - 24) + bob + hop;
+    if (state.fagelTillstand === 'fly') {
+      // fly_loop: vingslag 0.8 s cykel, fågeln svävar lite upp
+      state.fagelFlyTimer -= dt;
+      if (state.fagelFlyTimer <= 0) state.fagelTillstand = 'idle';
+
+      state.fagelVingT    = (Math.sin(now * 2 * Math.PI / 800) + 1) / 2;
+      state.fagelFaceLeft = false;
+      const liftY         = -12 * Math.sin(now * Math.PI / 900);  // mjuk svävning
+      birdCont.y          = (NY - 36) + liftY + hop;
+      birdCont.rotation   = 0;
+
+    } else if (state.fagelTillstand === 'alert') {
+      // alert_in+out: 150 ms in (ease-out), 500 ms ut
+      if (state.fagelAlertDir === 1) {
+        state.fagelAlertT += dt / 0.15;
+        if (state.fagelAlertT >= 1) { state.fagelAlertT = 1; state.fagelAlertDir = -1; }
+      } else {
+        state.fagelAlertT -= dt / 0.50;
+        if (state.fagelAlertT <= 0) {
+          state.fagelAlertT     = 0;
+          state.fagelTillstand  = 'idle';
+        }
+      }
+      state.fagelVingT    = 0.5;
+      state.fagelFaceLeft = Math.sin(now * 0.004) > 0;
+      const bob           = Math.sin(now * 0.0085) * 3.5;
+      birdCont.y          = (NY - 24) + bob + hop;
+      birdCont.rotation   = 0;
+
+    } else {
+      // idle_loop: mjuk pendling ±2° (3 s cykel), lugnt bob
+      state.fagelVingT    = 0.5;
+      state.fagelFaceLeft = Math.sin(now * 0.004) > 0;
+      const bob           = Math.sin(now * 0.0085) * 3.5;
+      birdCont.y          = (NY - 24) + bob + hop;
+      birdCont.rotation   = Math.sin(now * 2 * Math.PI / 3000) * 0.035;  // ±2°
+    }
+
     birdCont.alpha = eo(state.fagelScale);
-    drawBird(birdGfx, size, state.fagelFaceLeft);
+    drawBird(birdGfx, size, state.fagelFaceLeft, state.fagelVingT, state.fagelAlertT);
 
     if (size > 2) {
-      // Uppdatera nestGfx med lite mer färg vid nivå-upp
       txtNiva.text = `Nivå ${state.fjadrar >= state.maxFjadrar ? 4 : 3}`;
     }
   }
