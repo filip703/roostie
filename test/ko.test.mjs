@@ -34,3 +34,14 @@ test('inget svar → ingen siffra', () => {
   assert.equal(koSammanfattning(null), null)
   assert.equal(koSammanfattning({ error: 'x' }), null)
 })
+
+test('Sajts verkliga svarsform: skapad, alder_min, prio som text', () => {
+  const s = koSammanfattning({ antal: 9, rader: [
+    { id: 1, prio: 'P2', rubrik: 'a', skapad: '2026-09-28T18:48:05Z', alder_min: 3706 },
+    { id: 2, prio: 'P1', rubrik: 'b', skapad: '2026-09-30T18:07:31Z', alder_min: 867 },
+    { id: 3, prio: 'P2', rubrik: 'c', alder_min: 100 },
+  ] }, Date.parse('2026-10-01T08:34:00Z'))
+  assert.deepEqual(s.alla.map((r) => r.text), ['b', 'a', 'c'])
+  assert.equal(s.antal, 9)
+  assert.equal(s.alla[0].alder, '14 tim')
+})

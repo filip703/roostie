@@ -19,7 +19,7 @@ export const klarsprak = (rubrik) =>
     .trim()
 
 export const alderText = (r, nu = Date.now()) => {
-  const t = Date.parse(r?.created_at || r?.nar || '')
+  const t = Date.parse(r?.created_at || r?.skapad || r?.nar || '')
   const min = Number.isFinite(t) ? Math.max(0, Math.round((nu - t) / 60000)) : Number(r?.alder_min)
   if (!Number.isFinite(min)) return ''
   if (min < 60) return `${min} min`
@@ -28,10 +28,13 @@ export const alderText = (r, nu = Date.now()) => {
 }
 
 /** Sorterad kö: P0 först, äldst först inom samma prioritet. */
+const tidAv = (r) => {
+  const t = Date.parse(r?.created_at || r?.skapad || '')
+  return Number.isFinite(t) ? t : Date.now() - (Number(r?.alder_min) || 0) * 60000
+}
+
 export const sortera = (rader) =>
-  [...(Array.isArray(rader) ? rader : [])].sort(
-    (a, b) => prioAv(a) - prioAv(b) || Date.parse(a.created_at || 0) - Date.parse(b.created_at || 0),
-  )
+  [...(Array.isArray(rader) ? rader : [])].sort((a, b) => prioAv(a) - prioAv(b) || tidAv(a) - tidAv(b))
 
 export const koRad = (r, nu = Date.now(), langd = 60) => {
   const text = klarsprak(r.rubrik)
