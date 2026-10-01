@@ -1,6 +1,7 @@
 import { PRESETS, PLANETS_ORDER } from './hud-data.js'
 import { byggFlode } from './flode.js'
 import { koSammanfattning } from './ko.js'
+import { fragaUrl, fragaText } from './gorsjalv.js'
 import { PLANETS } from '../world/planet.js'
 import { TIMES, systemTimeOfDay } from '../world/sky.js'
 import { STATUS_LABEL } from '../game/colony.js'
@@ -1109,6 +1110,37 @@ export class Hud {
     this._hintTimer = setTimeout(() => el.classList.remove('on'), ms)
   }
 
+  /**
+   * Gör själv-korten (rad 1847 p.3): det som väntar på Filips händer, med Klart / Fråga / Senare.
+   * Ritas om vid varje poll; tom lista släcker panelen. Inte i köksläget — skärmen där är
+   * ingens händer.
+   */
+  visaGorSjalv(kort) {
+    const box = this.$('.gorsjalv')
+    if (!box) return
+    const lista = this.actions.kiosk ? [] : kort || []
+    box.hidden = lista.length === 0
+    box.innerHTML = lista.length
+      ? `<h3>Gör själv · ${lista.length}</h3>` +
+        lista
+          .map(
+            (k, i) => `<div class="gs-kort" data-i="${i}"><div class="gs-titel">${escapeHtml(k.titel || k.rubrik)}</div>
+      <div class="gs-rad"><button class="btn primary" data-v="klart">Klart</button><button class="btn" data-v="fraga">Fråga</button><button class="btn" data-v="senare">Senare</button></div></div>`
+          )
+          .join('')
+      : ''
+    box.onclick = (e) => {
+      const knapp = e.target.closest('button[data-v]')
+      const k = knapp && lista[Number(knapp.closest('.gs-kort').dataset.i)]
+      if (!k) return
+      if (knapp.dataset.v === 'fraga') {
+        navigator.clipboard?.writeText(fragaText(k)).catch(() => {})
+        window.open(fragaUrl(k), '_blank', 'noopener,noreferrer')
+        this.toast('Frågan är kopierad — klistra in i chatten')
+      } else this.actions.gorSjalv?.(knapp.dataset.v, k)
+    }
+  }
+
   toast(message, kind = '') {
     const el = document.createElement('div')
     el.className = `toast panel ${kind}`
@@ -1445,6 +1477,7 @@ const TEMPLATE = `
   </div>
 </div>
 
+<div class="gorsjalv panel" hidden></div>
 <div class="toasts"></div>
 <div class="fps panel"></div>
 <div class="hint-pill panel"></div>

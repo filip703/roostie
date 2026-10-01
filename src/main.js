@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { synligaKort, markeraKlart, markeraSenare } from './ui/gorsjalv.js'
 import './ui/styles.css'
 import { DEFAULT_PRESET, Settings, hasStoredSettings } from './core/settings.js'
 import { Engine } from './core/engine.js'
@@ -406,6 +407,14 @@ const skyltlager = new Skyltlager(app, () => ({
   let natt = false
   hud.actions.arPausad = (id) => pausade.has(String(id).replace(/^roost-loggbok:/, ''))
   hud.actions.kiosk = new URLSearchParams(location.search).get('kiosk') === '1'
+  hud.actions.gorSjalv = (typ, k) => {
+    if (k.id == null) return hud.toast('Raden saknar id — kan inte kvitteras', 'err')
+    const nytt = typ === 'klart' ? markeraKlart(gsLagrat(), k.id) : markeraSenare(gsLagrat(), k.id)
+    try { localStorage.setItem('roostie.gorsjalv', JSON.stringify(nytt)) } catch {}
+    visaGorSjalv()
+    if (typ === 'klart') hud.actions.skickaSvar?.('ledning', `Gör själv klart (rad ${k.id}): ${k.titel}`)
+    else hud.toast('Påminner i morgon 08:00')
+  }
   hud.actions.hamtaKo = (trad) => fetchKo(trad, hud.actions.kiosk).catch(() => null)
   hud.actions.styrPass = async (knapp) => {
     const trad = hud.selected?.thread?.id?.replace(/^roost-loggbok:/, '')
@@ -839,7 +848,7 @@ async function poll() {
     // Billboarden och maskinparken hämtas i samma varv, men får inte kunna fälla pollen:
     // astronauterna är det viktiga, de två andra är utsikt.
     fetchTavlan()
-      .then((t) => colony.setTavla(t))
+      .then((t) => { colony.setTavla(t); visaGorSjalv(t) })
       // Tavlan får inte fälla astronauterna, men ett tomt catch är hur något kan vara trasigt
       // i timmar utan att någon vet. Felet loggas, och syns i felfällan med ?debug=1.
       .catch((e) => console.error('[roostie] tavlan:', e))
@@ -864,6 +873,14 @@ async function poll() {
   } finally {
     polling = false
   }
+}
+
+/** Gör själv-korten: kvittering och "senare" bor i webbläsaren (localStorage), inte på tavlan. */
+let gsTavla = null
+const gsLagrat = () => { try { return JSON.parse(localStorage.getItem('roostie.gorsjalv') || '{}') } catch { return {} } }
+function visaGorSjalv(t = gsTavla) {
+  gsTavla = t
+  hud.visaGorSjalv(synligaKort(t?.filip, gsLagrat()))
 }
 
 function queueSave() {

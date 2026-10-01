@@ -516,6 +516,7 @@ export async function senasteRader(antal = 40) {
   if (!rader) return { rader: [], vantar: [], fel: cache.fel }
   const alla = rader
     .map((r) => ({
+      id: Number.isInteger(r?.id) ? r.id : undefined,
       trad: String(r?.trad || '').trim().toLowerCase(),
       fas: String(r?.fas || ''),
       rubrik: text(r?.rubrik, 180),
@@ -550,7 +551,7 @@ export async function senasteRader(antal = 40) {
   const stangt = stangtFore(alla)
   const filip = alla
     .filter((r) => r.fas === 'notis' && ARTILLFILIP(r.rubrik) && r.nar > stangt)
-    .map((r) => ({ trad: r.trad, rubrik: r.rubrik, text: r.text, nar: r.nar }))
+    .map((r) => ({ id: r.id, trad: r.trad, rubrik: r.rubrik, text: r.text, nar: r.nar }))
 
   return {
     rader: alla.slice(0, Math.max(1, Math.min(60, antal))),
