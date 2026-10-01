@@ -17,6 +17,7 @@ import {
   fetchThreads,
   fetchTavlan,
   styrPass,
+  fetchKo,
   fetchMaskiner,
   fetchPuls,
   fetchState,
@@ -405,6 +406,7 @@ const skyltlager = new Skyltlager(app, () => ({
   let natt = false
   hud.actions.arPausad = (id) => pausade.has(String(id).replace(/^roost-loggbok:/, ''))
   hud.actions.kiosk = new URLSearchParams(location.search).get('kiosk') === '1'
+  hud.actions.hamtaKo = (trad) => fetchKo(trad, hud.actions.kiosk).catch(() => null)
   hud.actions.styrPass = async (knapp) => {
     const trad = hud.selected?.thread?.id?.replace(/^roost-loggbok:/, '')
     if (!trad) return

@@ -1,5 +1,6 @@
 import { PRESETS, PLANETS_ORDER } from './hud-data.js'
 import { byggFlode } from './flode.js'
+import { koSammanfattning } from './ko.js'
 import { PLANETS } from '../world/planet.js'
 import { TIMES, systemTimeOfDay } from '../world/sky.js'
 import { STATUS_LABEL } from '../game/colony.js'
@@ -960,6 +961,27 @@ export class Hud {
     this.$('#btn-pass-pausa').textContent = this.actions.arPausad?.(thread.id) ? 'Återuppta' : 'Pausa'
     // Knapparna hör till Roost-trådar (id roost-loggbok:<tråd>) och syns inte i köksläget.
     this.$('.thread-pop .pass').hidden = !thread.id?.startsWith('roost-loggbok:') || this.actions.kiosk
+    this.visaKo(thread)
+  }
+
+  /** Kön under raden: hämtas en gång per val, och bara om svaret hör till samma tråd när det kommer. */
+  async visaKo(thread) {
+    const ko = this.$('.thread-pop .ko')
+    const trad = thread.id?.startsWith('roost-loggbok:') ? thread.id.replace(/^roost-loggbok:/, '') : null
+    ko.hidden = true
+    if (!trad || !this.actions.hamtaKo) return
+    const s = koSammanfattning(await this.actions.hamtaKo(trad))
+    if (!s || this.selected?.thread?.id !== thread.id) return
+    const rad = (r) => `<li><b class="p${r.prio[1]}">${r.prio}</b> ${escapeHtml(r.text)}<i>${escapeHtml(r.alder)}</i></li>`
+    const lista = this.$('.thread-pop .ko-lista')
+    const knapp = this.$('.thread-pop .ko-rubrik')
+    knapp.textContent = s.antal === 0 ? 'Kön är tom' : `Kö: ${s.antal} öppna`
+    const rita = (alla) => { lista.innerHTML = (alla ? s.alla : s.topp).map(rad).join('') }
+    let alla = false
+    rita(alla)
+    knapp.onclick = () => { alla = !alla; rita(alla) }
+    ko.hidden = false
+    this._cardSize = { w: this.$('.thread-pop').offsetWidth, h: this.$('.thread-pop').offsetHeight }
   }
 
   /**
@@ -1404,6 +1426,11 @@ const TEMPLATE = `
   <!-- Vad tråden senast skrev på tavlan, och framför allt vad den ber om när den håller upp
        handen: ett ? man måste öppna chatten för att förstå är bara en prick. -->
   <div class="rad"></div>
+  <!-- Kön (rad 1850): antal öppna rader + topp 3, tryck → hela kön. Tom om Sajts API inte svarar. -->
+  <div class="ko" hidden>
+    <button class="ko-rubrik" type="button"></button>
+    <ol class="ko-lista"></ol>
+  </div>
   <!-- Passtyrning (rad 1882): bara i admin-läge, aldrig i köksläget. -->
   <div class="pass" hidden>
     <button class="btn" id="btn-pass-starta" title="Starta ett pass för tråden nu — inom 5 minuter">Starta nu</button>

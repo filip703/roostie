@@ -1886,6 +1886,14 @@ kbd {
 .teckenforklaring .tf-vippa { float: right; background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; min-height: 32px; }
 .teckenforklaring.dold .tf-kropp { display: none; }
 
+/* Kön på trådkortet (rad 1850): en rubrikrad som öppnar listan. Syns även i köksläget (bara läsning). */
+.thread-pop .ko[hidden] { display: none; }
+.thread-pop .ko-rubrik { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; min-height: 28px; }
+.thread-pop .ko-lista { list-style: none; margin: 2px 0 0; padding: 0; max-height: 180px; overflow: auto; font-size: 12px; }
+.thread-pop .ko-lista li { display: flex; gap: 6px; padding: 2px 0; }
+.thread-pop .ko-lista i { margin-left: auto; font-style: normal; color: var(--muted); white-space: nowrap; }
+.thread-pop .ko-lista b.p0 { color: #d9534f; }
+
 /* Passtyrning på trådkortet (rad 1882): fyra små knappar, bara för admin. */
 .thread-pop .pass {
   display: grid;
