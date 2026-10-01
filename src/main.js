@@ -26,6 +26,7 @@ import {
   sendSvar,
   revealFolder,
 } from './game/api.js'
+import { Skyltlager } from './ui/skyltlager.js'
 import { hideProject, hiddenCatalog, unhideProject } from './game/hidden-projects.js'
 
 /**
@@ -390,6 +391,14 @@ const actions = {
 }
 
 const hud = new Hud(app, settings, actions)
+// Skylten över varje Roost-astronaut + gruppmarkeringarna (rad 1814).
+const skyltlager = new Skyltlager(app, () => ({
+  agenter: colony.astronauts.agents,
+  tradar: colony.threads,
+  kamera: engine.camera,
+  vy: engine.viewport,
+  pausade: { has: (id) => Boolean(hud.actions.arPausad?.(id)) },
+}))
 // Passtyrning (rad 1882): knapparna på trådkortet. Pausa växlar mot Återuppta efter varje tryck.
 {
   const pausade = new Set()
@@ -1112,6 +1121,7 @@ engine.add({
       if (!agent) select(null, {})
       else hud.placeCard(screenOf(agent))
     }
+    skyltlager.update(statusFor)
     hud.setFps(engine.perf, engine.viewport, `${colony.astronauts.visibleCount} crew · ${colony.particles.liveCount} bits`)
   },
 })

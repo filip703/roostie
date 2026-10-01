@@ -1903,3 +1903,51 @@ kbd {
   padding: 0 4px;
   font-size: 12px;
 }
+
+/* Skyltlagret (rad 1814): skylten över varje Roost-astronaut och gruppmarkeringarna i marken.
+   Syns även i köksläget och när HUD:en är dold — det är kolonins egen text, inte chrome. */
+.skyltlager {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+}
+.skyltlager .skylt {
+  position: absolute;
+  left: 0;
+  top: 0;
+  white-space: nowrap;
+  padding: 5px 11px;
+  border-radius: 8px;
+  background: rgba(20, 21, 27, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 13px;
+  color: var(--text);
+  will-change: transform;
+}
+.skyltlager .skylt.vantar {
+  color: var(--amber);
+  border-color: var(--amber);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.skyltlager .gruppmarke {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  border: 1px dashed rgba(242, 240, 236, 0.14);
+  background: radial-gradient(closest-side, rgba(242, 240, 236, 0.05), transparent);
+}
+.skyltlager .gruppnamn {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(242, 240, 236, 0.34);
+}
