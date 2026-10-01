@@ -16,6 +16,7 @@ import { TIMES } from './world/sky.js'
 import {
   fetchThreads,
   fetchTavlan,
+  styrPass,
   fetchMaskiner,
   fetchPuls,
   fetchState,
@@ -389,6 +390,42 @@ const actions = {
 }
 
 const hud = new Hud(app, settings, actions)
+// Passtyrning (rad 1882): knapparna på trådkortet. Pausa växlar mot Återuppta efter varje tryck.
+{
+  const pausade = new Set()
+  let natt = false
+  hud.actions.arPausad = (id) => pausade.has(String(id).replace(/^roost-loggbok:/, ''))
+  hud.actions.kiosk = new URLSearchParams(location.search).get('kiosk') === '1'
+  hud.actions.styrPass = async (knapp) => {
+    const trad = hud.selected?.thread?.id?.replace(/^roost-loggbok:/, '')
+    if (!trad) return
+    let typ = knapp
+    let varde = null
+    if (knapp === 'pausa' && pausade.has(trad)) typ = 'aterupptag'
+    if (knapp === 'nattlage') varde = natt ? 'av' : 'pa'
+    if (knapp === 'budget') {
+      const svar = globalThis.prompt(`Hur många pass per dag för ${trad}?`, '6')
+      if (svar == null) return
+      varde = String(Math.max(0, Math.floor(Number(svar) || 0)))
+    }
+    try {
+      await styrPass(trad, typ, varde)
+      if (knapp === 'pausa') pausade[typ === 'pausa' ? 'add' : 'delete'](trad)
+      if (knapp === 'nattlage') natt = !natt
+      const text = {
+        starta: `${trad} startar inom 5 minuter`,
+        pausa: `${trad} pausad`,
+        aterupptag: `${trad} återupptas`,
+        budget: `${trad}: ${varde} pass per dag`,
+        nattlage: `Nattläge ${natt ? 'på' : 'av'}`,
+      }[typ]
+      hud.toast(text)
+      if (knapp === 'pausa') hud.$('#btn-pass-pausa').textContent = typ === 'pausa' ? 'Återuppta' : 'Pausa'
+    } catch (err) {
+      hud.toast(`Gick inte: ${err.message}`)
+    }
+  }
+}
 // Rundtur första gången + teckenförklaring (rad 1813). Köksskärmen startar ingen rundtur själv.
 const forklaring = new Forklaring(app, globalThis.localStorage, {
   kiosk: new URLSearchParams(location.search).get('kiosk') === '1',

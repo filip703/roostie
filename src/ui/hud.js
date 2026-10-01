@@ -366,6 +366,10 @@ export class Hud {
     on('#btn-time', 'click', () => this.actions.cycleTime?.())
     on('#btn-open', 'click', () => this.actions.openThread?.())
     on('#btn-viewed', 'click', () => this.actions.markViewed?.())
+    on('#btn-pass-starta', 'click', () => this.actions.styrPass?.('starta'))
+    on('#btn-pass-pausa', 'click', () => this.actions.styrPass?.('pausa'))
+    on('#btn-pass-budget', 'click', () => this.actions.styrPass?.('budget'))
+    on('#btn-pass-natt', 'click', () => this.actions.styrPass?.('nattlage'))
     on('#btn-archive', 'click', () => this.actions.archiveThread?.())
     on('#btn-deselect', 'click', () => this.actions.select?.(null))
     on('#btn-hide-project', 'click', () => this.actions.hideProject?.())
@@ -953,6 +957,9 @@ export class Hud {
     // crowd the two that are always worth having, and "Viewed" on a thread that is not asking
     // for anything is a control with no effect.
     this.$('#btn-viewed').hidden = !thread.unread
+    this.$('#btn-pass-pausa').textContent = this.actions.arPausad?.(thread.id) ? 'Återuppta' : 'Pausa'
+    // Knapparna hör till Roost-trådar (id roost-loggbok:<tråd>) och syns inte i köksläget.
+    this.$('.thread-pop .pass').hidden = !thread.id?.startsWith('roost-loggbok:') || this.actions.kiosk
   }
 
   /**
@@ -1397,6 +1404,13 @@ const TEMPLATE = `
   <!-- Vad tråden senast skrev på tavlan, och framför allt vad den ber om när den håller upp
        handen: ett ? man måste öppna chatten för att förstå är bara en prick. -->
   <div class="rad"></div>
+  <!-- Passtyrning (rad 1882): bara i admin-läge, aldrig i köksläget. -->
+  <div class="pass" hidden>
+    <button class="btn" id="btn-pass-starta" title="Starta ett pass för tråden nu — inom 5 minuter">Starta nu</button>
+    <button class="btn" id="btn-pass-pausa" title="Pausa trådens pass">Pausa</button>
+    <button class="btn" id="btn-pass-budget" title="Hur många pass tråden får köra per dag">Budget</button>
+    <button class="btn" id="btn-pass-natt" title="Nattläge för alla trådar">Nattläge</button>
+  </div>
   <div class="pair">
     <button class="btn primary" id="btn-open" title="Open this thread in the harness it came from (Enter)">${ICON.open} Open</button>
     <button class="btn" id="btn-viewed" title="Sluta be om dig tills tråden gjort något nytt (V)">${ICON.eye} Sedd</button>

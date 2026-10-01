@@ -22,6 +22,9 @@ export const fetchTavlan = () => req('/api/tavlan')
 /** Roosts lasvag: agenternas puls, kommandokon och barnens skarmtid. */
 export const fetchPuls = () => req('/api/puls')
 
+/** Passtyrning: Starta nu / Pausa / Budget / Nattläge (rad 1882). Bara admin. */
+export const styrPass = (trad, typ, varde = null) => post('/api/passtyrning', { trad, typ, varde })
+
 /** NUC:ens containrar, som maskinparken ritar. */
 export const fetchMaskiner = () => req('/api/maskiner')
 

@@ -1885,3 +1885,21 @@ kbd {
 .teckenforklaring p { margin: 0; color: var(--muted); }
 .teckenforklaring .tf-vippa { float: right; background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; text-decoration: underline; min-height: 32px; }
 .teckenforklaring.dold .tf-kropp { display: none; }
+
+/* Passtyrning på trådkortet (rad 1882): fyra små knappar, bara för admin. */
+.thread-pop .pass {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.thread-pop .pass[hidden] {
+  display: none;
+}
+
+.thread-pop .pass .btn {
+  min-width: 0;
+  height: 30px;
+  padding: 0 4px;
+  font-size: 12px;
+}
