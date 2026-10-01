@@ -1034,7 +1034,8 @@ async function boot() {
   }
 
   if (!localStorage.getItem('botcrossing.seen-help')) {
-    hud.toggleHelp(true)
+    // Rundturen tar första gången; den gamla hjälpen ska inte ligga ovanpå (rad 1813).
+    if (forklaring.tur.hidden) hud.toggleHelp(true)
     localStorage.setItem('botcrossing.seen-help', '1')
   } else {
     hud.hint('Dra för att flytta · klicka på en tråd · H gömmer allt', 5200)
