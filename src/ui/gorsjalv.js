@@ -47,3 +47,18 @@ export const markeraKlart = (lagrat, id, nu = Date.now()) => ({
 export const markeraSenare = (lagrat, id, nu = Date.now()) => ({
   ...lagrat, senare: { ...(lagrat?.senare || {}), [id]: imorgonAtta(nu) },
 })
+
+/** Radens id ur ?rad=N (länk från ntfy/mejl, rad 2173) — null om det inte är ett heltal. */
+export const radFranUrl = (search = '') => {
+  const v = new URLSearchParams(search).get('rad')
+  return /^\d+$/.test(v || '') ? Number(v) : null
+}
+
+/** Kortet länken pekar på kommer först och markeras; en uttryckligen öppnad rad glöms inte bort av "Senare". */
+export const medFokus = (filip, lagrat, rad, nu = Date.now()) => {
+  const kort = synligaKort(filip, lagrat, nu)
+  if (rad == null) return kort
+  const direkt = (Array.isArray(filip) ? filip : []).find((p) => p.id === rad && arGorSjalv(p) && !lagrat?.klart?.[rad])
+  if (!direkt) return kort
+  return [{ ...direkt, titel: kortTitel(direkt), fokus: true }, ...kort.filter((k) => k.id !== rad)]
+}

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { arGorSjalv, kortTitel, fragaUrl, synligaKort, markeraKlart, markeraSenare, imorgonAtta } from '../src/ui/gorsjalv.js'
+import { arGorSjalv, kortTitel, fragaUrl, synligaKort, markeraKlart, markeraSenare, imorgonAtta, radFranUrl, medFokus } from '../src/ui/gorsjalv.js'
 
 const NU = new Date(2026, 9, 1, 12, 0, 0).getTime()
 const p = (id, rubrik, text = '') => ({ id, trad: 'nexus', rubrik, text, nar: NU })
@@ -34,4 +34,20 @@ test('Klart döljer kortet, Senare döljer till 08:00 nästa morgon', () => {
 test('före 08:00 räknas samma dags 08:00', () => {
   const tidigt = new Date(2026, 9, 1, 6, 0, 0).getTime()
   assert.equal(new Date(imorgonAtta(tidigt)).getDate(), 1)
+})
+
+test('?rad=N: heltal eller null', () => {
+  assert.equal(radFranUrl('?rad=2174'), 2174)
+  assert.equal(radFranUrl('?rad=abc'), null)
+  assert.equal(radFranUrl(''), null)
+})
+
+test('radens kort kommer först och överlever Senare', () => {
+  const filip = [p(1, 'TILL FILIP: Gör själv: a'), p(2, 'TILL FILIP: Gör själv: b')]
+  const lagrat = { senare: { 2: NU + 1e6 } }
+  assert.deepEqual(medFokus(filip, lagrat, null, NU).map((k) => k.id), [1])
+  const m = medFokus(filip, lagrat, 2, NU)
+  assert.deepEqual(m.map((k) => k.id), [2, 1])
+  assert.equal(m[0].fokus, true)
+  assert.deepEqual(medFokus(filip, { klart: { 2: NU } }, 2, NU).map((k) => k.id), [1])
 })

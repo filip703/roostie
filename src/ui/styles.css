@@ -1964,6 +1964,7 @@ kbd {
 .gorsjalv { position: absolute; left: 14px; bottom: 14px; width: 300px; max-height: 60vh; overflow: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .gorsjalv[hidden] { display: none; }
 .gorsjalv h3 { margin: 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.gs-kort.fokus { outline: 2px solid #f5c542; outline-offset: 4px; border-radius: 6px; }
 .gs-kort { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
 .gs-titel { font-size: 13px; line-height: 1.35; }
 .gs-rad { display: flex; gap: 6px; }

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { synligaKort, markeraKlart, markeraSenare } from './ui/gorsjalv.js'
+import { medFokus, radFranUrl, markeraKlart, markeraSenare } from './ui/gorsjalv.js'
 import './ui/styles.css'
 import { DEFAULT_PRESET, Settings, hasStoredSettings } from './core/settings.js'
 import { Engine } from './core/engine.js'
@@ -880,7 +880,7 @@ let gsTavla = null
 const gsLagrat = () => { try { return JSON.parse(localStorage.getItem('roostie.gorsjalv') || '{}') } catch { return {} } }
 function visaGorSjalv(t = gsTavla) {
   gsTavla = t
-  hud.visaGorSjalv(synligaKort(t?.filip, gsLagrat()))
+  hud.visaGorSjalv(medFokus(t?.filip, gsLagrat(), radFranUrl(location.search)))
 }
 
 function queueSave() {

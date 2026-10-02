@@ -1124,7 +1124,7 @@ export class Hud {
       ? `<h3>Gör själv · ${lista.length}</h3>` +
         lista
           .map(
-            (k, i) => `<div class="gs-kort" data-i="${i}"><div class="gs-titel">${escapeHtml(k.titel || k.rubrik)}</div>
+            (k, i) => `<div class="gs-kort${k.fokus ? ' fokus' : ''}" data-i="${i}"><div class="gs-titel">${escapeHtml(k.titel || k.rubrik)}</div>
       <div class="gs-rad"><button class="btn primary" data-v="klart">Klart</button><button class="btn" data-v="fraga">Fråga</button><button class="btn" data-v="senare">Senare</button></div></div>`
           )
           .join('')
