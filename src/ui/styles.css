@@ -1985,4 +1985,4 @@ kbd {
 
 :root { --tf-h: 112px; }
 :root:has(.tavelflode.kompakt) { --tf-h: 96px; }
-.hud { bottom: var(--tf-h, 0); }
+.teckenforklaring { bottom: calc(var(--tf-h) + 12px); }
