@@ -6,10 +6,12 @@
   "start_url": "https://kolonin.roost.love/?fran=pwa",
   "scope": "https://kolonin.roost.love/",
   "display": "standalone",
-  "background_color": "#0b0f1a",
-  "theme_color": "#0b0f1a",
+  "background_color": "#f6efe2",
+  "theme_color": "#0e5f73",
   "icons": [
-    { "src": "/assets/pwa/roost-pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/assets/pwa/roost-pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    { "src": "/assets/pwa/kolonin-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/pwa/kolonin-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/pwa/kolonin-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/pwa/kolonin-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
