@@ -9,7 +9,7 @@
  * API-rutter (/api/*) och statiska assets (/assets/*) körs utan middleware.
  */
 export const config = {
-  matcher: ['/((?!api/|assets/|public/|_vercel).*)'],
+  matcher: ['/((?!api/|assets/|public/|_vercel|manifest.webmanifest).*)'],
 }
 
 export default function middleware(request) {
