@@ -29,6 +29,7 @@ import {
   revealFolder,
 } from './game/api.js'
 import { Skyltlager } from './ui/skyltlager.js'
+import { monteraTavelflode } from './ui/tavelflode-dom.js'
 import { hideProject, hiddenCatalog, unhideProject } from './game/hidden-projects.js'
 
 /**
@@ -393,6 +394,7 @@ const actions = {
 }
 
 const hud = new Hud(app, settings, actions)
+const tavelflode = monteraTavelflode(app, { kiosk: new URLSearchParams(location.search).get('kiosk') === '1' })
 // Skylten över varje Roost-astronaut + gruppmarkeringarna (rad 1814).
 const skyltlager = new Skyltlager(app, () => ({
   agenter: colony.astronauts.agents,
@@ -848,7 +850,7 @@ async function poll() {
     // Billboarden och maskinparken hämtas i samma varv, men får inte kunna fälla pollen:
     // astronauterna är det viktiga, de två andra är utsikt.
     fetchTavlan()
-      .then((t) => { colony.setTavla(t); visaGorSjalv(t) })
+      .then((t) => { colony.setTavla(t); visaGorSjalv(t); tavelflode.uppdatera(t) })
       // Tavlan får inte fälla astronauterna, men ett tomt catch är hur något kan vara trasigt
       // i timmar utan att någon vet. Felet loggas, och syns i felfällan med ?debug=1.
       .catch((e) => console.error('[roostie] tavlan:', e))

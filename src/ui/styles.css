@@ -1968,3 +1968,17 @@ kbd {
 .gs-kort { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.08); }
 .gs-titel { font-size: 13px; line-height: 1.35; }
 .gs-rad { display: flex; gap: 6px; }
+
+/* Tavelflödet (rad 2362): live-ticker längst ned. */
+.tavelflode { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; gap: 8px; align-items: flex-start; padding: 6px 10px; background: var(--panel); backdrop-filter: blur(8px); font-size: 12px; max-height: 22vh; overflow: hidden auto; pointer-events: auto; }
+.tavelflode .tf-paus { flex: none; background: none; border: 1px solid rgba(255,255,255,.2); color: inherit; border-radius: 6px; padding: 2px 7px; cursor: pointer; }
+.tavelflode .tf-lista { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; }
+.tavelflode .tf-rad { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.6; border-left: 3px solid #888; padding-left: 8px; }
+.tavelflode .tf-rad a { color: inherit; text-decoration: none; }
+.tavelflode .tf-tid { opacity: .6; font-variant-numeric: tabular-nums; }
+.tavelflode .tf-rad.borjar { border-color: #8a8d96; }
+.tavelflode .tf-rad.klart { border-color: #5aa469; }
+.tavelflode .tf-rad.stoppat { border-color: #d8b441; }
+.tavelflode .tf-rad.filip { border-color: #d65a52; }
+.tavelflode.kompakt { max-height: none; font-size: 15px; }
+.tavelflode.pausad { opacity: .75; }
