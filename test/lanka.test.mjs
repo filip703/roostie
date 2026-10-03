@@ -31,3 +31,8 @@ test('tom eller saknad text', () => {
   assert.equal(lankifiera(null), '')
   assert.equal(lankifiera(''), '')
 })
+
+test('bart https:// utan värd blir ingen länk', () => {
+  assert.doesNotMatch(lankifiera('alla URL:er — https://, roost.love/x'), /href="https:\/\/"/)
+  assert.match(lankifiera('alla URL:er — https://, roost.love/x'), /href="https:\/\/roost\.love\/x"/)
+})

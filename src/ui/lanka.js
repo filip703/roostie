@@ -20,8 +20,12 @@ export function lankifiera(text) {
   let sist = 0
   for (const m of s.matchAll(MONSTER)) {
     ut += esc(s.slice(sist, m.index))
-    if (m[1]) {
-      const url = m[1].replace(SLUT, '')
+    const url = m[1] ? m[1].replace(SLUT, '') : ''
+    if (m[1] && /^https?:\/\/?$/.test(url)) {
+      // "https://," är ett ord om adresser, inte en adress.
+      ut += esc(s.slice(m.index, m.index + m[0].length))
+      sist = m.index + m[0].length
+    } else if (m[1]) {
       const href = /^https?:/.test(url) ? url : `https://${url}`
       const bild = BILD.test(url) ? ' data-bild="1"' : ''
       ut += `<a class="lank" href="${esc(href)}" target="_blank" rel="noopener"${bild}>${esc(url)}</a>`
