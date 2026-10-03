@@ -1986,3 +1986,17 @@ kbd {
 :root { --tf-h: 112px; }
 :root:has(.tavelflode.kompakt) { --tf-h: 96px; }
 .teckenforklaring { bottom: calc(var(--tf-h) + 12px); }
+
+/* Länkar och markerbar text (rad 2457). Bara astronauterna och scenen är låsta; texten i
+   korten, djupläget och flödet går att markera och kopiera. */
+.side, .thread-pop, .gorsjalv, .tavelflode, .tf-rub { user-select: text; -webkit-user-select: text; }
+.side button, .thread-pop button, .gorsjalv button, .tavelflode button { user-select: none; -webkit-user-select: none; }
+a.lank { color: #9cc4ff; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; -webkit-touch-callout: default; }
+a.lank:hover { color: #c8defe; }
+.tavelflode .tf-rub a.lank { text-decoration: underline; }
+.tavelflode .tf-rad a:not(.lank):hover { text-decoration: underline; }
+.bild-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.82); cursor: zoom-out; pointer-events: auto; }
+.bild-overlay img { max-width: 94vw; max-height: 94vh; border-radius: 8px; }
+.kopiera-meny { position: fixed; z-index: 101; display: flex; gap: 4px; padding: 4px; background: var(--panel-solid); border: 1px solid rgba(255,255,255,.2); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.4); pointer-events: auto; }
+.kopiera-meny button { background: none; border: 0; color: inherit; font: inherit; font-size: 14px; padding: 10px 12px; min-height: 44px; border-radius: 8px; cursor: pointer; }
+.kopiera-meny button:active { background: rgba(255,255,255,.12); }

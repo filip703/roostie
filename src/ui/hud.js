@@ -1,6 +1,8 @@
 import { PRESETS, PLANETS_ORDER } from './hud-data.js'
 import { byggFlode } from './flode.js'
 import { koSammanfattning } from './ko.js'
+import { lankifiera } from './lanka.js'
+import { installeraLankhjalp } from './lankhjalp.js'
 import { fragaUrl, fragaText } from './gorsjalv.js'
 import { PLANETS } from '../world/planet.js'
 import { TIMES, systemTimeOfDay } from '../world/sky.js'
@@ -73,6 +75,7 @@ export class Hud {
     this.el.className = 'hud'
     this.el.innerHTML = TEMPLATE
     root.appendChild(this.el)
+    installeraLankhjalp(this.el)
 
     this.$ = (sel) => this.el.querySelector(sel)
 
@@ -655,8 +658,8 @@ export class Hud {
       ? repliker
           .map((r) => {
             if (r.avdelare) return `<div class="dag">${escapeHtml(r.avdelare)}</div>`
-            const kropp = r.text && r.text !== r.rubrik ? `<div class="txt">${escapeHtml(r.text)}</div>` : ''
-            const rub = r.rubrik ? `<div class="rub">${escapeHtml(r.rubrik)}</div>` : ''
+            const kropp = r.text && r.text !== r.rubrik ? `<div class="txt">${lankifiera(r.text)}</div>` : ''
+            const rub = r.rubrik ? `<div class="rub">${lankifiera(r.rubrik)}</div>` : ''
             const meta = [r.min ? 'Du' : thread.title || trad, klockan(r.nar), r.langd, LAGE[r.fas] || '']
               .filter(Boolean)
               .map((x) => `<span>${escapeHtml(x)}</span>`)
@@ -943,7 +946,7 @@ export class Hud {
     // Raden under mätaren: frågan när tråden vinkar, annars det den senast skrev.
     const rad = this.$('.thread-pop .rad')
     const text = thread.notis ? `${thread.notis}${thread.notisText ? ` — ${thread.notisText}` : ''}` : thread.preview || ''
-    rad.textContent = text
+    rad.innerHTML = lankifiera(text)
     rad.classList.toggle('vantar', Boolean(thread.notis))
     rad.hidden = !text
 
@@ -1124,7 +1127,7 @@ export class Hud {
       ? `<h3>Gör själv · ${lista.length}</h3>` +
         lista
           .map(
-            (k, i) => `<div class="gs-kort${k.fokus ? ' fokus' : ''}" data-i="${i}"><div class="gs-titel">${escapeHtml(k.titel || k.rubrik)}</div>
+            (k, i) => `<div class="gs-kort${k.fokus ? ' fokus' : ''}" data-i="${i}"><div class="gs-titel">${lankifiera(k.titel || k.rubrik)}</div>
       <div class="gs-rad"><button class="btn primary" data-v="klart">Klart</button><button class="btn" data-v="fraga">Fråga</button><button class="btn" data-v="senare">Senare</button></div></div>`
           )
           .join('')

@@ -1,3 +1,4 @@
+import { lankifiera } from './lanka.js'
 import { flodesrader, klockslag, radUrl } from './tavelflode.js'
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
@@ -20,7 +21,7 @@ export function monteraTavelflode(root, { kiosk = false } = {}) {
   const rita = () => {
     const rader = flodesrader(senaste, antal)
     lista.innerHTML = rader.length
-      ? rader.map((r) => `<li class="tf-rad ${r.klass}"><a href="${esc(radUrl(r))}" target="_blank" rel="noopener"><span class="tf-tid">${klockslag(r.nar)}</span> <b class="tf-namn">${esc(r.trad)}</b> <span class="tf-rub">${esc(r.rubrik)}</span></a></li>`).join('')
+      ? rader.map((r) => `<li class="tf-rad ${r.klass}"><a href="${esc(radUrl(r))}" target="_blank" rel="noopener"><span class="tf-tid">${klockslag(r.nar)}</span> <b class="tf-namn">${esc(r.trad)}</b></a> <span class="tf-rub">${lankifiera(r.rubrik)}</span></li>`).join('')
       : '<li class="tf-rad notis">Inget på tavlan just nu</li>'
   }
   paus.addEventListener('click', () => {
